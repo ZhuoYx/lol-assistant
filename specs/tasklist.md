@@ -86,7 +86,7 @@ Task 1 (项目初始化)
   - **依赖:** Task 3（可与 Task 4 并行开发）
   - 参考：设计文档 - 第三方数据爬取模块设计 / 5.1 爬取数据存储方案
 
-- [ ] 4. IPC 通信、缓存与 Preload 实现
+- [x] 4. IPC 通信、缓存与 Preload 实现 ✅
   - 创建 IPC 处理器注册模块及各处理器（connection、summoner、match、rank、cache、live-game、scraper、window、updater、log、app）
   - 实现 WebSocket 事件转发 IPC 通道（lcu:subscribe、lcu:unsubscribe、lcu:event）
   - 实现缓存存储模块 src/main/cache/store.ts（electron-store，含缓存总大小 50MB 上限控制、LRU 淘汰，仅用于 LCU 数据缓存）

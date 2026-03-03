@@ -1,45 +1,65 @@
+/**
+ * Preload 脚本
+ *
+ * 通过 contextBridge 安全暴露 IPC API 给渲染进程
+ * 所有事件监听器均返回 unsubscribe 函数，防止内存泄漏
+ */
 import { contextBridge, ipcRenderer } from 'electron';
 
-// 暴露给渲染进程的 API（占位，Task 4 中完整实现）
+/**
+ * 创建安全的事件监听器，返回 unsubscribe 函数
+ * 使用具体的 listener 引用确保精确移除，而非 removeAllListeners
+ */
+function createEventListener<T>(
+  channel: string,
+  callback: (data: T) => void,
+): () => void {
+  const listener = (_event: Electron.IpcRendererEvent, data: T): void => {
+    callback(data);
+  };
+  ipcRenderer.on(channel, listener);
+  return () => {
+    ipcRenderer.removeListener(channel, listener);
+  };
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
-  // LCU 连接
+  // ─── LCU 连接 ──────────────────────────────────────────
   lcuConnect: () => ipcRenderer.invoke('lcu:connect'),
   lcuDisconnect: () => ipcRenderer.invoke('lcu:disconnect'),
   lcuGetStatus: () => ipcRenderer.invoke('lcu:status'),
 
-  // 召唤师
+  // ─── 召唤师 ────────────────────────────────────────────
   getCurrentSummoner: () => ipcRenderer.invoke('summoner:getCurrent'),
   getSummonerById: (puuid: string) => ipcRenderer.invoke('summoner:getById', puuid),
 
-  // 战绩
+  // ─── 战绩 ──────────────────────────────────────────────
   getMatchList: (params: object) => ipcRenderer.invoke('match:getList', params),
   getMatchDetail: (gameId: number) => ipcRenderer.invoke('match:getDetail', gameId),
 
-  // 排位
+  // ─── 排位 ──────────────────────────────────────────────
   getRankStats: (puuid: string) => ipcRenderer.invoke('rank:getStats', puuid),
 
-  // 缓存
+  // ─── 缓存 ──────────────────────────────────────────────
   clearCache: () => ipcRenderer.invoke('cache:clear'),
   getCacheStats: () => ipcRenderer.invoke('cache:getStats'),
 
-  // WebSocket 事件监听
+  // ─── WebSocket 事件监听 ─────────────────────────────────
   lcuSubscribe: (uri: string) => ipcRenderer.send('lcu:subscribe', uri),
   lcuUnsubscribe: (uri: string) => ipcRenderer.send('lcu:unsubscribe', uri),
   onLCUEvent: (callback: (event: unknown) => void) => {
-    ipcRenderer.on('lcu:event', (_event, data) => callback(data));
-    return () => ipcRenderer.removeAllListeners('lcu:event');
+    return createEventListener('lcu:event', callback);
   },
 
-  // 通用事件监听
+  // ─── 连接状态变化 ──────────────────────────────────────
   onConnectionChange: (callback: (status: string) => void) => {
-    ipcRenderer.on('lcu:connection-change', (_event, status) => callback(status));
-    return () => ipcRenderer.removeAllListeners('lcu:connection-change');
+    return createEventListener('lcu:connection-change', callback);
   },
 
-  // 对局实时分析
+  // ─── 对局实时分析 ──────────────────────────────────────
   analyzeLiveGame: () => ipcRenderer.invoke('live-game:analyze'),
 
-  // 第三方数据
+  // ─── 第三方数据 ────────────────────────────────────────
   getChampionBuilds: (championId: number) =>
     ipcRenderer.invoke('scraper:getChampionBuilds', championId),
   getChampionCounters: (championId: number) =>
@@ -47,30 +67,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateScraperData: () => ipcRenderer.invoke('scraper:updateData'),
   getScraperDataVersion: () => ipcRenderer.invoke('scraper:getDataVersion'),
 
-  // 窗口管理
+  // ─── 窗口管理 ──────────────────────────────────────────
   setAlwaysOnTop: (flag: boolean) => ipcRenderer.send('window:setAlwaysOnTop', flag),
   setMiniMode: (flag: boolean) => ipcRenderer.send('window:setMiniMode', flag),
   minimizeToTray: () => ipcRenderer.send('window:minimize-to-tray'),
 
-  // 自动更新
+  // ─── 自动更新 ──────────────────────────────────────────
   checkForUpdates: () => ipcRenderer.invoke('updater:checkForUpdates'),
   downloadUpdate: () => ipcRenderer.send('updater:downloadUpdate'),
   installUpdate: () => ipcRenderer.send('updater:installUpdate'),
   onUpdateProgress: (callback: (progress: number) => void) => {
-    ipcRenderer.on('updater:progress', (_event, progress) => callback(progress));
-    return () => ipcRenderer.removeAllListeners('updater:progress');
+    return createEventListener('updater:progress', callback);
   },
 
-  // 日志
+  // ─── 日志 ──────────────────────────────────────────────
   exportLog: () => ipcRenderer.invoke('log:export'),
 
-  // 通知事件
+  // ─── 通知事件（主进程 -> 渲染进程） ─────────────────────
   onGamePhaseChange: (callback: (phase: string) => void) => {
-    ipcRenderer.on('game:phase-change', (_event, phase) => callback(phase));
-    return () => ipcRenderer.removeAllListeners('game:phase-change');
+    return createEventListener('game:phase-change', callback);
   },
 
-  // 静态资源
+  // ─── 静态资源 ──────────────────────────────────────────
   getGameVersion: () => ipcRenderer.invoke('assets:getVersion'),
   getMajorVersion: () => ipcRenderer.invoke('assets:getMajorVersion'),
   getCachedAsset: (remoteUrl: string, assetType: string, assetId: string | number) =>
@@ -80,7 +98,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAssetCacheStats: () => ipcRenderer.invoke('assets:getCacheStats'),
   clearAssetCache: () => ipcRenderer.invoke('assets:clearCache'),
 
-  // 首次引导
+  // ─── 首次引导 ──────────────────────────────────────────
   getIsFirstLaunch: () => ipcRenderer.invoke('app:isFirstLaunch'),
   setFirstLaunchDone: () => ipcRenderer.invoke('app:setFirstLaunchDone'),
 });

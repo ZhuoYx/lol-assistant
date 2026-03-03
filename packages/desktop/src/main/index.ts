@@ -8,7 +8,7 @@ import { logger, cleanupOldLogs } from './utils/logger';
 import { pollForLOLClient } from './utils/process';
 import { lcuClient } from './lcu/client';
 import { lcuWebSocket } from './lcu/websocket';
-import { registerAssetIpcHandlers } from './ipc/assets';
+import { registerAllIpcHandlers } from './ipc/index';
 import { assetCacheManager } from './assets/index';
 
 /** 主窗口 */
@@ -197,10 +197,7 @@ function startProcessPolling(): void {
  * 注册所有 IPC 处理器
  */
 function registerIpcHandlers(): void {
-  // 静态资源 IPC
-  registerAssetIpcHandlers();
-
-  // 其他 IPC 处理器将在 Task 4 中实现
+  registerAllIpcHandlers();
 }
 
 /**
