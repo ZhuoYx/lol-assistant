@@ -51,7 +51,7 @@ Task 1 (项目初始化)
   - **依赖:** 无，可与 Task 1 并行开发，需在 Task 5 前完成
   - 参考：REQ-003、REQ-005
 
-- [ ] 2. shared 包完整实现
+- [x] 2. shared 包完整实现 ✅
   - 类型定义：创建 summoner.ts、match.ts、rank.ts、champion.ts、live-game.ts（含 LiveGamePlayer.dataStatus 字段）、scraper.ts、common.ts、error.ts（含 SCRAPER_*、LIVE_GAME_* 错误码），定义所有数据模型接口和错误类型枚举
   - 工具函数：创建 format.ts（日期、数字格式化）、calculate.ts（KDA、胜率、击杀参与率计算）、cache.ts（缓存条目创建、过期检测、清理）
   - 常量数据：创建 champions.ts（英雄 ID 映射）、items.ts（装备 ID 映射）、queues.ts（游戏模式/队列类型）、cache.ts（缓存 TTL 和大小上限配置）、champion-counters.ts（内置静态英雄克制关系表，作为兜底数据）
@@ -61,7 +61,7 @@ Task 1 (项目初始化)
   - **依赖:** Task 1
   - 参考：设计文档 - shared 包结构 / 数据模型 / 缓存策略 / 第三方数据爬取模块
 
-- [ ] 3. Electron 主进程基础实现
+- [x] 3. Electron 主进程基础实现 ✅
   - 创建主进程入口 src/main/index.ts，配置 BrowserWindow（含 Always-on-Top 支持、迷你模式窗口尺寸）、应用生命周期事件、系统托盘
   - 实现进程检测工具 src/main/utils/process.ts（LOL 客户端进程检测，读取 --install-directory 参数）
   - 实现日志模块 src/main/utils/logger.ts（electron-log 封装，日志按日切割，保留 7 天）

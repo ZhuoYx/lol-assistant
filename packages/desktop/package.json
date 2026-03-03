@@ -21,13 +21,16 @@
     "electron-log": "^5.2.0",
     "electron-store": "^10.0.0",
     "electron-updater": "^6.3.0",
+    "naive-ui": "^2.40.0",
     "p-limit": "^6.1.0",
     "pinia": "^2.2.0",
-    "naive-ui": "^2.40.0",
     "vue": "^3.5.0",
-    "vue-router": "^4.4.0"
+    "vue-router": "^4.4.0",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
+    "@types/node": "^25.3.3",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-vue": "^5.1.0",
     "electron": "^33.0.0",
     "electron-builder": "^25.1.0",
