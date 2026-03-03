@@ -73,7 +73,7 @@ Task 1 (项目初始化)
   - **依赖:** Task 2
   - 参考：设计文档 - Electron 主进程设计 / LCU 连接模块 / WebSocket 设计
 
-- [ ] 3.5. 第三方数据爬取模块实现
+- [x] 3.5. 第三方数据爬取模块实现 ✅
   - 实现爬取器统一接口 src/main/scraper/index.ts（IChampionDataScraper）
   - 实现爬取数据分片存储 src/main/scraper/storage.ts（独立 JSON 文件按 {championId}_{role} 分片，避免 electron-store 大文件性能瓶颈）
   - 实现 OP.GG 爬取器 src/main/scraper/opgg.ts：
