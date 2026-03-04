@@ -253,7 +253,7 @@ class LANProxyServer {
     <div class="api-hint">
       <p><strong>API 使用方式</strong></p>
       <p style="margin-top:8px">服务状态: <code>GET /status</code></p>
-      <p>LCU API: <code>GET /api/lol-summoner/v1/summoners/me</code></p>
+      <p>LCU API: <code>GET /api/lol-summoner/v1/current-summoner</code></p>
     </div>
   </div>
 </body>

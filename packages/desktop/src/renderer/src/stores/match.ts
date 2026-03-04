@@ -34,11 +34,11 @@ export const useMatchStore = defineStore('match', () => {
       const result = await window.electronAPI.getMatchList(params);
 
       if (reset) {
-        matchList.value = result.matches;
+        matchList.value = result.matches ?? [];
       } else {
-        matchList.value.push(...result.matches);
+        matchList.value.push(...(result.matches ?? []));
       }
-      totalGames.value = result.totalGames;
+      totalGames.value = result.totalGames ?? 0;
     } catch (e) {
       error.value = e instanceof Error ? e.message : '获取战绩失败';
     } finally {

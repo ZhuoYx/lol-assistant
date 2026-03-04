@@ -28,13 +28,9 @@ export function registerAppIpcHandlers(): void {
         return processInfo.installDirectory;
       }
 
-      // 策略2：尝试常见路径（国际服 + 国服 / WeGame）
+      // 策略2：尝试常见路径（国服 / WeGame）
       const drives = ['C:', 'D:', 'E:', 'F:'];
       const commonPaths = [
-        // Riot 国际服
-        path.resolve(process.env.LOCALAPPDATA ?? '', 'Riot Games/League of Legends'),
-        ...drives.map((d) => `${d}/Riot Games/League of Legends`),
-        // 国服 / WeGame 常见路径（包含常见子目录结构）
         ...drives.flatMap((d) => [
           `${d}/腾讯游戏/英雄联盟`,
           `${d}/WeGame/games/英雄联盟`,
@@ -96,7 +92,7 @@ export function registerAppIpcHandlers(): void {
     const result = await dialog.showOpenDialog({
       title: '选择英雄联盟安装目录',
       properties: ['openDirectory'],
-      defaultPath: 'C:/Riot Games/League of Legends',
+      defaultPath: 'D:/腾讯游戏/英雄联盟',
     });
 
     if (result.canceled || result.filePaths.length === 0) {

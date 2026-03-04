@@ -1,9 +1,12 @@
 /**
  * Electron 主进程入口
  * 配置 BrowserWindow、应用生命周期、系统托盘、LCU 连接等
+ * 注意：需要以管理员身份运行才能读取 LeagueClientUx 的命令行参数（国服必需）
  */
 import { app, BrowserWindow, Tray, Menu, nativeImage, Notification } from 'electron';
 import { join } from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { logger, cleanupOldLogs } from './utils/logger';
 import { pollForLOLClient } from './utils/process';
 import { lcuClient } from './lcu/client';
@@ -12,6 +15,7 @@ import { registerAllIpcHandlers } from './ipc/index';
 import { assetCacheManager } from './assets/index';
 import { lanProxyServer } from './proxy/server';
 import { appUpdater } from './updater/index';
+import { cacheStore } from './cache/store';
 import type { LCUEvent, GamePhase } from '@lol-assistant/shared';
 
 /** 主窗口 */
@@ -271,7 +275,9 @@ function startProcessPolling(): void {
   cancelPoll = pollForLOLClient(async () => {
     logger.info('检测到 LOL 客户端进程，尝试连接...');
     try {
-      await lcuClient.connect();
+      // 使用用户保存的路径辅助 lockfile 查找
+      const savedPath = cacheStore.getSetting<string>('lolInstallPath', '');
+      await lcuClient.connect(savedPath || undefined);
     } catch (err) {
       logger.warn('连接 LCU 失败，将继续轮询:', err);
       // 连接失败，启动重连
@@ -292,6 +298,16 @@ function registerIpcHandlers(): void {
  */
 async function initApp(): Promise<void> {
   logger.info('应用启动...');
+
+  // 检测是否以管理员身份运行
+  try {
+    const execAsync = promisify(exec);
+    await execAsync('net session 2>&1', { encoding: 'utf-8', timeout: 3000 });
+    // net session 成功 = 管理员权限
+    logger.info('已以管理员身份运行');
+  } catch {
+    logger.warn('未以管理员身份运行，国服可能无法获取 LCU 凭证（lockfile 为空时需要管理员权限读取进程命令行参数）');
+  }
 
   // 清理过期日志
   cleanupOldLogs();

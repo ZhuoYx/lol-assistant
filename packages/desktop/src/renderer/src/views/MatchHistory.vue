@@ -30,7 +30,7 @@
           @retry="refresh"
         />
 
-        <div v-else-if="matchStore.matchList.length > 0" class="match-list" ref="listRef">
+        <div v-else-if="matchStore.matchList?.length > 0" class="match-list" ref="listRef">
           <MatchListItem
             v-for="match in matchStore.matchList"
             :key="match.gameId"

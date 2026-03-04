@@ -35,7 +35,7 @@ export interface IAPIProvider {
 
 /** LCU API 端点常量 */
 export const LCU_ENDPOINTS = {
-  CURRENT_SUMMONER: '/lol-summoner/v1/summoners/me',
+  CURRENT_SUMMONER: '/lol-summoner/v1/current-summoner',
   MATCH_HISTORY: '/lol-match-history/v1/products/lol/current-summoner/matches',
   MATCH_DETAIL: '/lol-match-history/v1/matches',
   RANKED_STATS: '/lol-ranked/v1/ranked-stats',

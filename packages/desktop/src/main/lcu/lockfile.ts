@@ -28,25 +28,17 @@ export interface LCUCredentials {
   protocol: 'https';
 }
 
-/** 备选的 lockfile 静态路径列表（国际服 + 国服，含 LeagueClient 子目录） */
+/** 备选的 lockfile 静态路径列表（含 LeagueClient 子目录） */
 const LOCKFILE_FALLBACK_PATHS: string[] = (() => {
   const paths: string[] = [];
-  const localAppData = process.env.LOCALAPPDATA;
-  if (localAppData) {
-    paths.push(path.resolve(localAppData, 'Riot Games/League of Legends/lockfile'));
-  }
   const drives = ['C:', 'D:', 'E:', 'F:'];
   for (const d of drives) {
     paths.push(
-      // 国际服
-      path.resolve(`${d}/Riot Games/League of Legends/lockfile`),
-      // 国服 — 根目录/lockfile
       path.resolve(`${d}/腾讯游戏/英雄联盟/lockfile`),
       path.resolve(`${d}/WeGame/games/英雄联盟/lockfile`),
       path.resolve(`${d}/英雄联盟/lockfile`),
       path.resolve(`${d}/LOL/lockfile`),
       path.resolve(`${d}/Program Files (x86)/英雄联盟/lockfile`),
-      // 国服 — 根目录/LeagueClient/lockfile（典型国服子目录结构）
       path.resolve(`${d}/腾讯游戏/英雄联盟/LeagueClient/lockfile`),
       path.resolve(`${d}/WeGame/games/英雄联盟/LeagueClient/lockfile`),
       path.resolve(`${d}/英雄联盟/LeagueClient/lockfile`),
@@ -82,24 +74,6 @@ function parseLockfile(content: string): LockfileData | null {
   }
 
   return { name, pid, port, password, protocol };
-}
-
-/**
- * 通过进程命令行参数动态获取 lockfile 路径（首选方案）
- */
-async function findLockfileByProcess(): Promise<string | null> {
-  const processInfo = await detectLOLProcess();
-  if (!processInfo) return null;
-
-  const lockfilePath = path.join(processInfo.installDirectory, 'lockfile');
-  try {
-    await fs.access(lockfilePath);
-    logger.info(`通过进程检测找到 lockfile: ${lockfilePath}`);
-    return lockfilePath;
-  } catch {
-    logger.warn(`进程检测到安装路径但 lockfile 不存在: ${lockfilePath}`);
-    return null;
-  }
 }
 
 /**
@@ -152,18 +126,55 @@ async function findLockfileByManualPath(manualPath: string): Promise<string | nu
 /**
  * 查找并读取 lockfile
  * 优先级: 手动路径 > 进程检测 > 静态路径
+ * 当 lockfile 为空时（国服常见），自动从进程命令行参数获取凭证
+ * （需要应用以管理员身份运行才能读取其他进程的命令行参数）
  */
 export async function readLockfile(manualPath?: string): Promise<LockfileData | null> {
   let lockfilePath: string | null = null;
 
+  // 先通过进程检测获取信息（可能包含命令行凭证）
+  const processInfo = await detectLOLProcess();
+
+  if (processInfo) {
+    logger.info(`进程检测结果: pid=${processInfo.pid}, appPort=${processInfo.appPort ?? 'N/A'}, authToken=${processInfo.authToken ? '***' + processInfo.authToken.slice(-4) : 'N/A'}, dir=${processInfo.installDirectory}`);
+  }
+
+  // 优先使用进程命令行参数中的凭证（最可靠，一定是当前运行进程的真实凭证）
+  // 需要应用以管理员身份运行，Get-CimInstance 才能获取到 --app-port / --remoting-auth-token
+  if (processInfo?.appPort && processInfo?.authToken) {
+    logger.info(`从进程命令行获取 LCU 凭证: port=${processInfo.appPort}, pid=${processInfo.pid}`);
+    return {
+      name: 'LeagueClient',
+      pid: processInfo.pid || 0,
+      port: processInfo.appPort,
+      password: processInfo.authToken,
+      protocol: 'https',
+    };
+  }
+
+  // 命令行参数获取不到时（非管理员运行等情况），回退到 lockfile
   // 1. 手动路径
   if (manualPath) {
     lockfilePath = await findLockfileByManualPath(manualPath);
   }
 
-  // 2. 进程检测
-  if (!lockfilePath) {
-    lockfilePath = await findLockfileByProcess();
+  // 2. 进程检测路径
+  if (!lockfilePath && processInfo) {
+    const dir = processInfo.installDirectory;
+    const candidates = [
+      path.join(dir, 'lockfile'),
+      path.join(dir, 'LeagueClient', 'lockfile'),
+    ];
+    for (const candidate of candidates) {
+      try {
+        await fs.access(candidate);
+        lockfilePath = candidate;
+        logger.info(`通过进程检测找到 lockfile: ${candidate}`);
+        break;
+      } catch {
+        // continue
+      }
+    }
   }
 
   // 3. 静态路径列表
@@ -171,22 +182,26 @@ export async function readLockfile(manualPath?: string): Promise<LockfileData | 
     lockfilePath = await findLockfileByStaticPaths();
   }
 
-  if (!lockfilePath) {
+  // 尝试读取并解析 lockfile
+  if (lockfilePath) {
+    try {
+      const content = await fs.readFile(lockfilePath, 'utf-8');
+      const data = parseLockfile(content);
+      if (data) {
+        logger.info(`Lockfile 解析成功: port=${data.port}, pid=${data.pid}, password=${data.password ? '***' + data.password.slice(-4) : 'EMPTY'}`);
+        return data;
+      }
+      // lockfile 存在但内容为空（国服常见情况）
+      logger.warn(`Lockfile 存在但内容为空: ${lockfilePath}`);
+    } catch (err) {
+      logger.error('读取 lockfile 失败:', err);
+    }
+  } else {
     logger.warn('未找到 lockfile');
-    return null;
   }
 
-  try {
-    const content = await fs.readFile(lockfilePath, 'utf-8');
-    const data = parseLockfile(content);
-    if (data) {
-      logger.info(`Lockfile 解析成功: port=${data.port}, pid=${data.pid}`);
-    }
-    return data;
-  } catch (err) {
-    logger.error('读取 lockfile 失败:', err);
-    return null;
-  }
+  logger.warn('无法获取 LCU 凭证（lockfile 为空且无法从进程命令行获取，请确保以管理员身份运行）');
+  return null;
 }
 
 /**

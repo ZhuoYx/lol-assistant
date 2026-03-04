@@ -17,7 +17,8 @@
       }
     ],
     "icon": "resources/icons/icon.ico",
-    "artifactName": "${productName}-${version}-setup.${ext}"
+    "artifactName": "${productName}-${version}-setup.${ext}",
+    "requestedExecutionLevel": "requireAdministrator"
   },
   "nsis": {
     "oneClick": false,

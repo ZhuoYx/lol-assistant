@@ -6,6 +6,7 @@ import https from 'https';
 import { EventEmitter } from 'events';
 import { logger } from '../utils/logger';
 import { readLockfile, extractCredentials, type LCUCredentials } from './lockfile';
+import { cacheStore } from '../cache/store';
 import type { ConnectionStatus } from '@lol-assistant/shared';
 
 /** LCU 请求选项 */
@@ -26,6 +27,12 @@ const RECONNECT_CONFIG = {
 /** 请求超时（毫秒） */
 const REQUEST_TIMEOUT = 10000;
 
+/** 连接健康检查间隔（毫秒） */
+const HEALTH_CHECK_INTERVAL = 15000;
+
+/** 连续请求失败多少次后判定连接断开 */
+const MAX_CONSECUTIVE_FAILURES = 3;
+
 /**
  * LCU 客户端连接管理器
  */
@@ -35,6 +42,8 @@ export class LCUClient extends EventEmitter {
   private reconnectTimer: ReturnType<typeof setInterval> | null = null;
   private reconnectCount = 0;
   private manualDisconnect = false;
+  private consecutiveFailures = 0;
+  private healthCheckTimer: ReturnType<typeof setInterval> | null = null;
 
   /** HTTPS Agent - 忽略自签名证书 */
   private httpsAgent = new https.Agent({
@@ -66,7 +75,7 @@ export class LCUClient extends EventEmitter {
 
   /**
    * 连接到 LCU 客户端
-   * @param manualPath 手动指定的安装路径
+   * @param manualPath 手动指定的安装路径（可选，未传则自动从 cacheStore 读取）
    */
   async connect(manualPath?: string): Promise<void> {
     if (this._status === 'connected') {
@@ -78,7 +87,9 @@ export class LCUClient extends EventEmitter {
     this.setStatus('connecting');
 
     try {
-      const lockfileData = await readLockfile(manualPath);
+      // 如果没有传入手动路径，尝试从持久化存储读取
+      const pathToUse = manualPath || cacheStore.getSetting<string>('lolInstallPath', '') || undefined;
+      const lockfileData = await readLockfile(pathToUse);
       if (!lockfileData) {
         this.setStatus('disconnected');
         throw new Error('无法找到 lockfile，请确认 LOL 客户端已启动');
@@ -86,11 +97,13 @@ export class LCUClient extends EventEmitter {
 
       this.credentials = extractCredentials(lockfileData);
 
-      // 验证连接（尝试获取当前召唤师信息）
-      await this.request('/lol-summoner/v1/summoners/me');
+      // 验证连接
+      await this.request('/lol-summoner/v1/current-summoner');
 
       this.setStatus('connected');
       this.reconnectCount = 0;
+      this.consecutiveFailures = 0;
+      this.startHealthCheck();
       this.emit('connected');
       logger.info(`成功连接到 LCU 客户端: port=${this.credentials.port}`);
     } catch (err) {
@@ -107,7 +120,9 @@ export class LCUClient extends EventEmitter {
   disconnect(): void {
     this.manualDisconnect = true;
     this.stopReconnect();
+    this.stopHealthCheck();
     this.credentials = null;
+    this.consecutiveFailures = 0;
     this.setStatus('disconnected');
     this.emit('disconnected');
     logger.info('已断开 LCU 客户端连接');
@@ -154,6 +169,47 @@ export class LCUClient extends EventEmitter {
   }
 
   /**
+   * 启动健康检查定时器
+   * 定期向 LCU 发送轻量请求，确认连接是否仍然有效
+   */
+  private startHealthCheck(): void {
+    this.stopHealthCheck();
+    this.healthCheckTimer = setInterval(async () => {
+      if (this._status !== 'connected' || !this.credentials) {
+        this.stopHealthCheck();
+        return;
+      }
+      try {
+        await this.request('/riotclient/auth-token', { timeout: 5000 });
+      } catch {
+        // request 内部的 error handler 会累计失败次数并在必要时断开连接
+      }
+    }, HEALTH_CHECK_INTERVAL);
+  }
+
+  /**
+   * 停止健康检查
+   */
+  private stopHealthCheck(): void {
+    if (this.healthCheckTimer) {
+      clearInterval(this.healthCheckTimer);
+      this.healthCheckTimer = null;
+    }
+  }
+
+  /**
+   * 处理连接丢失
+   */
+  private handleConnectionLost(): void {
+    this.stopHealthCheck();
+    this.credentials = null;
+    this.consecutiveFailures = 0;
+    this.setStatus('disconnected');
+    this.emit('disconnected');
+    this.startReconnect();
+  }
+
+  /**
    * 发送 LCU API 请求
    */
   async request<T = unknown>(
@@ -193,6 +249,9 @@ export class LCUClient extends EventEmitter {
           body += chunk.toString();
         });
         res.on('end', () => {
+          // 收到响应说明连接正常，重置失败计数
+          this.consecutiveFailures = 0;
+
           if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
             try {
               resolve(body ? JSON.parse(body) : ({} as T));
@@ -208,13 +267,15 @@ export class LCUClient extends EventEmitter {
       });
 
       req.on('error', (err) => {
-        // 连接错误可能意味着客户端已关闭
+        // 连接错误：累计失败次数，达到阈值后才判定连接断开
         if (this._status === 'connected') {
-          logger.warn(`LCU 连接异常: ${err.message}`);
-          this.credentials = null;
-          this.setStatus('disconnected');
-          this.emit('disconnected');
-          this.startReconnect();
+          this.consecutiveFailures++;
+          logger.warn(`LCU 请求失败 (${this.consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}): ${err.message}`);
+
+          if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+            logger.warn('连续请求失败次数过多，判定连接已断开');
+            this.handleConnectionLost();
+          }
         }
         reject(err);
       });

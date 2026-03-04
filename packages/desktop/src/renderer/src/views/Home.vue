@@ -27,7 +27,7 @@
       <!-- Recent Matches Quick View -->
       <div class="card recent-card">
         <h3 class="card-section-title">最近战绩</h3>
-        <div v-if="matchStore.matchList.length > 0" class="recent-matches">
+        <div v-if="matchStore.matchList?.length > 0" class="recent-matches">
           <div
             v-for="match in recentMatches"
             :key="match.gameId"

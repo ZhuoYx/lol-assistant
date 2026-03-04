@@ -6,6 +6,16 @@ import log from 'electron-log';
 import path from 'path';
 import fs from 'fs';
 import { app } from 'electron';
+import { execSync } from 'child_process';
+
+// Windows 下尽早将当前控制台代码页设为 UTF-8，避免中文乱码
+if (process.platform === 'win32') {
+  try {
+    execSync('chcp 65001', { stdio: 'ignore' });
+  } catch {
+    // 非关键，忽略
+  }
+}
 
 /** 日志保留天数 */
 const LOG_RETENTION_DAYS = 7;
