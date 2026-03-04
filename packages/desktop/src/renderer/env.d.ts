@@ -48,6 +48,16 @@ interface ElectronAPI {
   updateScraperData: () => Promise<void>;
   getScraperDataVersion: () => Promise<import('@lol-assistant/shared').ScraperDataVersion | null>;
 
+  // 符文页管理
+  getPerksPages: () => Promise<unknown[]>;
+  applyPerksPage: (pageData: {
+    name: string;
+    primaryStyleId: number;
+    subStyleId: number;
+    selectedPerkIds: number[];
+  }) => Promise<unknown>;
+  deletePerksPage: (pageId: number) => Promise<void>;
+
   // 窗口管理
   setAlwaysOnTop: (flag: boolean) => void;
   setMiniMode: (flag: boolean) => void;

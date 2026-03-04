@@ -17,6 +17,7 @@ import { registerWindowIpcHandlers } from './window';
 import { registerUpdaterIpcHandlers } from './updater';
 import { registerLogIpcHandlers } from './log';
 import { registerAppIpcHandlers } from './app';
+import { registerPerksIpcHandlers } from './perks';
 
 /**
  * 注册所有 IPC 处理器
@@ -57,6 +58,9 @@ export function registerAllIpcHandlers(): void {
 
   // 应用（首次引导等）
   registerAppIpcHandlers();
+
+  // 符文页管理
+  registerPerksIpcHandlers();
 
   // WebSocket 事件转发
   registerWebSocketForwarding();

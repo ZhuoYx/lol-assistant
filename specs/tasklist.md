@@ -118,7 +118,7 @@ Task 1 (项目初始化)
   - **依赖:** Task 5
   - 参考：REQ-002~005、REQ-009
 
-- [ ] 7a. 对局实时分析
+- [x] 7a. 对局实时分析 ✅
   - 通过 LCU WebSocket 监听 gameflow-phase（/lol-gameflow/v1/session），自动检测进入 InProgress 阶段
   - 实现 10 人数据并发获取逻辑（使用 p-limit 控制并发数 ≤5，Promise.allSettled 容错）
   - 实现 LiveGame.vue 页面和组件（LiveGamePanel、PlayerCard 列表）
@@ -129,7 +129,7 @@ Task 1 (项目初始化)
   - **依赖:** Task 6
   - 参考：REQ-008、设计文档 3.2
 
-- [ ] 7b. 选人助手
+- [x] 7b. 选人助手 ✅
   - 实现英雄选择状态监听（通过 LCU WebSocket 订阅 /lol-champ-select/v1/session）
   - 使用第三方爬取数据（OP.GG/Lolalytics）+ 玩家英雄池 + 本地静态数据进行推荐
   - 实现选人助手页面和组件（DraftAssistant、TeamComposition、CounterSuggestion）
@@ -138,7 +138,7 @@ Task 1 (项目初始化)
   - **依赖:** Task 6
   - 参考：REQ-006
 
-- [ ] 7c. 符文与装备推荐
+- [x] 7c. 符文与装备推荐 ✅
   - 展示第三方热门配置（OP.GG/Lolalytics 爬取的符文+出装，含胜率和使用率）
   - 展示玩家个人常用配置（LCU API）
   - 无数据时展示内置默认推荐配置（兜底）

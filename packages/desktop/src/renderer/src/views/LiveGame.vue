@@ -1,27 +1,37 @@
 <template>
   <div class="page live-game-page">
     <header class="page-header">
-      <h1 class="page-title">对局分析</h1>
-      <p class="page-subtitle">实时查看双方玩家数据</p>
+      <div class="header-left">
+        <h1 class="page-title">对局分析</h1>
+        <p class="page-subtitle">实时查看双方玩家数据</p>
+      </div>
+      <div v-if="analysis" class="header-right">
+        <span class="load-status">
+          <span class="load-dot" :class="{ active: !hasLoadingPlayers }" />
+          {{ loadedPlayerCount }}/{{ totalPlayerCount }} 已加载
+        </span>
+      </div>
     </header>
 
     <div class="live-game-content">
+      <!-- Not connected -->
       <EmptyState
         v-if="!appStore.isConnected"
         title="未连接客户端"
-        description="请启动英雄联盟客户端"
+        description="请启动英雄联盟客户端以使用对局分析功能"
       >
         <template #icon>
           <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10" /><polygon points="10 8 16 12 10 16 10 8" />
+            <path d="M18.36 6.64a9 9 0 1 1-12.73 0" /><line x1="12" y1="2" x2="12" y2="12" />
           </svg>
         </template>
       </EmptyState>
 
+      <!-- Not in game -->
       <EmptyState
-        v-else-if="!isInGame"
+        v-else-if="!isInGame && !analysis"
         title="当前不在对局中"
-        description="进入对局后将自动开始分析"
+        description="进入对局后将自动开始分析双方玩家数据"
       >
         <template #icon>
           <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
@@ -30,8 +40,73 @@
         </template>
       </EmptyState>
 
-      <div v-else class="analysis-placeholder">
-        <p class="placeholder-note">对局分析功能将在 Task 7a 中完整实现</p>
+      <!-- Loading initial data -->
+      <LoadingSpinner
+        v-else-if="loading && !analysis"
+        size="lg"
+        text="正在获取对局数据..."
+        :centered="true"
+      />
+
+      <!-- Error state -->
+      <ErrorDisplay
+        v-else-if="error && !analysis"
+        :message="error"
+        :retryable="true"
+        @retry="analyze"
+      />
+
+      <!-- Analysis view -->
+      <div v-else-if="analysis" class="analysis-view">
+        <!-- Game info panel -->
+        <LiveGamePanel
+          :analysis="analysis"
+          :refreshing="refreshing"
+          @refresh="analyze"
+        />
+
+        <!-- Two-team layout -->
+        <div class="teams-grid">
+          <TeamPanel
+            v-if="blueTeam"
+            :team="blueTeam"
+            side="blue"
+            :my-puuid="myPuuid"
+            :my-tier="myTier"
+            @player-click="handlePlayerClick"
+          />
+          <TeamPanel
+            v-if="redTeam"
+            :team="redTeam"
+            side="red"
+            :my-puuid="myPuuid"
+            :my-tier="myTier"
+            @player-click="handlePlayerClick"
+          />
+        </div>
+
+        <!-- Strength legend -->
+        <div class="legend-bar">
+          <span class="legend-title">实力标记</span>
+          <div class="legend-items">
+            <span class="legend-item">
+              <span class="legend-dot much-higher" />
+              远高于你
+            </span>
+            <span class="legend-item">
+              <span class="legend-dot higher" />
+              略高于你
+            </span>
+            <span class="legend-item">
+              <span class="legend-dot even" />
+              接近
+            </span>
+            <span class="legend-item">
+              <span class="legend-dot lower" />
+              低于你
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -39,15 +114,53 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useAppStore } from '@/stores';
-import { EmptyState } from '@/components/common';
+import { useRouter } from 'vue-router';
+import { useAppStore, useSummonerStore } from '@/stores';
+import { useLiveGameStore } from '@/stores/live-game';
+import { useRankStore } from '@/stores/rank';
+import { useLiveGame } from '@/composables/useLiveGame';
+import { EmptyState, LoadingSpinner, ErrorDisplay } from '@/components/common';
+import LiveGamePanel from '@/components/live-game/LiveGamePanel.vue';
+import TeamPanel from '@/components/live-game/TeamPanel.vue';
 
 const appStore = useAppStore();
+const summonerStore = useSummonerStore();
+const rankStore = useRankStore();
+const liveGameStore = useLiveGameStore();
+const router = useRouter();
+
+const {
+  analysis,
+  loading,
+  error,
+  refreshing,
+  analyze,
+} = useLiveGame();
+
+const blueTeam = computed(() => liveGameStore.blueTeam);
+const redTeam = computed(() => liveGameStore.redTeam);
+const loadedPlayerCount = computed(() => liveGameStore.loadedPlayerCount);
+const totalPlayerCount = computed(() => liveGameStore.totalPlayerCount);
+const hasLoadingPlayers = computed(() => liveGameStore.hasLoadingPlayers);
 
 const isInGame = computed(() => {
   const phase = appStore.gamePhase;
   return phase === 'InProgress' || phase === 'GameStart' || phase === 'ChampSelect';
 });
+
+const myPuuid = computed(() => summonerStore.currentSummoner?.puuid ?? '');
+
+const myTier = computed(() => {
+  const solo = rankStore.rankStats?.queueMap?.RANKED_SOLO_5x5;
+  return solo?.tier ?? '';
+});
+
+function handlePlayerClick(puuid: string) {
+  router.push({
+    name: 'MatchHistory',
+    query: { puuid },
+  });
+}
 </script>
 
 <style scoped>
@@ -57,7 +170,15 @@ const isInGame = computed(() => {
 }
 
 .page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
   margin-bottom: var(--space-6);
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
 }
 
 .page-title {
@@ -73,7 +194,46 @@ const isInGame = computed(() => {
   margin-top: var(--space-1);
 }
 
+.header-right {
+  flex-shrink: 0;
+}
+
+.load-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-secondary);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+}
+
+.load-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-warning);
+  animation: pulse-dot 1.2s ease infinite;
+}
+
+.load-dot.active {
+  background: var(--color-success);
+  animation: none;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
 .live-game-content {
+  min-height: 300px;
+}
+
+.live-game-content > .empty-state,
+.live-game-content > .loading-spinner,
+.live-game-content > .error-display {
   background: var(--color-bg-card);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-light);
@@ -83,13 +243,56 @@ const isInGame = computed(() => {
   justify-content: center;
 }
 
-.analysis-placeholder {
-  padding: var(--space-8);
-  text-align: center;
+.analysis-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
 }
 
-.placeholder-note {
-  font-size: var(--text-sm);
+.teams-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+}
+
+/* Legend */
+.legend-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-light);
+}
+
+.legend-title {
+  font-size: var(--text-xs);
+  color: var(--color-text-placeholder);
+  flex-shrink: 0;
+}
+
+.legend-items {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
   color: var(--color-text-tertiary);
 }
+
+.legend-dot {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.legend-dot.much-higher { background: var(--color-lose); }
+.legend-dot.higher { background: var(--color-warning); }
+.legend-dot.even { background: var(--color-text-placeholder); }
+.legend-dot.lower { background: var(--color-success); }
 </style>

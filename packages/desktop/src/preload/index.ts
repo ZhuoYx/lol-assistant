@@ -67,6 +67,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateScraperData: () => ipcRenderer.invoke('scraper:updateData'),
   getScraperDataVersion: () => ipcRenderer.invoke('scraper:getDataVersion'),
 
+  // ─── 符文页管理 ────────────────────────────────────────
+  getPerksPages: () => ipcRenderer.invoke('perks:getPages'),
+  applyPerksPage: (pageData: {
+    name: string;
+    primaryStyleId: number;
+    subStyleId: number;
+    selectedPerkIds: number[];
+  }) => ipcRenderer.invoke('perks:apply', pageData),
+  deletePerksPage: (pageId: number) => ipcRenderer.invoke('perks:delete', pageId),
+
   // ─── 窗口管理 ──────────────────────────────────────────
   setAlwaysOnTop: (flag: boolean) => ipcRenderer.send('window:setAlwaysOnTop', flag),
   setMiniMode: (flag: boolean) => ipcRenderer.send('window:setMiniMode', flag),

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { LiveGameAnalysis } from '@lol-assistant/shared';
+import type { LiveGameAnalysis, LiveGameTeam } from '@lol-assistant/shared';
 
 export const useLiveGameStore = defineStore('live-game', () => {
   const analysis = ref<LiveGameAnalysis | null>(null);
@@ -8,8 +8,41 @@ export const useLiveGameStore = defineStore('live-game', () => {
   const error = ref<string | null>(null);
 
   const hasData = computed(() => analysis.value !== null);
-  const myTeam = computed(() => analysis.value?.teams?.find((t) => t.teamId === 100) ?? null);
-  const enemyTeam = computed(() => analysis.value?.teams?.find((t) => t.teamId === 200) ?? null);
+
+  const blueTeam = computed<LiveGameTeam | null>(() =>
+    analysis.value?.teams?.find((t) => t.teamId === 100) ?? null
+  );
+
+  const redTeam = computed<LiveGameTeam | null>(() =>
+    analysis.value?.teams?.find((t) => t.teamId === 200) ?? null
+  );
+
+  // Alias for backward compat
+  const myTeam = blueTeam;
+  const enemyTeam = redTeam;
+
+  /** Total loaded player count across both teams */
+  const loadedPlayerCount = computed(() => {
+    if (!analysis.value) return 0;
+    return analysis.value.teams.reduce(
+      (sum, team) => sum + team.players.filter((p) => p.dataStatus === 'loaded').length,
+      0,
+    );
+  });
+
+  /** Total player count */
+  const totalPlayerCount = computed(() => {
+    if (!analysis.value) return 0;
+    return analysis.value.teams.reduce((sum, team) => sum + team.players.length, 0);
+  });
+
+  /** Whether any player data is still loading */
+  const hasLoadingPlayers = computed(() => {
+    if (!analysis.value) return false;
+    return analysis.value.teams.some((team) =>
+      team.players.some((p) => p.dataStatus === 'loading'),
+    );
+  });
 
   async function fetchLiveGame() {
     loading.value = true;
@@ -33,8 +66,13 @@ export const useLiveGameStore = defineStore('live-game', () => {
     loading,
     error,
     hasData,
+    blueTeam,
+    redTeam,
     myTeam,
     enemyTeam,
+    loadedPlayerCount,
+    totalPlayerCount,
+    hasLoadingPlayers,
     fetchLiveGame,
     clear,
   };

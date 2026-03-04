@@ -38,6 +38,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '选人助手', icon: 'draft' },
   },
   {
+    path: '/rune-builder',
+    name: 'RuneBuilder',
+    component: () => import('@/views/RuneBuilder.vue'),
+    meta: { title: '符文出装', icon: 'rune' },
+  },
+  {
     path: '/settings',
     name: 'Settings',
     component: () => import('@/views/Settings.vue'),
