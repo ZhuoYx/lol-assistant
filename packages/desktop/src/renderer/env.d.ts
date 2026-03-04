@@ -67,7 +67,14 @@ interface ElectronAPI {
   checkForUpdates: () => Promise<import('@lol-assistant/shared').UpdateInfo | null>;
   downloadUpdate: () => void;
   installUpdate: () => void;
+  getUpdateStatus: () => Promise<{
+    status: string;
+    updateInfo: import('@lol-assistant/shared').UpdateInfo | null;
+    downloadPercent: number;
+  }>;
   onUpdateProgress: (callback: (progress: number) => void) => () => void;
+  onUpdateStatusChange: (callback: (status: string) => void) => () => void;
+  onUpdateAvailable: (callback: (info: import('@lol-assistant/shared').UpdateInfo) => void) => () => void;
 
   // 日志
   exportLog: () => Promise<string>;

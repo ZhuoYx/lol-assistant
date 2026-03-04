@@ -86,8 +86,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkForUpdates: () => ipcRenderer.invoke('updater:checkForUpdates'),
   downloadUpdate: () => ipcRenderer.send('updater:downloadUpdate'),
   installUpdate: () => ipcRenderer.send('updater:installUpdate'),
+  getUpdateStatus: () => ipcRenderer.invoke('updater:getStatus'),
   onUpdateProgress: (callback: (progress: number) => void) => {
     return createEventListener('updater:progress', callback);
+  },
+  onUpdateStatusChange: (callback: (status: string) => void) => {
+    return createEventListener('updater:status-change', callback);
+  },
+  onUpdateAvailable: (callback: (info: unknown) => void) => {
+    return createEventListener('updater:update-available', callback);
   },
 
   // ─── 日志 ──────────────────────────────────────────────

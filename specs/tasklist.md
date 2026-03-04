@@ -173,7 +173,7 @@ Task 1 (项目初始化)
   - **依赖:** Task 6
   - 参考：设计文档 - 局域网代理设计 / REQ-016
 
-- [ ] 10. 打包、自动更新与应用优化
+- [x] 10. 打包、自动更新与应用优化 ✅
   - 配置 electron-builder Windows 打包选项和应用图标
   - 配置 package.json 构建命令，测试打包流程
   - 实现自动更新模块 src/main/updater/index.ts（electron-updater 封装，provider 配置为 GitHub Releases）

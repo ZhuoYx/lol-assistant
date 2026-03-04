@@ -67,6 +67,22 @@
         <div class="settings-card">
           <div class="setting-row">
             <div class="setting-info">
+              <span class="setting-label">当前版本</span>
+              <span class="setting-desc">v{{ appVersion }}</span>
+            </div>
+            <div class="setting-control">
+              <n-button
+                size="small"
+                :loading="updateChecking"
+                @click="handleCheckUpdate"
+              >
+                检查更新
+              </n-button>
+            </div>
+          </div>
+          <div class="setting-divider" />
+          <div class="setting-row">
+            <div class="setting-info">
               <span class="setting-label">自动更新</span>
               <span class="setting-desc">有新版本时自动下载安装</span>
             </div>
@@ -74,6 +90,41 @@
               <n-switch v-model:value="autoUpdate" @update:value="onAutoUpdateChange" />
             </div>
           </div>
+          <template v-if="updateStatus === 'available' && updateNewVersion">
+            <div class="setting-tip update-available-tip">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span>发现新版本 v{{ updateNewVersion }}</span>
+              <n-button size="tiny" type="primary" @click="handleDownloadUpdate">下载</n-button>
+            </div>
+          </template>
+          <template v-if="updateStatus === 'downloading'">
+            <div class="setting-row update-progress-row">
+              <div class="setting-info" style="flex: 1">
+                <span class="setting-label">正在下载更新</span>
+                <n-progress :percentage="updatePercent" :show-indicator="false" :height="6" />
+              </div>
+              <span class="update-percent">{{ updatePercent }}%</span>
+            </div>
+          </template>
+          <template v-if="updateStatus === 'downloaded'">
+            <div class="setting-tip update-ready-tip">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <span>更新已下载，重启应用即可安装</span>
+              <n-button size="tiny" type="primary" @click="handleInstallUpdate">立即重启</n-button>
+            </div>
+          </template>
+          <template v-if="updateStatus === 'not-available' && updateCheckDone">
+            <div class="setting-tip update-latest-tip">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+              <span>当前已是最新版本</span>
+            </div>
+          </template>
         </div>
       </section>
 
@@ -200,7 +251,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { NSelect, NSwitch, NButton } from 'naive-ui';
+import { NSelect, NSwitch, NButton, NProgress } from 'naive-ui';
 import { useAppStore } from '@/stores';
 import { useCache } from '@/composables/useCache';
 import { useScraperData } from '@/composables/useScraperData';
@@ -230,6 +281,17 @@ const proxyToggling = ref(false);
 const proxyAddress = ref<string | null>(null);
 const proxyQrDataUrl = ref<string | null>(null);
 
+// Auto Update
+const appVersion = ref('0.1.0');
+const updateChecking = ref(false);
+const updateStatus = ref('idle'); // idle | checking | available | downloading | downloaded | not-available | error
+const updateNewVersion = ref<string | null>(null);
+const updatePercent = ref(0);
+const updateCheckDone = ref(false);
+let unsubUpdateStatus: (() => void) | null = null;
+let unsubUpdateProgress: (() => void) | null = null;
+let unsubUpdateAvailable: (() => void) | null = null;
+
 const themeOptions = [
   { label: '浅色', value: 'light' as const },
   { label: '深色', value: 'dark' as const },
@@ -252,6 +314,66 @@ function onMiniModeChange(value: boolean) {
 
 function onAutoUpdateChange(value: boolean) {
   appStore.updateSettings({ autoUpdate: value });
+}
+
+async function handleCheckUpdate() {
+  updateChecking.value = true;
+  updateCheckDone.value = false;
+  try {
+    const info = await window.electronAPI.checkForUpdates();
+    if (info) {
+      updateStatus.value = 'available';
+      updateNewVersion.value = info.version;
+    } else {
+      updateStatus.value = 'not-available';
+    }
+    updateCheckDone.value = true;
+  } catch {
+    updateStatus.value = 'error';
+  } finally {
+    updateChecking.value = false;
+  }
+}
+
+function handleDownloadUpdate() {
+  window.electronAPI.downloadUpdate();
+  updateStatus.value = 'downloading';
+  updatePercent.value = 0;
+}
+
+function handleInstallUpdate() {
+  window.electronAPI.installUpdate();
+}
+
+function initUpdateListeners() {
+  unsubUpdateStatus = window.electronAPI.onUpdateStatusChange((status) => {
+    updateStatus.value = status;
+    if (status === 'not-available') {
+      updateCheckDone.value = true;
+    }
+  });
+
+  unsubUpdateProgress = window.electronAPI.onUpdateProgress((percent) => {
+    updatePercent.value = percent;
+  });
+
+  unsubUpdateAvailable = window.electronAPI.onUpdateAvailable((info) => {
+    updateNewVersion.value = info.version;
+    updateStatus.value = 'available';
+  });
+}
+
+async function loadUpdateStatus() {
+  try {
+    const status = await window.electronAPI.getUpdateStatus();
+    updateStatus.value = status.status;
+    if (status.updateInfo) {
+      updateNewVersion.value = status.updateInfo.version;
+    }
+    updatePercent.value = status.downloadPercent;
+  } catch {
+    // ignore
+  }
 }
 
 async function handleClearCache() {
@@ -357,10 +479,14 @@ onMounted(() => {
   loadCacheStats();
   loadScraperVersion();
   loadProxyStatus();
+  loadUpdateStatus();
+  initUpdateListeners();
 });
 
 onUnmounted(() => {
-  // cleanup if needed
+  unsubUpdateStatus?.();
+  unsubUpdateProgress?.();
+  unsubUpdateAvailable?.();
 });
 </script>
 
@@ -510,5 +636,44 @@ onUnmounted(() => {
 .proxy-qr-hint {
   font-size: var(--text-xs);
   color: var(--color-text-tertiary);
+}
+
+.update-available-tip {
+  background: rgba(10, 132, 255, 0.06);
+  color: var(--color-accent);
+  border-top: 1px solid rgba(10, 132, 255, 0.1);
+}
+
+.update-available-tip .n-button {
+  margin-left: auto;
+}
+
+.update-progress-row {
+  gap: var(--space-3);
+}
+
+.update-percent {
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  min-width: 36px;
+  text-align: right;
+}
+
+.update-ready-tip {
+  background: rgba(48, 209, 88, 0.06);
+  color: var(--color-success);
+  border-top: 1px solid rgba(48, 209, 88, 0.1);
+}
+
+.update-ready-tip .n-button {
+  margin-left: auto;
+}
+
+.update-latest-tip {
+  background: rgba(48, 209, 88, 0.06);
+  color: var(--color-success);
+  border-top: 1px solid rgba(48, 209, 88, 0.1);
 }
 </style>

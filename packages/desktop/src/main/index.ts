@@ -11,6 +11,7 @@ import { lcuWebSocket } from './lcu/websocket';
 import { registerAllIpcHandlers } from './ipc/index';
 import { assetCacheManager } from './assets/index';
 import { lanProxyServer } from './proxy/server';
+import { appUpdater } from './updater/index';
 import type { LCUEvent, GamePhase } from '@lol-assistant/shared';
 
 /** 主窗口 */
@@ -314,6 +315,13 @@ async function initApp(): Promise<void> {
 
   // 启动进程轮询
   startProcessPolling();
+
+  // 延迟检查自动更新（启动 5 秒后），避免影响启动速度
+  setTimeout(() => {
+    appUpdater.checkForUpdates().catch(() => {
+      // 静默跳过，不影响正常使用
+    });
+  }, 5000);
 }
 
 // ---- 应用生命周期 ----

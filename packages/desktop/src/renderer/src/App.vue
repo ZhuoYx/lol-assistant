@@ -117,6 +117,20 @@
                   </span>
                 </div>
                 <div class="status-right">
+                  <span
+                    v-if="appStore.updateAvailable && !appStore.updateDownloaded"
+                    class="status-update"
+                    @click="router.push('/settings')"
+                  >
+                    新版本 v{{ appStore.updateVersion }}
+                  </span>
+                  <span
+                    v-if="appStore.updateDownloaded"
+                    class="status-update status-update-ready"
+                    @click="router.push('/settings')"
+                  >
+                    更新就绪，点击安装
+                  </span>
                   <span v-if="appStore.gamePhase !== 'None'" class="status-phase">
                     {{ gamePhaseLabel }}
                   </span>
@@ -155,6 +169,9 @@ const router = useRouter();
 
 useLCU();
 useGameNotification();
+
+let unsubUpdateAvailable: (() => void) | null = null;
+let unsubUpdateStatus: (() => void) | null = null;
 
 const currentRoute = computed(() => route.path);
 
@@ -265,6 +282,16 @@ function handleKeydown(e: KeyboardEvent) {
 onMounted(async () => {
   document.addEventListener('keydown', handleKeydown);
 
+  // Listen for update events
+  unsubUpdateAvailable = window.electronAPI.onUpdateAvailable((info) => {
+    appStore.setUpdateAvailable(info.version);
+  });
+  unsubUpdateStatus = window.electronAPI.onUpdateStatusChange((status) => {
+    if (status === 'downloaded') {
+      appStore.setUpdateDownloaded();
+    }
+  });
+
   // Check first launch
   try {
     const isFirst = await window.electronAPI.getIsFirstLaunch();
@@ -279,6 +306,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown);
+  unsubUpdateAvailable?.();
+  unsubUpdateStatus?.();
 });
 </script>
 
@@ -498,6 +527,29 @@ onUnmounted(() => {
 .status-phase {
   font-weight: var(--font-medium);
   color: var(--color-accent);
+}
+
+.status-update {
+  font-weight: var(--font-medium);
+  color: var(--color-accent);
+  cursor: pointer;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(10, 132, 255, 0.1);
+  transition: background var(--transition-fast);
+}
+
+.status-update:hover {
+  background: rgba(10, 132, 255, 0.2);
+}
+
+.status-update-ready {
+  color: var(--color-success);
+  background: rgba(48, 209, 88, 0.1);
+}
+
+.status-update-ready:hover {
+  background: rgba(48, 209, 88, 0.2);
 }
 
 @keyframes pulse {

@@ -23,6 +23,11 @@ export const useAppStore = defineStore('app', () => {
   const error = ref<AppError | null>(null);
   const isFirstLaunch = ref(false);
 
+  // Update state
+  const updateAvailable = ref(false);
+  const updateVersion = ref<string | null>(null);
+  const updateDownloaded = ref(false);
+
   // Computed
   const isConnected = computed(() => connectionStatus.value === 'connected');
   const isConnecting = computed(() => connectionStatus.value === 'connecting');
@@ -63,6 +68,21 @@ export const useAppStore = defineStore('app', () => {
     isFirstLaunch.value = value;
   }
 
+  function setUpdateAvailable(version: string) {
+    updateAvailable.value = true;
+    updateVersion.value = version;
+  }
+
+  function setUpdateDownloaded() {
+    updateDownloaded.value = true;
+  }
+
+  function clearUpdateState() {
+    updateAvailable.value = false;
+    updateVersion.value = null;
+    updateDownloaded.value = false;
+  }
+
   // Sync theme to DOM
   watch(isDarkTheme, (dark) => {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
@@ -76,6 +96,9 @@ export const useAppStore = defineStore('app', () => {
     sidebarCollapsed,
     error,
     isFirstLaunch,
+    updateAvailable,
+    updateVersion,
+    updateDownloaded,
 
     // Computed
     isConnected,
@@ -91,5 +114,8 @@ export const useAppStore = defineStore('app', () => {
     clearError,
     toggleSidebar,
     setFirstLaunch,
+    setUpdateAvailable,
+    setUpdateDownloaded,
+    clearUpdateState,
   };
 });

@@ -16,6 +16,7 @@
         "arch": ["x64"]
       }
     ],
+    "icon": "resources/icons/icon.ico",
     "artifactName": "${productName}-${version}-setup.${ext}"
   },
   "nsis": {
@@ -23,11 +24,15 @@
     "perMachine": false,
     "allowToChangeInstallationDirectory": true,
     "deleteAppDataOnUninstall": false,
-    "shortcutName": "英雄联盟助手"
+    "shortcutName": "英雄联盟助手",
+    "uninstallDisplayName": "英雄联盟助手"
   },
   "publish": {
     "provider": "github",
     "owner": "your-github-username",
-    "repo": "lol-assistant"
-  }
+    "repo": "lol-assistant",
+    "releaseType": "release"
+  },
+  "asar": true,
+  "compression": "maximum"
 }
