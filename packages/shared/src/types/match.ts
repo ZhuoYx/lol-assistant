@@ -3,6 +3,7 @@ export interface MatchSummary {
   gameId: number;
   gameMode: string;
   gameType: string;
+  queueId: number;
   gameCreation: number;
   gameDuration: number;
   championId: number;

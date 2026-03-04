@@ -4,6 +4,8 @@ export interface Summoner {
   summonerId: number;
   accountId: number;
   displayName: string;
+  gameName?: string;
+  tagLine?: string;
   internalName: string;
   profileIconId: number;
   summonerLevel: number;

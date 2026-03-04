@@ -217,15 +217,16 @@ const TIER_ICON_MAP: Record<string, string> = {
 
 /**
  * 获取段位图标 URL（CommunityDragon）
+ * 使用 rcp-fe-lol-shared-components 路径，所有段位均有 PNG 格式
  * @param tier 段位名称，如 "GOLD"、"PLATINUM"
  * @param patch 版本号
  */
 export function getTierIconUrl(tier: string, patch: string = 'latest'): string {
   const tierKey = TIER_ICON_MAP[tier.toUpperCase()];
   if (!tierKey) {
-    return `${CDRAGON_BASE}/${patch}/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-mini-crests/unranked.png`;
+    return `${CDRAGON_BASE}/${patch}/plugins/rcp-fe-lol-shared-components/global/default/images/unranked.png`;
   }
-  return `${CDRAGON_BASE}/${patch}/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-mini-crests/${tierKey}.png`;
+  return `${CDRAGON_BASE}/${patch}/plugins/rcp-fe-lol-shared-components/global/default/images/${tierKey}.png`;
 }
 
 /**
@@ -233,7 +234,7 @@ export function getTierIconUrl(tier: string, patch: string = 'latest'): string {
  * @param patch 版本号
  */
 export function getUnrankedIconUrl(patch: string = 'latest'): string {
-  return `${CDRAGON_BASE}/${patch}/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-mini-crests/unranked.png`;
+  return `${CDRAGON_BASE}/${patch}/plugins/rcp-fe-lol-shared-components/global/default/images/unranked.png`;
 }
 
 // ============================================================

@@ -1,10 +1,5 @@
 <template>
   <div class="page home-page">
-    <header class="page-header">
-      <h1 class="page-title">首页</h1>
-      <p class="page-subtitle">欢迎回来</p>
-    </header>
-
     <div class="home-grid">
       <!-- Summoner Card -->
       <SummonerCard
@@ -16,12 +11,14 @@
       <RankCard
         title="单排/双排"
         :queue="soloQueue"
+        :loading="rankStore.loading"
       />
 
       <!-- Flex Rank -->
       <RankCard
         title="灵活组排"
         :queue="flexQueue"
+        :loading="rankStore.loading"
       />
 
       <!-- Recent Matches Quick View -->
@@ -35,10 +32,14 @@
             :class="{ win: match.win, lose: !match.win }"
             @click="goToMatch(match.gameId)"
           >
-            <ChampionIcon :champion-id="match.championId" :name="match.championName" size="sm" />
+            <div class="match-result-bar" />
+            <ChampionIcon :champion-id="match.championId" :name="match.championName" size="md" />
             <div class="match-info">
-              <span class="match-result">{{ match.win ? '胜利' : '失败' }}</span>
-              <span class="match-mode">{{ getQueueName(match) }}</span>
+              <span class="match-champion-name">{{ match.championName || '未知英雄' }}</span>
+              <div class="match-meta-row">
+                <span class="match-result">{{ match.win ? '胜利' : '失败' }}</span>
+                <span class="match-mode-tag" :class="getQueueTagClass(match)">{{ getQueueName(match) }}</span>
+              </div>
             </div>
             <div class="match-kda">
               <span class="kda-text">{{ match.kills }}/{{ match.deaths }}/{{ match.assists }}</span>
@@ -57,30 +58,18 @@
           <span class="empty-hint">连接客户端后显示</span>
         </div>
       </div>
-
-      <!-- Game Status Card -->
-      <div class="card status-card">
-        <h3 class="card-section-title">游戏状态</h3>
-        <div class="game-status-row">
-          <ConnectionStatusComp :status="appStore.connectionStatus" />
-        </div>
-        <div v-if="appStore.gamePhase !== 'None'" class="game-phase">
-          <span class="phase-dot" />
-          <span class="phase-label">{{ gamePhaseLabel }}</span>
-        </div>
-      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore, useSummonerStore, useMatchStore, useRankStore } from '@/stores';
 import { calculateKDA, formatRelativeTime, getQueueNameById } from '@lol-assistant/shared';
 import SummonerCard from '@/components/summoner/SummonerCard.vue';
 import RankCard from '@/components/rank/RankCard.vue';
-import { ChampionIcon, LoadingSpinner, ConnectionStatus as ConnectionStatusComp } from '@/components/common';
+import { ChampionIcon, LoadingSpinner } from '@/components/common';
 
 const router = useRouter();
 const appStore = useAppStore();
@@ -93,63 +82,63 @@ const summoner = computed(() => summonerStore.currentSummoner);
 const soloQueue = computed(() => rankStore.rankStats?.queueMap?.RANKED_SOLO_5x5 ?? null);
 const flexQueue = computed(() => rankStore.rankStats?.queueMap?.RANKED_FLEX_SR ?? null);
 
-const recentMatches = computed(() => matchStore.matchList.slice(0, 5));
+const recentMatches = computed(() => matchStore.matchList.slice(0, 8));
 
-const gamePhaseLabel = computed(() => {
-  const map: Record<string, string> = {
-    Lobby: '房间中',
-    Matchmaking: '匹配中',
-    ReadyCheck: '准备确认',
-    ChampSelect: '英雄选择',
-    GameStart: '对局开始',
-    InProgress: '对局中',
-    WaitingForStats: '等待结算',
-    EndOfGame: '对局结束',
+function getQueueName(match: { queueId: number; gameMode: string }): string {
+  const name = getQueueNameById(match.queueId);
+  if (name !== '其他模式') return name;
+  const modeMap: Record<string, string> = {
+    CLASSIC: '匹配模式',
+    ARAM: '极地大乱斗',
+    URF: '无限火力',
+    CHERRY: '竞技场',
+    TUTORIAL: '新手教程',
+    PRACTICETOOL: '训练模式',
   };
-  return map[appStore.gamePhase] ?? appStore.gamePhase;
-});
+  return modeMap[match.gameMode] || match.gameMode || '其他模式';
+}
 
-function getQueueName(match: { gameMode: string }): string {
-  return match.gameMode || '匹配';
+function getQueueTagClass(match: { queueId: number; gameMode: string }): string {
+  const ranked = [420, 440];
+  const aram = [450, 720, 2400];
+  const fun = [900, 1020, 1300, 1400, 1700, 1710, 1900];
+  const bot = [830, 840, 850, 870, 880, 890];
+  const clash = [700, 720];
+  if (ranked.includes(match.queueId)) return 'tag-ranked';
+  if (clash.includes(match.queueId)) return 'tag-ranked';
+  if (aram.includes(match.queueId)) return 'tag-aram';
+  if (fun.includes(match.queueId)) return 'tag-fun';
+  if (bot.includes(match.queueId)) return 'tag-bot';
+  if (match.gameMode === 'ARAM') return 'tag-aram';
+  if (match.gameMode === 'URF') return 'tag-fun';
+  if (match.gameMode === 'CHERRY') return 'tag-fun';
+  return 'tag-normal';
 }
 
 function goToMatch(gameId: number) {
   router.push({ path: '/match-history', query: { gameId: String(gameId) } });
 }
 
-onMounted(async () => {
-  if (appStore.isConnected && summoner.value) {
-    if (!rankStore.rankStats) {
-      rankStore.fetchRankStats(summoner.value.puuid);
-    }
-    if (matchStore.matchList.length === 0) {
-      matchStore.fetchMatchList(true);
-    }
+function loadHomeData() {
+  const s = summoner.value;
+  if (!s || !appStore.isConnected) return;
+  if (!rankStore.rankStats && !rankStore.loading) {
+    rankStore.fetchRankStats(s.puuid);
   }
-});
+  if (matchStore.matchList.length === 0 && !matchStore.loading) {
+    matchStore.fetchMatchList(true);
+  }
+}
+
+watch(summoner, (val) => {
+  if (val) loadHomeData();
+}, { immediate: true });
 </script>
 
 <style scoped>
 .home-page {
   max-width: var(--content-max-width);
   margin: 0 auto;
-}
-
-.page-header {
-  margin-bottom: var(--space-6);
-}
-
-.page-title {
-  font-size: var(--text-2xl);
-  font-weight: var(--font-bold);
-  letter-spacing: -0.5px;
-  color: var(--color-text-primary);
-}
-
-.page-subtitle {
-  font-size: var(--text-sm);
-  color: var(--color-text-tertiary);
-  margin-top: var(--space-1);
 }
 
 .home-grid {
@@ -187,49 +176,109 @@ onMounted(async () => {
 .recent-matches {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-2);
 }
 
 .recent-match-item {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-lg);
   cursor: pointer;
   transition: background var(--transition-fast);
+  position: relative;
 }
 
-.recent-match-item:hover {
-  background: var(--color-bg-hover);
-}
-
+/* 胜负淡色背景区分 */
 .recent-match-item.win {
-  border-left: 3px solid var(--color-win);
+  background: rgba(52, 199, 89, 0.06);
 }
 
 .recent-match-item.lose {
-  border-left: 3px solid var(--color-lose);
+  background: rgba(255, 59, 48, 0.06);
 }
+
+.recent-match-item.win:hover {
+  background: rgba(52, 199, 89, 0.12);
+}
+
+.recent-match-item.lose:hover {
+  background: rgba(255, 59, 48, 0.12);
+}
+
+.match-result-bar {
+  width: 3px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.win .match-result-bar { background: var(--color-win); }
+.lose .match-result-bar { background: var(--color-lose); }
 
 .match-info {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  min-width: 60px;
+  gap: 2px;
+  min-width: 80px;
+}
+
+.match-champion-name {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.match-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .match-result {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: var(--font-semibold);
 }
 
 .win .match-result { color: var(--color-win); }
 .lose .match-result { color: var(--color-lose); }
 
-.match-mode {
+.match-mode-tag {
   font-size: 10px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-medium);
+  white-space: nowrap;
+}
+
+.tag-ranked {
+  background: rgba(99, 132, 255, 0.12);
+  color: #6384ff;
+}
+
+.tag-aram {
+  background: rgba(46, 216, 176, 0.12);
+  color: #2ed8b0;
+}
+
+.tag-fun {
+  background: rgba(255, 168, 38, 0.12);
+  color: #ffa826;
+}
+
+.tag-normal {
+  background: var(--color-bg-tertiary);
   color: var(--color-text-tertiary);
+}
+
+.tag-bot {
+  background: rgba(162, 132, 94, 0.12);
+  color: #a2845e;
 }
 
 .match-kda {
@@ -268,39 +317,6 @@ onMounted(async () => {
 .empty-hint {
   font-size: var(--text-sm);
   color: var(--color-text-placeholder);
-}
-
-/* Game Status */
-.game-status-row {
-  margin-bottom: var(--space-2);
-}
-
-.game-phase {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  background: rgba(0, 113, 227, 0.08);
-  border-radius: var(--radius-md);
-}
-
-.phase-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-accent);
-  animation: pulse 1.5s ease infinite;
-}
-
-.phase-label {
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  color: var(--color-accent);
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
 }
 
 @media (max-width: 800px) {

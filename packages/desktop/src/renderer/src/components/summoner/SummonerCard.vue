@@ -2,13 +2,23 @@
   <div class="summoner-card card">
     <div v-if="summoner" class="summoner-info">
       <div class="avatar-wrapper">
-        <div class="avatar">
-          {{ summoner.displayName.charAt(0) }}
+        <img
+          v-if="avatarUrl"
+          class="avatar-img"
+          :src="avatarUrl"
+          :alt="summoner.displayName"
+          @error="avatarError = true"
+        />
+        <div v-else class="avatar-fallback">
+          {{ summonerName.charAt(0) }}
         </div>
         <span class="level-badge">{{ summoner.summonerLevel }}</span>
       </div>
       <div class="info-body">
-        <h2 class="summoner-name">{{ summoner.displayName }}</h2>
+        <h2 class="summoner-name">
+          {{ summonerName }}
+          <span v-if="summoner.tagLine" class="summoner-tag">#{{ summoner.tagLine }}</span>
+        </h2>
         <div class="xp-section">
           <div class="xp-bar">
             <div class="xp-fill" :style="{ width: xpPercent + '%' }" />
@@ -33,14 +43,27 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { Summoner } from '@lol-assistant/shared';
+import { getProfileIconUrl } from '@lol-assistant/shared';
 import { LoadingSpinner } from '@/components/common';
 
 const props = defineProps<{
   summoner: Summoner | null;
   isConnected: boolean;
 }>();
+
+const avatarError = ref(false);
+
+const summonerName = computed(() => {
+  if (!props.summoner) return '';
+  return props.summoner.gameName || props.summoner.displayName || props.summoner.internalName || '召唤师';
+});
+
+const avatarUrl = computed(() => {
+  if (!props.summoner || avatarError.value) return '';
+  return getProfileIconUrl(props.summoner.profileIconId, '14.24.1');
+});
 
 const xpPercent = computed(() => {
   if (!props.summoner) return 0;
@@ -70,7 +93,15 @@ const totalXp = computed(() => {
   flex-shrink: 0;
 }
 
-.avatar {
+.avatar-img {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-xl);
+  object-fit: cover;
+  border: 2px solid var(--color-border-light);
+}
+
+.avatar-fallback {
   width: 64px;
   height: 64px;
   border-radius: var(--radius-xl);
@@ -108,6 +139,13 @@ const totalXp = computed(() => {
   letter-spacing: -0.3px;
   color: var(--color-text-primary);
   margin-bottom: var(--space-2);
+}
+
+.summoner-tag {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-text-tertiary);
+  margin-left: 2px;
 }
 
 .xp-section {
