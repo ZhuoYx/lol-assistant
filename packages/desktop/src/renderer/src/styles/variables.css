@@ -1,0 +1,163 @@
+:root {
+  /* Apple-inspired color palette */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f5f5f7;
+  --color-bg-tertiary: #e8e8ed;
+  --color-bg-sidebar: rgba(246, 246, 248, 0.88);
+  --color-bg-card: #ffffff;
+  --color-bg-hover: rgba(0, 0, 0, 0.04);
+  --color-bg-active: rgba(0, 0, 0, 0.06);
+  --color-bg-mask: rgba(0, 0, 0, 0.25);
+
+  --color-text-primary: #1d1d1f;
+  --color-text-secondary: #6e6e73;
+  --color-text-tertiary: #86868b;
+  --color-text-placeholder: #aeaeb2;
+
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-border-light: rgba(0, 0, 0, 0.04);
+  --color-divider: rgba(0, 0, 0, 0.06);
+
+  --color-accent: #0071e3;
+  --color-accent-hover: #0077ed;
+  --color-accent-active: #006edb;
+
+  --color-success: #30d158;
+  --color-warning: #ff9f0a;
+  --color-error: #ff453a;
+  --color-info: #64d2ff;
+
+  /* LoL-themed accent */
+  --color-gold: #c89b3c;
+  --color-gold-light: #f0e6d2;
+  --color-gold-dark: #785a28;
+
+  /* Win/Loss */
+  --color-win: #3b82f6;
+  --color-win-bg: rgba(59, 130, 246, 0.08);
+  --color-lose: #ef4444;
+  --color-lose-bg: rgba(239, 68, 68, 0.08);
+
+  /* Tier colors */
+  --color-tier-iron: #6b6b6b;
+  --color-tier-bronze: #8b6914;
+  --color-tier-silver: #7b8a8e;
+  --color-tier-gold: #c89b3c;
+  --color-tier-platinum: #22a38b;
+  --color-tier-emerald: #1ba88f;
+  --color-tier-diamond: #576cce;
+  --color-tier-master: #9b59b6;
+  --color-tier-grandmaster: #e74c3c;
+  --color-tier-challenger: #f1c40f;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Border radius (微圆角) */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-full: 9999px;
+
+  /* Typography */
+  --font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+    'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
+
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 28px;
+
+  --font-regular: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.65;
+
+  /* Shadows (subtle, Apple-style) */
+  --shadow-xs: 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 8px 30px rgba(0, 0, 0, 0.1), 0 4px 10px rgba(0, 0, 0, 0.04);
+
+  /* Transitions */
+  --transition-fast: 120ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 300ms ease;
+  --transition-spring: 350ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+  /* Layout */
+  --sidebar-width: 220px;
+  --sidebar-collapsed-width: 64px;
+  --statusbar-height: 36px;
+  --titlebar-height: 38px;
+  --content-max-width: 1200px;
+
+  /* Z-index scale */
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-popover: 500;
+  --z-toast: 600;
+}
+
+/* Dark theme */
+[data-theme='dark'] {
+  --color-bg-primary: #1c1c1e;
+  --color-bg-secondary: #2c2c2e;
+  --color-bg-tertiary: #3a3a3c;
+  --color-bg-sidebar: rgba(28, 28, 30, 0.92);
+  --color-bg-card: #2c2c2e;
+  --color-bg-hover: rgba(255, 255, 255, 0.06);
+  --color-bg-active: rgba(255, 255, 255, 0.08);
+  --color-bg-mask: rgba(0, 0, 0, 0.5);
+
+  --color-text-primary: #f5f5f7;
+  --color-text-secondary: #a1a1a6;
+  --color-text-tertiary: #8e8e93;
+  --color-text-placeholder: #636366;
+
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-light: rgba(255, 255, 255, 0.06);
+  --color-divider: rgba(255, 255, 255, 0.08);
+
+  --color-accent: #0a84ff;
+  --color-accent-hover: #409cff;
+  --color-accent-active: #0071e3;
+
+  --color-success: #30d158;
+  --color-warning: #ffd60a;
+  --color-error: #ff453a;
+  --color-info: #64d2ff;
+
+  --color-win-bg: rgba(59, 130, 246, 0.12);
+  --color-lose-bg: rgba(239, 68, 68, 0.12);
+
+  --shadow-xs: 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.15);
+  --shadow-xl: 0 8px 30px rgba(0, 0, 0, 0.35), 0 4px 10px rgba(0, 0, 0, 0.15);
+}

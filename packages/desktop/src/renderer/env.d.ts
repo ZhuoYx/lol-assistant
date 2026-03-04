@@ -6,56 +6,47 @@ declare module '*.vue' {
   export default component;
 }
 
-import type {
-  ConnectionStatus,
-  CacheStats,
-  UpdateInfo,
-  Summoner,
-  MatchList,
-  MatchListParams,
-  MatchDetail,
-  RankStats,
-  LiveGameAnalysis,
-  ChampionBuilds,
-  ChampionCounters,
-  ScraperDataVersion,
-} from '@lol-assistant/shared';
+declare global {
+  interface Window {
+    electronAPI: ElectronAPI;
+  }
+}
 
 interface ElectronAPI {
   // LCU 连接
   lcuConnect: () => Promise<void>;
   lcuDisconnect: () => Promise<void>;
-  lcuGetStatus: () => Promise<ConnectionStatus>;
+  lcuGetStatus: () => Promise<import('@lol-assistant/shared').ConnectionStatus>;
 
   // 召唤师
-  getCurrentSummoner: () => Promise<Summoner>;
-  getSummonerById: (puuid: string) => Promise<Summoner>;
+  getCurrentSummoner: () => Promise<import('@lol-assistant/shared').Summoner>;
+  getSummonerById: (puuid: string) => Promise<import('@lol-assistant/shared').Summoner>;
 
   // 战绩
-  getMatchList: (params: MatchListParams) => Promise<MatchList>;
-  getMatchDetail: (gameId: number) => Promise<MatchDetail>;
+  getMatchList: (params: import('@lol-assistant/shared').MatchListParams) => Promise<import('@lol-assistant/shared').MatchList>;
+  getMatchDetail: (gameId: number) => Promise<import('@lol-assistant/shared').MatchDetail>;
 
   // 排位
-  getRankStats: (puuid: string) => Promise<RankStats>;
+  getRankStats: (puuid: string) => Promise<import('@lol-assistant/shared').RankStats>;
 
   // 缓存
   clearCache: () => Promise<void>;
-  getCacheStats: () => Promise<CacheStats>;
+  getCacheStats: () => Promise<import('@lol-assistant/shared').CacheStats>;
 
   // WebSocket 事件
   lcuSubscribe: (uri: string) => void;
   lcuUnsubscribe: (uri: string) => void;
   onLCUEvent: (callback: (event: unknown) => void) => () => void;
-  onConnectionChange: (callback: (status: ConnectionStatus) => void) => () => void;
+  onConnectionChange: (callback: (status: import('@lol-assistant/shared').ConnectionStatus) => void) => () => void;
 
   // 对局实时分析
-  analyzeLiveGame: () => Promise<LiveGameAnalysis>;
+  analyzeLiveGame: () => Promise<import('@lol-assistant/shared').LiveGameAnalysis>;
 
   // 第三方数据
-  getChampionBuilds: (championId: number) => Promise<ChampionBuilds>;
-  getChampionCounters: (championId: number) => Promise<ChampionCounters>;
+  getChampionBuilds: (championId: number) => Promise<import('@lol-assistant/shared').ChampionBuilds>;
+  getChampionCounters: (championId: number) => Promise<import('@lol-assistant/shared').ChampionCounters>;
   updateScraperData: () => Promise<void>;
-  getScraperDataVersion: () => Promise<ScraperDataVersion | null>;
+  getScraperDataVersion: () => Promise<import('@lol-assistant/shared').ScraperDataVersion | null>;
 
   // 窗口管理
   setAlwaysOnTop: (flag: boolean) => void;
@@ -63,7 +54,7 @@ interface ElectronAPI {
   minimizeToTray: () => void;
 
   // 自动更新
-  checkForUpdates: () => Promise<UpdateInfo | null>;
+  checkForUpdates: () => Promise<import('@lol-assistant/shared').UpdateInfo | null>;
   downloadUpdate: () => void;
   installUpdate: () => void;
   onUpdateProgress: (callback: (progress: number) => void) => () => void;
@@ -79,7 +70,7 @@ interface ElectronAPI {
   getMajorVersion: () => Promise<string | null>;
   getCachedAsset: (remoteUrl: string, assetType: string, assetId: string | number) => Promise<string>;
   getMetadata: (url: string, metaKey: string) => Promise<unknown>;
-  getAssetCacheStats: () => Promise<CacheStats>;
+  getAssetCacheStats: () => Promise<import('@lol-assistant/shared').CacheStats>;
   clearAssetCache: () => Promise<void>;
 
   // 首次引导
@@ -87,6 +78,4 @@ interface ElectronAPI {
   setFirstLaunchDone: () => Promise<void>;
 }
 
-interface Window {
-  electronAPI: ElectronAPI;
-}
+export {};
