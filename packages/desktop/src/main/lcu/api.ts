@@ -34,6 +34,17 @@ export const lcuAPI = {
   },
 
   /**
+   * 通过召唤师名称搜索
+   * LCU 端点 /lol-summoner/v1/summoners 需要 GET + JSON body { name: "xxx" }
+   */
+  async getSummonerByName(name: string): Promise<Summoner> {
+    return lcuClient.request<Summoner>('/lol-summoner/v1/summoners', {
+      method: 'GET',
+      data: { name },
+    });
+  },
+
+  /**
    * 获取当前召唤师的战绩列表
    */
   async getMatchList(params: MatchListParams = {}): Promise<MatchList> {

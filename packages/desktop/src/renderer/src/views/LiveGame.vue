@@ -157,7 +157,7 @@ const myTier = computed(() => {
 
 function handlePlayerClick(puuid: string) {
   router.push({
-    name: 'MatchHistory',
+    path: '/',
     query: { puuid },
   });
 }

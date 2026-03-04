@@ -169,6 +169,8 @@ function onItemImgError(event: Event) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+  transition: color var(--transition-fast);
 }
 
 .pr-name.me {

@@ -14,12 +14,6 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '战绩', icon: 'match' },
   },
   {
-    path: '/rank',
-    name: 'Rank',
-    component: () => import('@/views/Rank.vue'),
-    meta: { title: '排位', icon: 'rank' },
-  },
-  {
     path: '/champion-stats',
     name: 'ChampionStats',
     component: () => import('@/views/ChampionStats.vue'),

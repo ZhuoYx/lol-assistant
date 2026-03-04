@@ -1,9 +1,20 @@
 <template>
   <div class="page home-page">
+    <!-- 查看他人数据时的返回横幅 -->
+    <div v-if="viewingOther" class="other-banner">
+      <button class="back-btn" @click="goBackToMine">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+        返回我的账号
+      </button>
+      <span class="other-name">正在查看: {{ viewingSummonerName }}</span>
+    </div>
+
     <div class="home-grid">
       <!-- Summoner Card -->
       <SummonerCard
-        :summoner="summoner"
+        :summoner="displaySummoner"
         :is-connected="appStore.isConnected"
       />
 
@@ -12,6 +23,7 @@
         title="单排/双排"
         :queue="soloQueue"
         :loading="rankStore.loading"
+        :is-other="summonerStore.isViewingOther"
       />
 
       <!-- Flex Rank -->
@@ -19,6 +31,7 @@
         title="灵活组排"
         :queue="flexQueue"
         :loading="rankStore.loading"
+        :is-other="summonerStore.isViewingOther"
       />
 
       <!-- Recent Matches Quick View -->
@@ -67,21 +80,24 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, watch, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useAppStore, useSummonerStore, useMatchStore, useRankStore } from '@/stores';
 import { calculateKDA, formatRelativeTime, getQueueNameById } from '@lol-assistant/shared';
 import SummonerCard from '@/components/summoner/SummonerCard.vue';
 import RankCard from '@/components/rank/RankCard.vue';
 import { ChampionIcon, LoadingSpinner } from '@/components/common';
 
+const route = useRoute();
 const router = useRouter();
 const appStore = useAppStore();
 const summonerStore = useSummonerStore();
 const matchStore = useMatchStore();
 const rankStore = useRankStore();
 
-const summoner = computed(() => summonerStore.currentSummoner);
+const viewingOther = computed(() => summonerStore.isViewingOther);
+const viewingSummonerName = computed(() => summonerStore.viewingName);
+const displaySummoner = computed(() => summonerStore.displaySummoner);
 
 const soloQueue = computed(() => rankStore.rankStats?.queueMap?.RANKED_SOLO_5x5 ?? null);
 const flexQueue = computed(() => rankStore.rankStats?.queueMap?.RANKED_FLEX_SR ?? null);
@@ -130,26 +146,110 @@ function goToMatch(gameId: number) {
   router.push({ path: '/match-history', query: { gameId: String(gameId) } });
 }
 
+/** 切换查看某个用户，刷新所有数据 */
+async function switchToPlayer(puuid: string) {
+  await summonerStore.switchPlayer(puuid);
+  reloadAllData();
+}
+
+/** 回到自己的账号，刷新所有数据 */
+function goBackToMine() {
+  summonerStore.resetToMe();
+  reloadAllData();
+  router.replace('/');
+}
+
+/** 统一刷新排位 + 战绩数据 */
+function reloadAllData() {
+  const puuid = summonerStore.activePUUID;
+  if (!puuid) return;
+  rankStore.fetchRankStats(puuid);
+  matchStore.fetchMatchList(true);
+}
+
 function loadHomeData() {
-  const s = summoner.value;
+  const s = summonerStore.currentSummoner;
   if (!s || !appStore.isConnected) return;
+  // 如果路由带了 puuid query，说明要查看他人，由 watch/onMounted 处理
+  if (route.query.puuid) return;
+  // 如果当前已经在查看他人，不重复加载自己的数据
+  if (summonerStore.isViewingOther) return;
+
+  const puuid = summonerStore.activePUUID;
+  if (!puuid) return;
+
   if (!rankStore.rankStats && !rankStore.loading) {
-    rankStore.fetchRankStats(s.puuid);
+    rankStore.fetchRankStats(puuid);
   }
   if (matchStore.matchList.length === 0 && !matchStore.loading) {
     matchStore.fetchMatchList(true);
   }
 }
 
-watch(summoner, (val) => {
+// 搜索后路由带 puuid query，触发切换
+watch(() => route.query.puuid, async (puuid) => {
+  if (puuid && typeof puuid === 'string') {
+    await switchToPlayer(puuid);
+  }
+}, { immediate: false });
+
+watch(() => summonerStore.currentSummoner, (val) => {
   if (val) loadHomeData();
 }, { immediate: true });
+
+onMounted(async () => {
+  const queryPUUID = route.query.puuid as string | undefined;
+  if (queryPUUID) {
+    await switchToPlayer(queryPUUID);
+  } else if (summonerStore.isViewingOther) {
+    // 从其他页面切回首页，已在查看他人，确保数据是最新的
+    reloadAllData();
+  }
+});
 </script>
 
 <style scoped>
 .home-page {
   max-width: var(--content-max-width);
   margin: 0 auto;
+}
+
+/* 查看他人数据的横幅 */
+.other-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(0, 113, 227, 0.06);
+  border: 1px solid rgba(0, 113, 227, 0.15);
+  border-radius: var(--radius-lg);
+}
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  color: var(--color-accent);
+  background: rgba(0, 113, 227, 0.06);
+  border: 1px solid rgba(0, 113, 227, 0.2);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.back-btn:hover {
+  background: rgba(0, 113, 227, 0.12);
+  border-color: rgba(0, 113, 227, 0.4);
+}
+
+.other-name {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
 }
 
 .home-grid {
@@ -379,4 +479,5 @@ watch(summoner, (val) => {
     grid-template-columns: 1fr;
   }
 }
+
 </style>

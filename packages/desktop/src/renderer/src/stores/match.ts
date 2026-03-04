@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { MatchSummary, MatchDetail, MatchFilters, MatchListParams } from '@lol-assistant/shared';
+import { useSummonerStore } from './summoner';
 
 export const useMatchStore = defineStore('match', () => {
   const matchList = ref<MatchSummary[]>([]);
@@ -11,20 +12,29 @@ export const useMatchStore = defineStore('match', () => {
   const error = ref<string | null>(null);
 
   const filters = ref<MatchFilters>({});
-  const currentPUUID = ref<string | undefined>(undefined);
 
   const PAGE_SIZE = 50;
   const hasMore = computed(() => matchList.value.length < totalGames.value);
 
+  let fetchId = 0;
+
   async function fetchMatchList(reset = false) {
-    if (loading.value) return;
+    if (!reset && loading.value) return;
     loading.value = true;
     error.value = null;
+    const currentFetchId = ++fetchId;
+
+    // reset 时立即清空旧数据，防止切换用户时短暂展示旧用户战绩
+    if (reset) {
+      matchList.value = [];
+      totalGames.value = 0;
+    }
 
     try {
+      const summonerStore = useSummonerStore();
       const begIndex = reset ? 0 : matchList.value.length;
       const params: MatchListParams = {
-        puuid: currentPUUID.value,
+        puuid: summonerStore.activePUUID,
         begIndex,
         endIndex: begIndex + PAGE_SIZE,
         championId: filters.value.championId,
@@ -33,6 +43,8 @@ export const useMatchStore = defineStore('match', () => {
 
       const result = await window.electronAPI.getMatchList(params);
 
+      if (currentFetchId !== fetchId) return;
+
       if (reset) {
         matchList.value = result.matches ?? [];
       } else {
@@ -40,9 +52,12 @@ export const useMatchStore = defineStore('match', () => {
       }
       totalGames.value = result.totalGames ?? 0;
     } catch (e) {
+      if (currentFetchId !== fetchId) return;
       error.value = e instanceof Error ? e.message : '获取战绩失败';
     } finally {
-      loading.value = false;
+      if (currentFetchId === fetchId) {
+        loading.value = false;
+      }
     }
   }
 
@@ -68,17 +83,12 @@ export const useMatchStore = defineStore('match', () => {
     filters.value = newFilters;
   }
 
-  function setPUUID(puuid?: string) {
-    currentPUUID.value = puuid;
-  }
-
   function clear() {
     matchList.value = [];
     currentMatch.value = null;
     totalGames.value = 0;
     error.value = null;
     filters.value = {};
-    currentPUUID.value = undefined;
   }
 
   return {
@@ -89,12 +99,10 @@ export const useMatchStore = defineStore('match', () => {
     loadingDetail,
     error,
     filters,
-    currentPUUID,
     hasMore,
     fetchMatchList,
     fetchMatchDetail,
     setFilters,
-    setPUUID,
     clear,
   };
 });

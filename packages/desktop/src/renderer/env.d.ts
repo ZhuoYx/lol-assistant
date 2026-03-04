@@ -21,6 +21,7 @@ interface ElectronAPI {
   // 召唤师
   getCurrentSummoner: () => Promise<import('@lol-assistant/shared').Summoner>;
   getSummonerById: (puuid: string) => Promise<import('@lol-assistant/shared').Summoner>;
+  searchSummoner: (query: string) => Promise<import('@lol-assistant/shared').Summoner>;
 
   // 战绩
   getMatchList: (params: import('@lol-assistant/shared').MatchListParams) => Promise<import('@lol-assistant/shared').MatchList>;

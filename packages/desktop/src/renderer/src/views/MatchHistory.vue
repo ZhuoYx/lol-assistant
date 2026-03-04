@@ -9,6 +9,7 @@
         返回我的战绩
       </button>
       <span class="other-name">{{ otherSummonerName }} 的战绩</span>
+
     </div>
 
     <!-- 详情视图 -->
@@ -110,7 +111,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useMatchStore, useSummonerStore } from '@/stores';
+import { useMatchStore, useSummonerStore, useRankStore } from '@/stores';
 import { LoadingSpinner, EmptyState, ErrorDisplay } from '@/components/common';
 import MatchFilter from '@/components/match/MatchFilter.vue';
 import MatchListItem from '@/components/match/MatchListItem.vue';
@@ -120,15 +121,16 @@ const route = useRoute();
 const router = useRouter();
 const matchStore = useMatchStore();
 const summonerStore = useSummonerStore();
+const rankStore = useRankStore();
 
 const selectedGameId = ref<number | null>(null);
 const currentQueue = ref<number | undefined>(undefined);
-const otherSummonerName = ref('');
 const currentPage = ref(1);
 const PAGE_SIZE = 10;
 
-const viewingOther = computed(() => !!matchStore.currentPUUID);
-const currentPUUID = computed(() => summonerStore.currentSummoner?.puuid);
+const viewingOther = computed(() => summonerStore.isViewingOther);
+const otherSummonerName = computed(() => summonerStore.viewingName);
+const currentPUUID = computed(() => summonerStore.activePUUID);
 const showDetail = computed(() => selectedGameId.value !== null);
 
 // totalPages 基于实际已加载的数据量，而非 totalGames（筛选后 totalGames 可能不准确）
@@ -195,13 +197,18 @@ async function refresh() {
 }
 
 function viewPlayerHistory(puuid: string) {
-  router.push({ path: '/match-history', query: { puuid } });
+  router.push({ path: '/', query: { puuid } });
 }
 
 function goBackToMine() {
-  matchStore.setPUUID(undefined);
+  summonerStore.resetToMe();
   currentPage.value = 1;
   selectedGameId.value = null;
+  // 刷新回自己的数据
+  const puuid = summonerStore.activePUUID;
+  if (puuid) {
+    rankStore.fetchRankStats(puuid);
+  }
   matchStore.fetchMatchList(true);
   router.replace('/match-history');
   scrollToTop();
@@ -214,9 +221,7 @@ onMounted(async () => {
   const queryGameId = route.query.gameId as string | undefined;
 
   if (queryPUUID) {
-    matchStore.setPUUID(queryPUUID);
-    const s = await summonerStore.fetchSummonerByPUUID(queryPUUID);
-    otherSummonerName.value = s?.displayName ?? '未知召唤师';
+    await summonerStore.switchPlayer(queryPUUID);
   }
 
   await matchStore.fetchMatchList(true);

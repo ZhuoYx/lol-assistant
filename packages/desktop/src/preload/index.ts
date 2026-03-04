@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ─── 召唤师 ────────────────────────────────────────────
   getCurrentSummoner: () => ipcRenderer.invoke('summoner:getCurrent'),
   getSummonerById: (puuid: string) => ipcRenderer.invoke('summoner:getById', puuid),
+  searchSummoner: (query: string) => ipcRenderer.invoke('summoner:search', query),
 
   // ─── 战绩 ──────────────────────────────────────────────
   getMatchList: (params: object) => ipcRenderer.invoke('match:getList', params),

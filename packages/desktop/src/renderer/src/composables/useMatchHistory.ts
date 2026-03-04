@@ -1,4 +1,5 @@
 import { useMatchStore } from '@/stores/match';
+import { useSummonerStore } from '@/stores/summoner';
 import type { MatchFilters } from '@lol-assistant/shared';
 
 /**
@@ -6,9 +7,12 @@ import type { MatchFilters } from '@lol-assistant/shared';
  */
 export function useMatchHistory() {
   const matchStore = useMatchStore();
+  const summonerStore = useSummonerStore();
 
   async function loadMatches(puuid?: string) {
-    matchStore.setPUUID(puuid);
+    if (puuid) {
+      await summonerStore.switchPlayer(puuid);
+    }
     await matchStore.fetchMatchList(true);
   }
 

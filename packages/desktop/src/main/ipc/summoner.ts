@@ -37,4 +37,23 @@ export function registerSummonerIpcHandlers(): void {
       throw err;
     }
   });
+
+  // 通过名称搜索召唤师（支持 "名称#标签" 格式）
+  ipcMain.handle('summoner:search', async (_event, query: string) => {
+    try {
+      // 解析 "名称#标签" 格式
+      const parts = query.split('#');
+      const gameName = parts[0].trim();
+      if (!gameName) throw new Error('搜索名称不能为空');
+
+      const summoner = await lcuAPI.getSummonerByName(gameName);
+      if (summoner) {
+        cacheStore.set('summoner', summoner.puuid, summoner);
+      }
+      return summoner;
+    } catch (err) {
+      logger.error(`IPC summoner:search 失败 (query=${query}):`, err);
+      throw err;
+    }
+  });
 }

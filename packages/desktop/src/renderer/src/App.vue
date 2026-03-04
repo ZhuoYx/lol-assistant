@@ -56,6 +56,41 @@
                 </div>
               </div>
 
+              <!-- Search Box -->
+              <div v-if="!appStore.sidebarCollapsed" class="sidebar-search">
+                <div class="search-wrapper" :class="{ focused: searchFocused, loading: searchLoading }">
+                  <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                  </svg>
+                  <input
+                    ref="searchInputRef"
+                    v-model="searchQuery"
+                    class="search-input"
+                    placeholder="搜索召唤师..."
+                    @focus="searchFocused = true"
+                    @blur="onSearchBlur"
+                    @keydown.enter="handleSearch"
+                  />
+                  <svg v-if="searchLoading" class="search-spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                </div>
+                <div v-if="searchError" class="search-error">{{ searchError }}</div>
+              </div>
+              <div v-else class="sidebar-search-collapsed">
+                <div
+                  class="nav-item"
+                  title="搜索召唤师"
+                  @click="expandAndFocusSearch"
+                >
+                  <span class="nav-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                    </svg>
+                  </span>
+                </div>
+              </div>
+
               <nav class="sidebar-nav">
                 <div
                   v-for="item in menuItems"
@@ -145,7 +180,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue';
+import { computed, ref, nextTick, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
   NConfigProvider,
@@ -175,6 +210,53 @@ let unsubUpdateStatus: (() => void) | null = null;
 
 const currentRoute = computed(() => route.path);
 
+// Search state
+const searchQuery = ref('');
+const searchFocused = ref(false);
+const searchLoading = ref(false);
+const searchError = ref('');
+const searchInputRef = ref<HTMLInputElement | null>(null);
+
+function onSearchBlur() {
+  setTimeout(() => {
+    searchFocused.value = false;
+    searchError.value = '';
+  }, 200);
+}
+
+async function handleSearch() {
+  const query = searchQuery.value.trim();
+  if (!query) return;
+  searchLoading.value = true;
+  searchError.value = '';
+
+  try {
+    // 判断输入是否为 UUID 格式（PUUID），是则直接用 getById；否则按名称搜索
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(query);
+    const summoner = isUUID
+      ? await window.electronAPI.getSummonerById(query)
+      : await window.electronAPI.searchSummoner(query);
+
+    if (summoner && summoner.puuid) {
+      searchQuery.value = '';
+      router.push({ path: '/', query: { puuid: summoner.puuid } });
+    } else {
+      searchError.value = '未找到该召唤师';
+    }
+  } catch {
+    searchError.value = '搜索失败，请检查名称格式';
+  } finally {
+    searchLoading.value = false;
+  }
+}
+
+function expandAndFocusSearch() {
+  appStore.sidebarCollapsed = false;
+  nextTick(() => {
+    searchInputRef.value?.focus();
+  });
+}
+
 // Menu items with inline SVG icons
 const menuItems = computed(() => {
   const isInGame = appStore.gamePhase === 'InProgress' || appStore.gamePhase === 'GameStart';
@@ -190,11 +272,6 @@ const menuItems = computed(() => {
       path: '/match-history',
       label: '战绩',
       icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>',
-    },
-    {
-      path: '/rank',
-      label: '排位',
-      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
     },
     {
       path: '/champion-stats',
@@ -382,6 +459,71 @@ onUnmounted(() => {
   font-weight: var(--font-semibold);
   white-space: nowrap;
   letter-spacing: -0.3px;
+}
+
+/* Search */
+.sidebar-search {
+  padding: 0 var(--space-2) var(--space-2);
+  flex-shrink: 0;
+}
+
+.sidebar-search-collapsed {
+  padding: 0 var(--space-2);
+  flex-shrink: 0;
+}
+
+.search-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-hover);
+  border: 1px solid transparent;
+  transition: all var(--transition-fast);
+}
+
+.search-wrapper.focused {
+  border-color: var(--color-accent);
+  background: var(--color-bg-primary);
+  box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.1);
+}
+
+.search-icon {
+  color: var(--color-text-placeholder);
+  flex-shrink: 0;
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: var(--text-xs);
+  color: var(--color-text-primary);
+  min-width: 0;
+}
+
+.search-input::placeholder {
+  color: var(--color-text-placeholder);
+}
+
+.search-spinner {
+  flex-shrink: 0;
+  color: var(--color-accent);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.search-error {
+  font-size: 10px;
+  color: var(--color-error);
+  padding: var(--space-1) var(--space-3) 0;
 }
 
 /* Navigation */

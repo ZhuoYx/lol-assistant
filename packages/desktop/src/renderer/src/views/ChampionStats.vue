@@ -76,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import type { ChampionStats } from '@lol-assistant/shared';
 import { useAppStore, useSummonerStore } from '@/stores';
 import { LoadingSpinner, EmptyState, ErrorDisplay } from '@/components/common';
@@ -128,7 +128,7 @@ function onSelectChampion(id: number) {
 }
 
 async function fetchData() {
-  const puuid = summonerStore.currentSummoner?.puuid;
+  const puuid = summonerStore.activePUUID;
   if (!puuid) return;
 
   loading.value = true;
@@ -147,7 +147,16 @@ async function fetchData() {
 }
 
 onMounted(() => {
-  if (appStore.isConnected && summonerStore.currentSummoner) {
+  if (appStore.isConnected && summonerStore.activePUUID) {
+    fetchData();
+  }
+});
+
+// 用户切换时（activePUUID 变化），重新拉取英雄数据
+watch(() => summonerStore.activePUUID, (newPUUID, oldPUUID) => {
+  if (newPUUID && newPUUID !== oldPUUID) {
+    championStats.value = [];
+    selectedChampionId.value = null;
     fetchData();
   }
 });

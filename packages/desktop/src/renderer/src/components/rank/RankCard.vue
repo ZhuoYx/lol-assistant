@@ -39,12 +39,13 @@
           <div class="lp-progress-fill" :style="{ width: lpProgress + '%' }" />
         </div>
 
-        <div class="rank-record-row">
+        <div v-if="!isOther" class="rank-record-row">
           <span class="wins">{{ queue.wins }}胜</span>
           <span class="losses">{{ queue.losses }}负</span>
           <span class="winrate-divider">&middot;</span>
           <span class="winrate" :class="winRateColorClass">{{ winRateText }}</span>
         </div>
+        <span v-else class="winrate-na">胜负数据不可用</span>
       </div>
 
       <!-- Mini Series -->
@@ -84,8 +85,11 @@ const props = withDefaults(defineProps<{
   title: string;
   queue: QueueInfo | null | undefined;
   loading?: boolean;
+  /** 是否查看他人（他人不显示胜负数据） */
+  isOther?: boolean;
 }>(), {
   loading: false,
+  isOther: false,
 });
 
 const iconError = ref(false);
@@ -140,6 +144,9 @@ const winRate = computed(() => {
   const total = props.queue.wins + props.queue.losses;
   return calculateWinRate(props.queue.wins, total);
 });
+
+
+
 
 const winRateText = computed(() => formatPercent(winRate.value));
 
@@ -431,6 +438,7 @@ const winRateColorClass = computed(() => {
 .winrate { color: var(--color-text-tertiary); }
 .winrate.high { color: var(--color-win); font-weight: var(--font-semibold); }
 .winrate.low { color: var(--color-lose); font-weight: var(--font-semibold); }
+.winrate-na { color: var(--color-text-placeholder); font-style: italic; font-size: var(--text-xs); }
 
 /* ── Mini Series ── */
 .mini-series {

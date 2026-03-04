@@ -365,16 +365,22 @@ export function registerMatchIpcHandlers(): void {
   // 获取战绩列表（含 MVP/SVP，通过批量请求详情计算）
   ipcMain.handle('match:getList', async (_event, params: MatchListParams) => {
     try {
-      const cacheKey = `list_${params.begIndex ?? 0}_${params.endIndex ?? 20}_q${params.queue ?? 'all'}_c${params.championId ?? 'all'}`;
+      const puuid = params.puuid;
+      const cacheKey = `list_${puuid ?? 'me'}_${params.begIndex ?? 0}_${params.endIndex ?? 20}_q${params.queue ?? 'all'}_c${params.championId ?? 'all'}`;
       const cached = cacheStore.get('matchList', cacheKey);
       if (cached) return cached;
 
       // LCU API 不支持 queue 参数，先拿全部数据再前端过滤
       const apiParams: MatchListParams = {
         ...params,
+        puuid: undefined,  // 移除 puuid，API 不需要
         queue: undefined,  // 移除 queue，避免 400 错误
       };
-      const raw = await lcuAPI.getMatchList(apiParams);
+
+      // 如果指定了 puuid，使用按 PUUID 查询的接口；否则使用当前用户接口
+      const raw = puuid
+        ? await lcuAPI.getMatchListByPUUID(puuid, apiParams)
+        : await lcuAPI.getMatchList(apiParams);
       const matchList = transformMatchList(raw);
 
       // 按队列类型过滤
