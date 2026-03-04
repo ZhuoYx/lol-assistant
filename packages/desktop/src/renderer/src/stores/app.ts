@@ -9,7 +9,7 @@ export const useAppStore = defineStore('app', () => {
 
   // Settings
   const settings = ref<AppSettings>({
-    theme: 'dark',
+    theme: 'light',
     language: 'zh-CN',
     cacheEnabled: true,
     lanProxyEnabled: false,

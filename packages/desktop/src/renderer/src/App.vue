@@ -11,9 +11,9 @@
         <n-dialog-provider>
           <!-- Mini Mode Layout -->
           <div v-if="appStore.isMiniMode" class="mini-layout">
-            <div class="mini-titlebar drag-region">
+            <div class="mini-titlebar">
               <span class="mini-title">LOL 助手</span>
-              <div class="mini-controls no-drag">
+              <div class="mini-controls">
                 <button class="mini-btn" title="退出迷你模式" @click="exitMiniMode">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" />
@@ -43,8 +43,8 @@
               class="sidebar"
               :class="{ collapsed: appStore.sidebarCollapsed }"
             >
-              <div class="sidebar-header drag-region">
-                <div class="sidebar-logo no-drag" @click="appStore.toggleSidebar">
+              <div class="sidebar-header">
+                <div class="sidebar-logo" @click="appStore.toggleSidebar">
                   <div class="logo-icon">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -57,13 +57,13 @@
               </div>
 
               <nav class="sidebar-nav">
-                <router-link
+                <div
                   v-for="item in menuItems"
                   :key="item.path"
-                  :to="item.path"
-                  class="nav-item no-drag"
+                  class="nav-item"
                   :class="{ active: currentRoute === item.path }"
                   :title="item.label"
+                  @click="router.push(item.path)"
                 >
                   <span class="nav-icon" v-html="item.icon" />
                   <transition name="fade">
@@ -75,15 +75,15 @@
                   >
                     {{ item.badge }}
                   </span>
-                </router-link>
+                </div>
               </nav>
 
-              <div class="sidebar-footer no-drag">
-                <router-link
-                  to="/settings"
+              <div class="sidebar-footer">
+                <div
                   class="nav-item"
                   :class="{ active: currentRoute === '/settings' }"
                   title="设置"
+                  @click="router.push('/settings')"
                 >
                   <span class="nav-icon">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -93,7 +93,7 @@
                   <transition name="fade">
                     <span v-if="!appStore.sidebarCollapsed" class="nav-label">设置</span>
                   </transition>
-                </router-link>
+                </div>
               </div>
             </aside>
 
@@ -347,16 +347,17 @@ onUnmounted(() => {
   height: var(--titlebar-height);
   display: flex;
   align-items: center;
-  padding: 0 var(--space-4);
+  padding: 0 var(--space-2);
   flex-shrink: 0;
 }
 
 .sidebar-logo {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   cursor: pointer;
-  padding: var(--space-1) var(--space-2);
+  padding: 0 var(--space-3);
+  height: 38px;
   border-radius: var(--radius-md);
   transition: background var(--transition-fast);
   color: var(--color-text-primary);
@@ -367,8 +368,8 @@ onUnmounted(() => {
 }
 
 .logo-icon {
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
