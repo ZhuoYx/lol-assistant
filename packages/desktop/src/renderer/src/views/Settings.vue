@@ -118,6 +118,56 @@
         </div>
       </section>
 
+      <!-- LAN Proxy -->
+      <section class="settings-section">
+        <h2 class="section-title">局域网代理</h2>
+        <div class="settings-card">
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">启用代理服务</span>
+              <span class="setting-desc">允许局域网内其他设备访问助手数据</span>
+            </div>
+            <div class="setting-control">
+              <n-switch
+                v-model:value="lanProxyEnabled"
+                :loading="proxyToggling"
+                @update:value="onLanProxyChange"
+              />
+            </div>
+          </div>
+          <template v-if="lanProxyEnabled">
+            <div class="setting-tip proxy-security-tip">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+              <span>代理服务仅在局域网内可用，请确保你处于受信任的网络环境</span>
+            </div>
+            <div class="setting-divider" />
+            <div class="setting-row proxy-info-row">
+              <div class="setting-info">
+                <span class="setting-label">访问地址</span>
+                <span class="setting-desc proxy-address">{{ proxyAddress || '获取中...' }}</span>
+              </div>
+              <div class="setting-control">
+                <n-button
+                  size="small"
+                  :disabled="!proxyAddress"
+                  @click="handleCopyAddress"
+                >
+                  复制
+                </n-button>
+              </div>
+            </div>
+            <div v-if="proxyQrDataUrl" class="proxy-qr-section">
+              <div class="proxy-qr-wrapper">
+                <img :src="proxyQrDataUrl" alt="QR Code" class="proxy-qr-img" />
+              </div>
+              <span class="proxy-qr-hint">使用手机扫码访问</span>
+            </div>
+          </template>
+        </div>
+      </section>
+
       <!-- About -->
       <section class="settings-section">
         <h2 class="section-title">关于</h2>
@@ -148,7 +198,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { NSelect, NSwitch, NButton } from 'naive-ui';
 import { useAppStore } from '@/stores';
@@ -156,6 +206,7 @@ import { useCache } from '@/composables/useCache';
 import { useScraperData } from '@/composables/useScraperData';
 import { formatRelativeTime, formatFileSize } from '@lol-assistant/shared';
 import type { ScraperDataVersion } from '@lol-assistant/shared';
+import QRCode from 'qrcode';
 
 const appStore = useAppStore();
 const router = useRouter();
@@ -172,6 +223,12 @@ const clearingCache = ref(false);
 const cacheSize = ref(0);
 const cacheSizeText = ref('计算中...');
 const scraperVersion = ref<ScraperDataVersion | null>(null);
+
+// LAN Proxy
+const lanProxyEnabled = ref(false);
+const proxyToggling = ref(false);
+const proxyAddress = ref<string | null>(null);
+const proxyQrDataUrl = ref<string | null>(null);
 
 const themeOptions = [
   { label: '浅色', value: 'light' as const },
@@ -221,6 +278,63 @@ function handleResetGuide() {
   router.push('/welcome');
 }
 
+async function onLanProxyChange(value: boolean) {
+  proxyToggling.value = true;
+  try {
+    if (value) {
+      const status = await window.electronAPI.startProxy();
+      proxyAddress.value = status.address;
+      appStore.updateSettings({ lanProxyEnabled: true });
+      if (status.address) {
+        await generateQRCode(status.address);
+      }
+    } else {
+      await window.electronAPI.stopProxy();
+      proxyAddress.value = null;
+      proxyQrDataUrl.value = null;
+      appStore.updateSettings({ lanProxyEnabled: false });
+    }
+  } catch {
+    lanProxyEnabled.value = !value;
+  } finally {
+    proxyToggling.value = false;
+  }
+}
+
+async function generateQRCode(text: string) {
+  try {
+    proxyQrDataUrl.value = await QRCode.toDataURL(text, {
+      width: 160,
+      margin: 2,
+      color: {
+        dark: appStore.isDarkTheme ? '#f5f5f7' : '#1d1d1f',
+        light: appStore.isDarkTheme ? '#2c2c2e' : '#ffffff',
+      },
+    });
+  } catch {
+    proxyQrDataUrl.value = null;
+  }
+}
+
+function handleCopyAddress() {
+  if (proxyAddress.value) {
+    navigator.clipboard.writeText(proxyAddress.value);
+  }
+}
+
+async function loadProxyStatus() {
+  try {
+    const status = await window.electronAPI.getProxyStatus();
+    lanProxyEnabled.value = status.running;
+    proxyAddress.value = status.address;
+    if (status.running && status.address) {
+      await generateQRCode(status.address);
+    }
+  } catch {
+    lanProxyEnabled.value = false;
+  }
+}
+
 async function loadCacheStats() {
   try {
     const stats = await window.electronAPI.getCacheStats();
@@ -242,6 +356,11 @@ async function loadScraperVersion() {
 onMounted(() => {
   loadCacheStats();
   loadScraperVersion();
+  loadProxyStatus();
+});
+
+onUnmounted(() => {
+  // cleanup if needed
 });
 </script>
 
@@ -350,5 +469,46 @@ onMounted(() => {
 
 .tip-dismiss:hover {
   color: var(--color-text-secondary);
+}
+
+.proxy-security-tip {
+  background: rgba(10, 132, 255, 0.06);
+  color: var(--color-accent);
+  border-top: 1px solid rgba(10, 132, 255, 0.1);
+}
+
+.proxy-address {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  user-select: all;
+}
+
+.proxy-qr-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-4);
+  gap: var(--space-2);
+  border-top: 1px solid var(--color-divider);
+}
+
+.proxy-qr-wrapper {
+  background: var(--color-bg-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  box-shadow: var(--shadow-sm);
+}
+
+.proxy-qr-img {
+  display: block;
+  width: 160px;
+  height: 160px;
+  border-radius: var(--radius-md);
+}
+
+.proxy-qr-hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
 }
 </style>

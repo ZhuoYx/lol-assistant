@@ -121,4 +121,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   validateLolPath: (lolPath: string) => ipcRenderer.invoke('app:validateLolPath', lolPath),
   saveLolPath: (lolPath: string) => ipcRenderer.invoke('app:saveLolPath', lolPath),
   getSavedLolPath: () => ipcRenderer.invoke('app:getSavedLolPath'),
+
+  // ─── 局域网代理 ────────────────────────────────────────
+  startProxy: () => ipcRenderer.invoke('proxy:start'),
+  stopProxy: () => ipcRenderer.invoke('proxy:stop'),
+  getProxyStatus: () => ipcRenderer.invoke('proxy:status'),
 });

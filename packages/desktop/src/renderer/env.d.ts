@@ -94,6 +94,21 @@ interface ElectronAPI {
   validateLolPath: (lolPath: string) => Promise<boolean>;
   saveLolPath: (lolPath: string) => Promise<void>;
   getSavedLolPath: () => Promise<string | null>;
+
+  // 局域网代理
+  startProxy: () => Promise<{
+    running: boolean;
+    port: number;
+    localIP: string | null;
+    address: string | null;
+  }>;
+  stopProxy: () => Promise<void>;
+  getProxyStatus: () => Promise<{
+    running: boolean;
+    port: number;
+    localIP: string | null;
+    address: string | null;
+  }>;
 }
 
 export {};

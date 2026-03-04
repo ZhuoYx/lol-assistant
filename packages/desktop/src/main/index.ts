@@ -10,6 +10,7 @@ import { lcuClient } from './lcu/client';
 import { lcuWebSocket } from './lcu/websocket';
 import { registerAllIpcHandlers } from './ipc/index';
 import { assetCacheManager } from './assets/index';
+import { lanProxyServer } from './proxy/server';
 import type { LCUEvent, GamePhase } from '@lol-assistant/shared';
 
 /** 主窗口 */
@@ -345,6 +346,7 @@ app.on('before-quit', () => {
   }
   lcuWebSocket.destroy();
   lcuClient.destroy();
+  lanProxyServer.destroy();
 
   if (tray) {
     tray.destroy();
