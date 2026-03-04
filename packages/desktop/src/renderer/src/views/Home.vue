@@ -42,8 +42,12 @@
               </div>
             </div>
             <div class="match-kda">
-              <span class="kda-text">{{ match.kills }}/{{ match.deaths }}/{{ match.assists }}</span>
-              <span class="kda-value">{{ calculateKDA(match.kills, match.deaths, match.assists).toFixed(1) }} KDA</span>
+              <div class="kda-row">
+                <span v-if="match.isMVP" class="badge badge-mvp">MVP</span>
+                <span v-if="match.isSVP" class="badge badge-svp">SVP</span>
+                <span class="kda-text">{{ match.kills }}/{{ match.deaths }}/{{ match.assists }}</span>
+              </div>
+              <span class="kda-value" :class="getKdaClass(match)">{{ calculateKDA(match.kills, match.deaths, match.assists).toFixed(1) }} KDA</span>
             </div>
             <span class="match-time">{{ formatRelativeTime(match.gameCreation) }}</span>
           </div>
@@ -113,6 +117,13 @@ function getQueueTagClass(match: { queueId: number; gameMode: string }): string 
   if (match.gameMode === 'URF') return 'tag-fun';
   if (match.gameMode === 'CHERRY') return 'tag-fun';
   return 'tag-normal';
+}
+
+function getKdaClass(match: { kills: number; deaths: number; assists: number; isMVP?: boolean; isSVP?: boolean }): string {
+  if (match.isMVP || match.isSVP) return 'kda-gold';
+  const kda = calculateKDA(match.kills, match.deaths, match.assists);
+  if (kda >= 1) return 'kda-good';
+  return 'kda-poor';
 }
 
 function goToMatch(gameId: number) {
@@ -289,6 +300,37 @@ watch(summoner, (val) => {
   margin-left: auto;
 }
 
+.kda-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.badge-mvp {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.18), rgba(255, 180, 0, 0.12));
+  color: #d4a017;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+.badge-svp {
+  background: linear-gradient(135deg, rgba(192, 192, 192, 0.18), rgba(160, 160, 180, 0.12));
+  color: #8e8ea0;
+  border: 1px solid rgba(192, 192, 192, 0.3);
+}
+
 .kda-text {
   font-size: var(--text-sm);
   font-weight: var(--font-semibold);
@@ -299,6 +341,19 @@ watch(summoner, (val) => {
 .kda-value {
   font-size: 10px;
   color: var(--color-text-tertiary);
+}
+
+.kda-value.kda-gold {
+  color: var(--color-gold);
+  font-weight: var(--font-semibold);
+}
+
+.kda-value.kda-good {
+  color: var(--color-win);
+}
+
+.kda-value.kda-poor {
+  color: var(--color-text-placeholder);
 }
 
 .match-time {

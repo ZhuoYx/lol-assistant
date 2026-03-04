@@ -13,7 +13,7 @@ export const useMatchStore = defineStore('match', () => {
   const filters = ref<MatchFilters>({});
   const currentPUUID = ref<string | undefined>(undefined);
 
-  const PAGE_SIZE = 20;
+  const PAGE_SIZE = 50;
   const hasMore = computed(() => matchList.value.length < totalGames.value);
 
   async function fetchMatchList(reset = false) {
@@ -49,8 +49,15 @@ export const useMatchStore = defineStore('match', () => {
   async function fetchMatchDetail(gameId: number) {
     loadingDetail.value = true;
     try {
-      currentMatch.value = await window.electronAPI.getMatchDetail(gameId);
+      const result = await window.electronAPI.getMatchDetail(gameId);
+      console.log('[matchStore] fetchMatchDetail result:', gameId, result);
+      console.log('[matchStore] participants count:', result?.participants?.length ?? 0);
+      if (result?.participants?.length > 0) {
+        console.log('[matchStore] first participant:', JSON.stringify(result.participants[0]));
+      }
+      currentMatch.value = result;
     } catch (e) {
+      console.error('[matchStore] fetchMatchDetail error:', e);
       error.value = e instanceof Error ? e.message : '获取战绩详情失败';
     } finally {
       loadingDetail.value = false;

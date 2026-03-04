@@ -14,6 +14,10 @@ export interface MatchSummary {
   assists: number;
   lane: string;
   role: string;
+  /** 是否为胜利方 KDA 最高者 */
+  isMVP?: boolean;
+  /** 是否为失败方 KDA 最高者 */
+  isSVP?: boolean;
 }
 
 /** 战绩列表 */
@@ -34,6 +38,7 @@ export interface MatchListParams {
 /** 战绩详情 */
 export interface MatchDetail {
   gameId: number;
+  queueId: number;
   gameMode: string;
   gameType: string;
   gameCreation: number;
@@ -52,8 +57,10 @@ export interface Team {
 
 /** 参与者信息 */
 export interface Participant {
+  participantId: number;
   puuid: string;
   summonerName: string;
+  tagLine?: string;
   championId: number;
   championName: string;
   teamId: number;
@@ -68,6 +75,9 @@ export interface Participant {
   items: number[];
   perks: Perks;
   lane: string;
+  role: string;
+  isMVP?: boolean;
+  isSVP?: boolean;
 }
 
 /** 符文配置 */

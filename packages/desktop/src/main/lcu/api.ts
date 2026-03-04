@@ -149,6 +149,10 @@ function buildMatchListQuery(params: MatchListParams): string {
   if (params.endIndex !== undefined) {
     queryParams.push(`endIndex=${params.endIndex}`);
   }
+  // 注意：LCU API 不支持 queue 参数，队列筛选在前端完成
+  if (params.championId !== undefined) {
+    queryParams.push(`championId=${params.championId}`);
+  }
 
   if (queryParams.length === 0) return '';
   return `?${queryParams.join('&')}`;

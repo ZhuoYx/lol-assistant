@@ -25,7 +25,7 @@ export const QUEUE_TYPE_MAP: Record<number, QueueType> = {
   870: { id: 870, name: '人机入门', description: '人机对战 入门' },
   880: { id: 880, name: '人机新手', description: '人机对战 新手' },
   890: { id: 890, name: '人机一般', description: '人机对战 一般' },
-  900: { id: 900, name: '无限火力', description: '无限火力 ARURF' },
+  900: { id: 900, name: '无限火力', description: '无限火力' },
   920: { id: 920, name: '魄罗大乱斗', description: '魄罗大乱斗' },
   1020: { id: 1020, name: '克隆大作战', description: '克隆大作战' },
   1300: { id: 1300, name: '极限闪击', description: '极限闪击' },
