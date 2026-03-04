@@ -7,54 +7,66 @@
 
     <div class="home-grid">
       <!-- Summoner Card -->
-      <div class="card summoner-card">
-        <div v-if="summoner" class="summoner-info">
-          <div class="summoner-avatar">
-            <div class="avatar-placeholder">
-              {{ summoner.displayName.charAt(0) }}
-            </div>
-            <span class="summoner-level">{{ summoner.summonerLevel }}</span>
-          </div>
-          <div class="summoner-detail">
-            <h2 class="summoner-name">{{ summoner.displayName }}</h2>
-            <div class="xp-bar">
-              <div class="xp-fill" :style="{ width: xpPercent + '%' }" />
-            </div>
-            <span class="xp-text">{{ summoner.xpSinceLastLevel }} / {{ summoner.xpSinceLastLevel + summoner.xpUntilNextLevel }} XP</span>
-          </div>
-        </div>
-        <div v-else-if="!appStore.isConnected" class="empty-state">
-          <div class="empty-icon">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/>
-            </svg>
-          </div>
-          <p class="empty-title">未连接客户端</p>
-          <p class="empty-desc">请启动英雄联盟客户端</p>
-        </div>
-        <div v-else class="loading-state">
-          <div class="loading-spinner" />
-        </div>
-      </div>
+      <SummonerCard
+        :summoner="summoner"
+        :is-connected="appStore.isConnected"
+      />
 
-      <!-- Quick Stats Card -->
-      <div class="card quick-stats-card">
-        <h3 class="card-title">快速概览</h3>
-        <p class="card-placeholder">连接客户端后显示段位和胜率信息</p>
-      </div>
+      <!-- Solo/Duo Rank -->
+      <RankCard
+        title="单排/双排"
+        :queue="soloQueue"
+      />
 
-      <!-- Recent Matches Card -->
+      <!-- Flex Rank -->
+      <RankCard
+        title="灵活组排"
+        :queue="flexQueue"
+      />
+
+      <!-- Recent Matches Quick View -->
       <div class="card recent-card">
-        <h3 class="card-title">最近战绩</h3>
-        <p class="card-placeholder">连接客户端后显示近期战绩概览</p>
+        <h3 class="card-section-title">最近战绩</h3>
+        <div v-if="matchStore.matchList.length > 0" class="recent-matches">
+          <div
+            v-for="match in recentMatches"
+            :key="match.gameId"
+            class="recent-match-item"
+            :class="{ win: match.win, lose: !match.win }"
+            @click="goToMatch(match.gameId)"
+          >
+            <ChampionIcon :champion-id="match.championId" :name="match.championName" size="sm" />
+            <div class="match-info">
+              <span class="match-result">{{ match.win ? '胜利' : '失败' }}</span>
+              <span class="match-mode">{{ getQueueName(match) }}</span>
+            </div>
+            <div class="match-kda">
+              <span class="kda-text">{{ match.kills }}/{{ match.deaths }}/{{ match.assists }}</span>
+              <span class="kda-value">{{ calculateKDA(match.kills, match.deaths, match.assists).toFixed(1) }} KDA</span>
+            </div>
+            <span class="match-time">{{ formatRelativeTime(match.gameCreation) }}</span>
+          </div>
+        </div>
+        <div v-else-if="appStore.isConnected && !matchStore.loading" class="card-empty">
+          <span class="empty-hint">暂无战绩数据</span>
+        </div>
+        <div v-else-if="matchStore.loading" class="card-empty">
+          <LoadingSpinner size="sm" />
+        </div>
+        <div v-else class="card-empty">
+          <span class="empty-hint">连接客户端后显示</span>
+        </div>
       </div>
 
       <!-- Game Status Card -->
-      <div class="card game-status-card">
-        <h3 class="card-title">游戏状态</h3>
-        <div class="game-status">
-          <span class="status-dot" :class="appStore.connectionStatus" />
-          <span>{{ appStore.gamePhase === 'None' ? '空闲中' : gamePhaseLabel }}</span>
+      <div class="card status-card">
+        <h3 class="card-section-title">游戏状态</h3>
+        <div class="game-status-row">
+          <ConnectionStatusComp :status="appStore.connectionStatus" />
+        </div>
+        <div v-if="appStore.gamePhase !== 'None'" class="game-phase">
+          <span class="phase-dot" />
+          <span class="phase-label">{{ gamePhaseLabel }}</span>
         </div>
       </div>
     </div>
@@ -62,19 +74,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useAppStore, useSummonerStore } from '@/stores';
+import { computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
+import { useAppStore, useSummonerStore, useMatchStore, useRankStore } from '@/stores';
+import { calculateKDA, formatRelativeTime, getQueueNameById } from '@lol-assistant/shared';
+import SummonerCard from '@/components/summoner/SummonerCard.vue';
+import RankCard from '@/components/rank/RankCard.vue';
+import { ChampionIcon, LoadingSpinner, ConnectionStatus as ConnectionStatusComp } from '@/components/common';
 
+const router = useRouter();
 const appStore = useAppStore();
 const summonerStore = useSummonerStore();
+const matchStore = useMatchStore();
+const rankStore = useRankStore();
 
 const summoner = computed(() => summonerStore.currentSummoner);
 
-const xpPercent = computed(() => {
-  if (!summoner.value) return 0;
-  const total = summoner.value.xpSinceLastLevel + summoner.value.xpUntilNextLevel;
-  return total > 0 ? Math.round((summoner.value.xpSinceLastLevel / total) * 100) : 0;
-});
+const soloQueue = computed(() => rankStore.rankStats?.queueMap?.RANKED_SOLO_5x5 ?? null);
+const flexQueue = computed(() => rankStore.rankStats?.queueMap?.RANKED_FLEX_SR ?? null);
+
+const recentMatches = computed(() => matchStore.matchList.slice(0, 5));
 
 const gamePhaseLabel = computed(() => {
   const map: Record<string, string> = {
@@ -88,6 +107,25 @@ const gamePhaseLabel = computed(() => {
     EndOfGame: '对局结束',
   };
   return map[appStore.gamePhase] ?? appStore.gamePhase;
+});
+
+function getQueueName(match: { gameMode: string }): string {
+  return match.gameMode || '匹配';
+}
+
+function goToMatch(gameId: number) {
+  router.push({ path: '/match-history', query: { gameId: String(gameId) } });
+}
+
+onMounted(async () => {
+  if (appStore.isConnected && summoner.value) {
+    if (!rankStore.rankStats) {
+      rankStore.fetchRankStats(summoner.value.puuid);
+    }
+    if (matchStore.matchList.length === 0) {
+      matchStore.fetchMatchList(true);
+    }
+  }
 });
 </script>
 
@@ -132,166 +170,137 @@ const gamePhaseLabel = computed(() => {
   box-shadow: var(--shadow-md);
 }
 
-.card-title {
-  font-size: var(--text-sm);
+.card-section-title {
+  font-size: var(--text-xs);
   font-weight: var(--font-semibold);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--space-3);
-  letter-spacing: -0.1px;
-}
-
-.card-placeholder {
-  font-size: var(--text-sm);
   color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--space-3);
 }
 
-/* Summoner Card */
-.summoner-card {
+/* Recent Matches */
+.recent-card {
   grid-column: 1 / -1;
 }
 
-.summoner-info {
+.recent-matches {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recent-match-item {
   display: flex;
   align-items: center;
-  gap: var(--space-5);
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast);
 }
 
-.summoner-avatar {
-  position: relative;
-  flex-shrink: 0;
+.recent-match-item:hover {
+  background: var(--color-bg-hover);
 }
 
-.avatar-placeholder {
-  width: 64px;
-  height: 64px;
-  border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, var(--color-accent), #5856d6);
+.recent-match-item.win {
+  border-left: 3px solid var(--color-win);
+}
+
+.recent-match-item.lose {
+  border-left: 3px solid var(--color-lose);
+}
+
+.match-info {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--text-xl);
-  font-weight: var(--font-bold);
-  color: #ffffff;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 60px;
 }
 
-.summoner-level {
-  position: absolute;
-  bottom: -4px;
-  right: -4px;
+.match-result {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.win .match-result { color: var(--color-win); }
+.lose .match-result { color: var(--color-lose); }
+
+.match-mode {
   font-size: 10px;
-  font-weight: var(--font-bold);
-  background: var(--color-bg-card);
-  color: var(--color-text-primary);
-  padding: 1px 6px;
-  border-radius: var(--radius-full);
-  border: 2px solid var(--color-bg-card);
-  box-shadow: var(--shadow-sm);
-}
-
-.summoner-detail {
-  flex: 1;
-  min-width: 0;
-}
-
-.summoner-name {
-  font-size: var(--text-xl);
-  font-weight: var(--font-bold);
-  letter-spacing: -0.3px;
-  color: var(--color-text-primary);
-  margin-bottom: var(--space-2);
-}
-
-.xp-bar {
-  height: 4px;
-  background: var(--color-bg-tertiary);
-  border-radius: var(--radius-full);
-  overflow: hidden;
-  margin-bottom: var(--space-1);
-}
-
-.xp-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--color-accent), #5856d6);
-  border-radius: var(--radius-full);
-  transition: width var(--transition-slow);
-}
-
-.xp-text {
-  font-size: var(--text-xs);
   color: var(--color-text-tertiary);
 }
 
-/* Empty State */
-.empty-state {
+.match-kda {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
+  gap: 1px;
+  margin-left: auto;
+}
+
+.kda-text {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+}
+
+.kda-value {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+}
+
+.match-time {
+  font-size: 10px;
+  color: var(--color-text-placeholder);
+  min-width: 54px;
+  text-align: right;
+}
+
+.card-empty {
+  display: flex;
   justify-content: center;
   padding: var(--space-6) 0;
 }
 
-.empty-icon {
-  color: var(--color-text-placeholder);
-  margin-bottom: var(--space-3);
-}
-
-.empty-title {
-  font-size: var(--text-md);
-  font-weight: var(--font-semibold);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--space-1);
-}
-
-.empty-desc {
+.empty-hint {
   font-size: var(--text-sm);
-  color: var(--color-text-tertiary);
-}
-
-/* Loading */
-.loading-state {
-  display: flex;
-  justify-content: center;
-  padding: var(--space-8) 0;
-}
-
-.loading-spinner {
-  width: 24px;
-  height: 24px;
-  border: 2.5px solid var(--color-border);
-  border-top-color: var(--color-accent);
-  border-radius: var(--radius-full);
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
+  color: var(--color-text-placeholder);
 }
 
 /* Game Status */
-.game-status {
+.game-status-row {
+  margin-bottom: var(--space-2);
+}
+
+.game-phase {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--text-sm);
-  color: var(--color-text-secondary);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(0, 113, 227, 0.08);
+  border-radius: var(--radius-md);
 }
 
-.status-dot {
-  width: 8px;
-  height: 8px;
+.phase-dot {
+  width: 6px;
+  height: 6px;
   border-radius: var(--radius-full);
+  background: var(--color-accent);
+  animation: pulse 1.5s ease infinite;
 }
 
-.status-dot.connected {
-  background: var(--color-success);
+.phase-label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--color-accent);
 }
 
-.status-dot.connecting {
-  background: var(--color-warning);
-}
-
-.status-dot.disconnected {
-  background: var(--color-text-placeholder);
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 @media (max-width: 800px) {

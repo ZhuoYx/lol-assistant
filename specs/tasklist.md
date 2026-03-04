@@ -108,7 +108,7 @@ Task 1 (项目初始化)
   - **依赖:** Task 4, Task 1.5
   - 参考：设计文档 - 渲染进程设计 / 状态管理设计 / API 层设计
 
-- [ ] 6. 页面与组件实现
+- [x] 6. 页面与组件实现 ✅
   - 通用组件：ConnectionStatus（连接状态）、LoadingSpinner、ErrorDisplay（错误+重试，支持爬取降级提示）、TierIcon（段位图标）、ChampionIcon（英雄图标）、EmptyState（空状态提示）、PlayerCard（玩家信息卡片，含段位/胜率/英雄熟练度/dataStatus 失败占位符）
   - 首页（Home.vue）：整合召唤师信息卡片（SummonerCard）、段位信息卡片（RankCard）
   - 战绩页（MatchHistory.vue）：战绩列表（MatchList + MatchListItem，含无限滚动/下拉刷新）、筛选组件（MatchFilter）、详情组件（MatchDetail + ParticipantRow）、空战绩提示、数据不完整容错、支持从对局分析页跳转查看他人战绩（通过 PUUID）
