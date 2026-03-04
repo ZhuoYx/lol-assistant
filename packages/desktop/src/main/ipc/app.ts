@@ -22,25 +22,65 @@ export function registerAppIpcHandlers(): void {
   // 自动检测 LOL 安装路径
   ipcMain.handle('app:detectLolPath', async () => {
     try {
+      // 策略1：通过进程/注册表检测
       const processInfo = await detectLOLProcess();
       if (processInfo) {
         return processInfo.installDirectory;
       }
 
-      // 尝试常见路径
+      // 策略2：尝试常见路径（国际服 + 国服 / WeGame）
+      const drives = ['C:', 'D:', 'E:', 'F:'];
       const commonPaths = [
+        // Riot 国际服
         path.resolve(process.env.LOCALAPPDATA ?? '', 'Riot Games/League of Legends'),
-        'C:/Riot Games/League of Legends',
-        'D:/Riot Games/League of Legends',
-        'E:/Riot Games/League of Legends',
+        ...drives.map((d) => `${d}/Riot Games/League of Legends`),
+        // 国服 / WeGame 常见路径（包含常见子目录结构）
+        ...drives.flatMap((d) => [
+          `${d}/腾讯游戏/英雄联盟`,
+          `${d}/WeGame/games/英雄联盟`,
+          `${d}/Program Files/腾讯游戏/英雄联盟`,
+          `${d}/Program Files (x86)/腾讯游戏/英雄联盟`,
+          `${d}/Program Files (x86)/英雄联盟`,
+          `${d}/Games/英雄联盟`,
+          `${d}/LOL`,
+          `${d}/英雄联盟`,
+        ]),
       ];
+
+      // 国服结构：安装根目录/LeagueClient/lockfile
+      const leagueClientFiles = ['LeagueClient.exe', 'LeagueClientUx.exe', 'lockfile'];
 
       for (const p of commonPaths) {
         try {
           await fs.access(p);
-          return p;
+          // 检查根目录自身
+          for (const f of leagueClientFiles) {
+            try {
+              await fs.access(path.join(p, f));
+              return p;
+            } catch {
+              // continue
+            }
+          }
+          // 检查 LeagueClient 子目录（国服典型结构）
+          const subDir = path.join(p, 'LeagueClient');
+          for (const f of leagueClientFiles) {
+            try {
+              await fs.access(path.join(subDir, f));
+              return subDir;
+            } catch {
+              // continue
+            }
+          }
+          // 检查 TCLS/Client.exe（国服启动器作为有效标记）
+          try {
+            await fs.access(path.join(p, 'TCLS', 'Client.exe'));
+            return p;
+          } catch {
+            // continue
+          }
         } catch {
-          // continue
+          // 目录不存在
         }
       }
 
@@ -68,16 +108,28 @@ export function registerAppIpcHandlers(): void {
   // 验证 LOL 安装路径
   ipcMain.handle('app:validateLolPath', async (_event, lolPath: string) => {
     try {
-      // 检查目录是否存在且有 LeagueClient.exe
       await fs.access(lolPath);
-      const exePath = path.join(lolPath, 'LeagueClient.exe');
-      try {
-        await fs.access(exePath);
-        return true;
-      } catch {
-        // 退而求其次，检查 lockfile 曾存在的痕迹
-        return false;
+      // 检查根目录下的文件
+      const candidates = ['LeagueClient.exe', 'LeagueClientUx.exe', 'lockfile', 'TCLS/Client.exe'];
+      for (const name of candidates) {
+        try {
+          await fs.access(path.join(lolPath, name));
+          return true;
+        } catch {
+          // continue
+        }
       }
+      // 检查 LeagueClient 子目录（国服典型结构）
+      const subDir = path.join(lolPath, 'LeagueClient');
+      for (const name of ['LeagueClient.exe', 'LeagueClientUx.exe', 'lockfile']) {
+        try {
+          await fs.access(path.join(subDir, name));
+          return true;
+        } catch {
+          // continue
+        }
+      }
+      return false;
     } catch {
       return false;
     }

@@ -28,18 +28,32 @@ export interface LCUCredentials {
   protocol: 'https';
 }
 
-/** 备选的 lockfile 静态路径列表 */
+/** 备选的 lockfile 静态路径列表（国际服 + 国服，含 LeagueClient 子目录） */
 const LOCKFILE_FALLBACK_PATHS: string[] = (() => {
   const paths: string[] = [];
   const localAppData = process.env.LOCALAPPDATA;
   if (localAppData) {
     paths.push(path.resolve(localAppData, 'Riot Games/League of Legends/lockfile'));
   }
-  paths.push(
-    path.resolve('C:/Riot Games/League of Legends/lockfile'),
-    path.resolve('D:/Riot Games/League of Legends/lockfile'),
-    path.resolve('E:/Riot Games/League of Legends/lockfile'),
-  );
+  const drives = ['C:', 'D:', 'E:', 'F:'];
+  for (const d of drives) {
+    paths.push(
+      // 国际服
+      path.resolve(`${d}/Riot Games/League of Legends/lockfile`),
+      // 国服 — 根目录/lockfile
+      path.resolve(`${d}/腾讯游戏/英雄联盟/lockfile`),
+      path.resolve(`${d}/WeGame/games/英雄联盟/lockfile`),
+      path.resolve(`${d}/英雄联盟/lockfile`),
+      path.resolve(`${d}/LOL/lockfile`),
+      path.resolve(`${d}/Program Files (x86)/英雄联盟/lockfile`),
+      // 国服 — 根目录/LeagueClient/lockfile（典型国服子目录结构）
+      path.resolve(`${d}/腾讯游戏/英雄联盟/LeagueClient/lockfile`),
+      path.resolve(`${d}/WeGame/games/英雄联盟/LeagueClient/lockfile`),
+      path.resolve(`${d}/英雄联盟/LeagueClient/lockfile`),
+      path.resolve(`${d}/LOL/LeagueClient/lockfile`),
+      path.resolve(`${d}/Program Files (x86)/英雄联盟/LeagueClient/lockfile`),
+    );
+  }
   return paths;
 })();
 
@@ -106,22 +120,33 @@ async function findLockfileByStaticPaths(): Promise<string | null> {
 
 /**
  * 通过手动指定路径查找 lockfile
+ * 支持传入安装根目录（自动检查 LeagueClient 子目录）
  */
 async function findLockfileByManualPath(manualPath: string): Promise<string | null> {
   // 支持传入安装目录或 lockfile 完整路径
-  let lockfilePath = manualPath;
-  if (!manualPath.endsWith('lockfile')) {
-    lockfilePath = path.join(manualPath, 'lockfile');
+  const candidates: string[] = [];
+
+  if (manualPath.endsWith('lockfile')) {
+    candidates.push(manualPath);
+  } else {
+    candidates.push(
+      path.join(manualPath, 'lockfile'),
+      path.join(manualPath, 'LeagueClient', 'lockfile'),
+    );
   }
 
-  try {
-    await fs.access(lockfilePath);
-    logger.info(`通过手动路径找到 lockfile: ${lockfilePath}`);
-    return lockfilePath;
-  } catch {
-    logger.warn(`手动路径 lockfile 不存在: ${lockfilePath}`);
-    return null;
+  for (const lockfilePath of candidates) {
+    try {
+      await fs.access(lockfilePath);
+      logger.info(`通过手动路径找到 lockfile: ${lockfilePath}`);
+      return lockfilePath;
+    } catch {
+      // continue
+    }
   }
+
+  logger.warn(`手动路径 lockfile 不存在: ${manualPath}`);
+  return null;
 }
 
 /**
