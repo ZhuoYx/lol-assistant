@@ -97,6 +97,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onGamePhaseChange: (callback: (phase: string) => void) => {
     return createEventListener('game:phase-change', callback);
   },
+  onMatchEnded: (callback: () => void) => {
+    return createEventListener('game:match-ended', callback);
+  },
 
   // ─── 静态资源 ──────────────────────────────────────────
   getGameVersion: () => ipcRenderer.invoke('assets:getVersion'),
@@ -111,4 +114,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ─── 首次引导 ──────────────────────────────────────────
   getIsFirstLaunch: () => ipcRenderer.invoke('app:isFirstLaunch'),
   setFirstLaunchDone: () => ipcRenderer.invoke('app:setFirstLaunchDone'),
+
+  // ─── LOL 路径管理 ──────────────────────────────────────
+  detectLolPath: () => ipcRenderer.invoke('app:detectLolPath'),
+  selectLolPath: () => ipcRenderer.invoke('app:selectLolPath'),
+  validateLolPath: (lolPath: string) => ipcRenderer.invoke('app:validateLolPath', lolPath),
+  saveLolPath: (lolPath: string) => ipcRenderer.invoke('app:saveLolPath', lolPath),
+  getSavedLolPath: () => ipcRenderer.invoke('app:getSavedLolPath'),
 });

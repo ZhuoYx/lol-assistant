@@ -74,6 +74,7 @@ interface ElectronAPI {
 
   // 游戏阶段变化
   onGamePhaseChange: (callback: (phase: string) => void) => () => void;
+  onMatchEnded: (callback: () => void) => () => void;
 
   // 静态资源
   getGameVersion: () => Promise<string | null>;
@@ -86,6 +87,13 @@ interface ElectronAPI {
   // 首次引导
   getIsFirstLaunch: () => Promise<boolean>;
   setFirstLaunchDone: () => Promise<void>;
+
+  // LOL 路径管理
+  detectLolPath: () => Promise<string | null>;
+  selectLolPath: () => Promise<string | null>;
+  validateLolPath: (lolPath: string) => Promise<boolean>;
+  saveLolPath: (lolPath: string) => Promise<void>;
+  getSavedLolPath: () => Promise<string | null>;
 }
 
 export {};

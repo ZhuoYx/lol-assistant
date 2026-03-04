@@ -1,19 +1,17 @@
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { useLiveGameStore } from '@/stores/live-game';
 import { useAppStore } from '@/stores/app';
-import { useRouter } from 'vue-router';
+import type { GamePhase } from '@lol-assistant/shared';
 
 /**
  * 对局实时分析组合式函数
- * 自动订阅 LCU 游戏流程事件，在进入对局时自动获取分析数据
- * 支持从选人阶段到对局阶段的自动视图过渡
+ * 监听游戏阶段变化事件，在进入对局时自动获取分析数据
+ * 注意：视图过渡由 useGameNotification 统一管理
  */
 export function useLiveGame() {
   const liveGameStore = useLiveGameStore();
   const appStore = useAppStore();
-  const router = useRouter();
 
-  let unsubLCU: (() => void) | null = null;
   let unsubPhase: (() => void) | null = null;
   const refreshing = ref(false);
 
@@ -23,43 +21,22 @@ export function useLiveGame() {
     refreshing.value = false;
   }
 
-  function subscribeToGameFlow() {
-    window.electronAPI.lcuSubscribe('/lol-gameflow/v1/session');
+  function handlePhaseChange(phase: string) {
+    const gamePhase = phase as GamePhase;
 
-    unsubLCU = window.electronAPI.onLCUEvent((event: unknown) => {
-      const evt = event as { uri?: string; data?: { phase?: string } };
-      if (evt.uri === '/lol-gameflow/v1/session' && evt.data?.phase) {
-        const phase = evt.data.phase;
-        appStore.setGamePhase(phase as import('@lol-assistant/shared').GamePhase);
+    // Auto-analyze when entering game
+    if (gamePhase === 'InProgress' || gamePhase === 'GameStart') {
+      analyze();
+    }
 
-        if (phase === 'InProgress' || phase === 'GameStart') {
-          analyze();
-        }
-      }
-    });
-
-    // Listen for game phase changes for auto-transition
-    unsubPhase = window.electronAPI.onGamePhaseChange((phase: string) => {
-      appStore.setGamePhase(phase as import('@lol-assistant/shared').GamePhase);
-
-      // Auto-navigate to live game page when entering game
-      if (phase === 'InProgress' || phase === 'GameStart') {
-        const currentRoute = router.currentRoute.value;
-        if (currentRoute.name === 'DraftAssistant') {
-          router.push({ name: 'LiveGame' });
-        }
-        analyze();
-      }
-
-      // Clear data when game ends
-      if (phase === 'EndOfGame' || phase === 'None' || phase === 'WaitingForStats') {
-        liveGameStore.clear();
-      }
-    });
+    // Clear data when game ends
+    if (gamePhase === 'EndOfGame' || gamePhase === 'None' || gamePhase === 'WaitingForStats') {
+      liveGameStore.clear();
+    }
   }
 
   onMounted(() => {
-    subscribeToGameFlow();
+    unsubPhase = window.electronAPI.onGamePhaseChange(handlePhaseChange);
 
     // If already in a game, fetch immediately
     const phase = appStore.gamePhase;
@@ -69,9 +46,7 @@ export function useLiveGame() {
   });
 
   onUnmounted(() => {
-    unsubLCU?.();
     unsubPhase?.();
-    window.electronAPI.lcuUnsubscribe('/lol-gameflow/v1/session');
   });
 
   return {
