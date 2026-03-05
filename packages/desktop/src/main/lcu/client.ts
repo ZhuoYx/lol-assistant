@@ -14,6 +14,8 @@ interface LCURequestOptions {
   method?: string;
   data?: unknown;
   timeout?: number;
+  /** 请求体编码格式，默认 'json'。部分 LCU 端点需要 'form' (application/x-www-form-urlencoded) */
+  contentType?: 'json' | 'form';
 }
 
 /** 重连配置 */
@@ -220,7 +222,7 @@ export class LCUClient extends EventEmitter {
       throw new Error('未连接到 LCU 客户端');
     }
 
-    const { method = 'GET', data, timeout = REQUEST_TIMEOUT } = options;
+    const { method = 'GET', data, timeout = REQUEST_TIMEOUT, contentType = 'json' } = options;
     const { port, password } = this.credentials;
 
     const url = `https://127.0.0.1:${port}${endpoint}`;
@@ -229,16 +231,40 @@ export class LCUClient extends EventEmitter {
     return new Promise<T>((resolve, reject) => {
       const urlObj = new URL(url);
 
+      const ct = contentType === 'form'
+        ? 'application/x-www-form-urlencoded'
+        : 'application/json';
+
+      // 预先序列化 body 以计算 Content-Length
+      let bodyStr: string | undefined;
+      if (data) {
+        if (contentType === 'form' && typeof data === 'object' && data !== null) {
+          const params = new URLSearchParams();
+          for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
+            params.append(k, String(v));
+          }
+          bodyStr = params.toString();
+        } else {
+          bodyStr = JSON.stringify(data);
+        }
+      }
+
+      const headers: Record<string, string> = {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': ct,
+        'Accept': 'application/json',
+      };
+      // 必须设置 Content-Length，否则 LCU 不会读取 body
+      if (bodyStr !== undefined) {
+        headers['Content-Length'] = Buffer.byteLength(bodyStr, 'utf8').toString();
+      }
+
       const reqOptions: https.RequestOptions = {
         hostname: urlObj.hostname,
         port: urlObj.port,
         path: urlObj.pathname + urlObj.search,
         method,
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        headers,
         agent: this.httpsAgent,
         timeout,
       };
@@ -285,8 +311,8 @@ export class LCUClient extends EventEmitter {
         reject(new Error(`LCU API 请求超时: ${endpoint} (${timeout}ms)`));
       });
 
-      if (data) {
-        req.write(JSON.stringify(data));
+      if (bodyStr !== undefined) {
+        req.write(bodyStr);
       }
 
       req.end();

@@ -41,12 +41,11 @@ export function registerSummonerIpcHandlers(): void {
   // 通过名称搜索召唤师（支持 "名称#标签" 格式）
   ipcMain.handle('summoner:search', async (_event, query: string) => {
     try {
-      // 解析 "名称#标签" 格式
-      const parts = query.split('#');
-      const gameName = parts[0].trim();
-      if (!gameName) throw new Error('搜索名称不能为空');
+      const trimmed = query.trim();
+      if (!trimmed) throw new Error('搜索名称不能为空');
 
-      const summoner = await lcuAPI.getSummonerByName(gameName);
+      // LCU 接口接受完整的 "名字" 或 "名字#编号" 格式
+      const summoner = await lcuAPI.getSummonerByName(trimmed);
       if (summoner) {
         cacheStore.set('summoner', summoner.puuid, summoner);
       }

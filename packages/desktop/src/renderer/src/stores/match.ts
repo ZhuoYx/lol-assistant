@@ -13,7 +13,7 @@ export const useMatchStore = defineStore('match', () => {
 
   const filters = ref<MatchFilters>({});
 
-  const PAGE_SIZE = 50;
+  const PAGE_SIZE = 30;
   const hasMore = computed(() => matchList.value.length < totalGames.value);
 
   let fetchId = 0;
@@ -36,7 +36,7 @@ export const useMatchStore = defineStore('match', () => {
       const params: MatchListParams = {
         puuid: summonerStore.activePUUID,
         begIndex,
-        endIndex: begIndex + PAGE_SIZE,
+        endIndex: begIndex + PAGE_SIZE - 1,
         championId: filters.value.championId,
         queue: filters.value.queue,
       };
