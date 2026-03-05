@@ -168,6 +168,25 @@ export class ScraperStorage {
     }
   }
 
+  /** 清除指定英雄的缓存数据（所有角色） */
+  async clearChampionData(championId: number): Promise<void> {
+    const dirs = ['builds', 'counters'];
+    for (const dir of dirs) {
+      try {
+        const dirPath = path.join(this.baseDir, dir);
+        const entries = await fs.readdir(dirPath).catch(() => []);
+        for (const entry of entries) {
+          if (entry.startsWith(`${championId}_`)) {
+            await fs.unlink(path.join(dirPath, entry)).catch(() => {});
+          }
+        }
+      } catch {
+        // 目录不存在时忽略
+      }
+    }
+    logger.info(`已清除英雄 ${championId} 的缓存数据`);
+  }
+
   /** 获取存储目录大小（字节） */
   async getStorageSize(): Promise<number> {
     try {

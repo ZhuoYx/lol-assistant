@@ -46,7 +46,13 @@
         <!-- Primary tree -->
         <div class="rune-tree primary">
           <div class="tree-header">
-            <div class="tree-dot" :style="{ background: primaryInfo.color }" />
+            <img
+              v-if="primaryInfo.iconUrl"
+              class="tree-icon"
+              :src="primaryInfo.iconUrl"
+              :alt="primaryInfo.name"
+            />
+            <div v-else class="tree-dot" :style="{ background: primaryInfo.color }" />
             <span class="tree-name">{{ primaryInfo.name }}</span>
             <span class="tree-type">主系</span>
           </div>
@@ -58,7 +64,14 @@
               :class="{ keystone: idx === 0 }"
             >
               <div class="perk-icon" :style="{ borderColor: primaryInfo.color }">
-                <span class="perk-id">{{ perkId }}</span>
+                <img
+                  v-if="getPerkIconUrl(perkId)"
+                  class="perk-img"
+                  :src="getPerkIconUrl(perkId)"
+                  :alt="String(perkId)"
+                  @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+                />
+                <span v-else class="perk-id">{{ perkId }}</span>
               </div>
             </div>
           </div>
@@ -67,7 +80,13 @@
         <!-- Secondary tree -->
         <div class="rune-tree secondary">
           <div class="tree-header">
-            <div class="tree-dot" :style="{ background: secondaryInfo.color }" />
+            <img
+              v-if="secondaryInfo.iconUrl"
+              class="tree-icon"
+              :src="secondaryInfo.iconUrl"
+              :alt="secondaryInfo.name"
+            />
+            <div v-else class="tree-dot" :style="{ background: secondaryInfo.color }" />
             <span class="tree-name">{{ secondaryInfo.name }}</span>
             <span class="tree-type">副系</span>
           </div>
@@ -78,7 +97,14 @@
               class="perk-slot"
             >
               <div class="perk-icon" :style="{ borderColor: secondaryInfo.color }">
-                <span class="perk-id">{{ perkId }}</span>
+                <img
+                  v-if="getPerkIconUrl(perkId)"
+                  class="perk-img"
+                  :src="getPerkIconUrl(perkId)"
+                  :alt="String(perkId)"
+                  @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+                />
+                <span v-else class="perk-id">{{ perkId }}</span>
               </div>
             </div>
           </div>
@@ -95,7 +121,14 @@
             class="shard-slot"
           >
             <div class="shard-icon">
-              <span class="shard-id">{{ shardId }}</span>
+              <img
+                v-if="getPerkIconUrl(shardId)"
+                class="shard-img"
+                :src="getPerkIconUrl(shardId)"
+                :alt="String(shardId)"
+                @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+              />
+              <span v-else class="shard-id">{{ shardId }}</span>
             </div>
           </div>
         </div>
@@ -129,6 +162,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { RuneBuild } from '@lol-assistant/shared';
+import { getPerkIconUrl, getRuneTreeIconUrl } from '@lol-assistant/shared';
 
 const RUNE_TREE_MAP: Record<number, { name: string; color: string }> = {
   8000: { name: '精密', color: '#c8aa6e' },
@@ -162,13 +196,15 @@ const currentRune = computed(() => {
 });
 
 const primaryInfo = computed(() => {
-  if (!currentRune.value) return { name: '—', color: '#888' };
-  return RUNE_TREE_MAP[currentRune.value.primaryTree] ?? { name: `#${currentRune.value.primaryTree}`, color: '#888' };
+  if (!currentRune.value) return { name: '—', color: '#888', iconUrl: '' };
+  const tree = RUNE_TREE_MAP[currentRune.value.primaryTree] ?? { name: `#${currentRune.value.primaryTree}`, color: '#888' };
+  return { ...tree, iconUrl: getRuneTreeIconUrl(currentRune.value.primaryTree) };
 });
 
 const secondaryInfo = computed(() => {
-  if (!currentRune.value) return { name: '—', color: '#888' };
-  return RUNE_TREE_MAP[currentRune.value.secondaryTree] ?? { name: `#${currentRune.value.secondaryTree}`, color: '#888' };
+  if (!currentRune.value) return { name: '—', color: '#888', iconUrl: '' };
+  const tree = RUNE_TREE_MAP[currentRune.value.secondaryTree] ?? { name: `#${currentRune.value.secondaryTree}`, color: '#888' };
+  return { ...tree, iconUrl: getRuneTreeIconUrl(currentRune.value.secondaryTree) };
 });
 
 const applyLabel = computed(() => {
@@ -179,7 +215,9 @@ const applyLabel = computed(() => {
 
 function formatPercent(v: number): string {
   if (!v) return '—';
-  return `${(v * 100).toFixed(1)}%`;
+  // 值大于1视为已经是百分比（如 52.3），否则视为小数（如 0.523）
+  const pct = v > 1 ? v : v * 100;
+  return `${pct.toFixed(1)}%`;
 }
 
 function formatSample(v: number): string {
@@ -326,6 +364,13 @@ function formatSample(v: number): string {
   flex-shrink: 0;
 }
 
+.tree-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
 .tree-name {
   font-size: var(--text-sm);
   font-weight: var(--font-semibold);
@@ -373,6 +418,13 @@ function formatSample(v: number): string {
   color: var(--color-text-tertiary);
 }
 
+.perk-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
 .keystone .perk-id {
   font-size: 10px;
   font-weight: var(--font-semibold);
@@ -417,6 +469,13 @@ function formatSample(v: number): string {
   font-size: 8px;
   font-family: var(--font-mono);
   color: var(--color-text-tertiary);
+}
+
+.shard-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
 }
 
 /* Apply button */

@@ -296,11 +296,8 @@ function parseProcessBlock(block: string): ProcessInfo | null {
  * 优先返回包含完整凭证（appPort + authToken）的进程块
  */
 function parseProcessOutput(output: string): ProcessInfo | null {
-  logger.debug(`[parseProcessOutput] 原始输出:\n${output}`);
-
   // 先合并 Format-List 的续行折行
   const joined = joinFormatListContinuations(output);
-  logger.debug(`[parseProcessOutput] 合并续行后:\n${joined}`);
 
   // 按进程块拆分
   const blocks = splitProcessBlocks(joined);
@@ -313,7 +310,6 @@ function parseProcessOutput(output: string): ProcessInfo | null {
 
     // 优先选择有完整凭证的块
     if (result.appPort && result.authToken) {
-      logger.debug(`[parseProcessOutput] 选择有完整凭证的进程块: PID=${result.pid}, port=${result.appPort}`);
       return result;
     }
 

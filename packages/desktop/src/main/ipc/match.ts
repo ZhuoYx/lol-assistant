@@ -107,7 +107,6 @@ export function transformMatchList(raw: unknown): MatchList {
  */
 function transformMatchDetail(raw: unknown): MatchDetail {
   const data = raw as Record<string, unknown>;
-  logger.debug(`transformMatchDetail 原始数据 keys: ${Object.keys(data).join(', ')}`);
 
   // 如果已经是标准格式（有 participants[].kills 且有 summonerName），仍需计算 MVP/SVP
   if (
@@ -179,13 +178,6 @@ function transformMatchDetail(raw: unknown): MatchDetail {
   // 转换 participants
   const rawParticipants = (data.participants ?? []) as Record<string, unknown>[];
   const participantIdentities = (data.participantIdentities ?? []) as Record<string, unknown>[];
-
-  if (rawParticipants.length > 0) {
-    const p0stats = rawParticipants[0].stats as Record<string, unknown> | undefined;
-    if (p0stats) {
-      logger.debug(`transformMatchDetail: participant[0].stats keys: ${Object.keys(p0stats).join(', ')}`);
-    }
-  }
 
   const participants: Participant[] = rawParticipants.map((p, idx) => {
     // stats 可能嵌套在 p.stats 中，也可能直接在 p 上

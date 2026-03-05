@@ -1,7 +1,6 @@
-import { ref, computed, watch, onMounted } from 'vue';
-import { useAppStore } from '@/stores/app';
+import { ref, computed } from 'vue';
 import type { ChampionBuilds, RuneBuild, ItemBuild } from '@lol-assistant/shared';
-import { CHAMPION_ID_MAP } from '@lol-assistant/shared';
+import { getChampionDisplayName } from '@lol-assistant/shared';
 
 /** 符文树名称映射（LCU perk style IDs） */
 const RUNE_TREE_MAP: Record<number, { name: string; color: string }> = {
@@ -30,10 +29,9 @@ export interface BuildConfig {
  * 符文与装备推荐组合式函数
  */
 export function useRuneBuilder() {
-  const appStore = useAppStore();
-
   const buildConfig = ref<BuildConfig | null>(null);
   const loading = ref(false);
+  const refreshing = ref(false);
   const error = ref<string | null>(null);
   const applying = ref(false);
   const applySuccess = ref(false);
@@ -92,7 +90,7 @@ export function useRuneBuilder() {
       if (builds) {
         buildConfig.value = {
           championId: builds.championId,
-          championName: CHAMPION_ID_MAP[builds.championId] ?? `#${builds.championId}`,
+          championName: getChampionDisplayName(builds.championId),
           role: builds.role,
           patch: builds.patch,
           dataSource: builds.dataSource,
@@ -109,6 +107,41 @@ export function useRuneBuilder() {
       error.value = '获取构建数据失败';
     } finally {
       loading.value = false;
+    }
+  }
+
+  /** 强制刷新当前英雄的构建数据（清除缓存） */
+  async function refreshBuilds() {
+    if (!currentChampionId.value) return;
+    const champId = currentChampionId.value;
+
+    refreshing.value = true;
+    error.value = null;
+
+    try {
+      await window.electronAPI.refreshChampionBuilds(champId);
+      const builds: ChampionBuilds = await window.electronAPI.getChampionBuilds(champId);
+      if (builds) {
+        buildConfig.value = {
+          championId: builds.championId,
+          championName: getChampionDisplayName(builds.championId),
+          role: builds.role,
+          patch: builds.patch,
+          dataSource: builds.dataSource,
+          runeBuilds: builds.runeBuilds ?? [],
+          itemBuilds: builds.itemBuilds ?? [],
+          skillOrder: builds.skillOrder ?? [],
+        };
+        selectedRuneIndex.value = 0;
+        selectedItemIndex.value = 0;
+      } else {
+        error.value = '暂无构建数据';
+      }
+    } catch (e) {
+      console.error('刷新数据失败:', e);
+      error.value = '刷新数据失败，请稍后重试';
+    } finally {
+      refreshing.value = false;
     }
   }
 
@@ -165,6 +198,7 @@ export function useRuneBuilder() {
   return {
     buildConfig,
     loading,
+    refreshing,
     error,
     applying,
     applySuccess,
@@ -179,6 +213,7 @@ export function useRuneBuilder() {
     hasItems,
     currentChampionId,
     fetchBuilds,
+    refreshBuilds,
     applyRune,
     getRuneTreeInfo,
     selectRune,

@@ -57,8 +57,11 @@
               class="dropdown-item"
               @click="selectChampion(champ.id)"
             >
-              <ChampionIcon :champion-id="champ.id" :name="champ.name" size="sm" />
-              <span class="champ-label">{{ champ.name }}</span>
+              <ChampionIcon :champion-id="champ.id" :name="champ.cnName" size="sm" />
+              <div class="champ-info">
+                <span class="champ-label">{{ champ.cnName || champ.name }}</span>
+                <span v-if="champ.title" class="champ-title">{{ champ.title }}</span>
+              </div>
             </button>
           </div>
 
@@ -83,17 +86,40 @@
         </div>
 
         <!-- No champion selected -->
-        <EmptyState
-          v-else-if="!buildConfig"
-          title="选择一个英雄"
-          description="搜索或从选人阶段自动获取英雄配置"
-        >
-          <template #icon>
-            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-            </svg>
-          </template>
-        </EmptyState>
+        <div v-else-if="!buildConfig" class="start-screen">
+          <!-- Favorite champions -->
+          <div v-if="favoriteChampions.length > 0" class="favorites-section">
+            <h3 class="section-title">收藏英雄</h3>
+            <div class="favorites-grid">
+              <div
+                v-for="champ in favoriteChampions"
+                :key="champ.id"
+                class="favorite-item"
+                @click="selectChampion(champ.id)"
+              >
+                <ChampionIcon :champion-id="champ.id" :name="champ.name" size="md" />
+                <span class="favorite-name">{{ champ.name }}</span>
+                <button class="favorite-remove" title="取消收藏" @click.stop="removeFavorite(champ.id)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty hint -->
+          <EmptyState
+            title="选择一个英雄"
+            description="搜索或从选人阶段自动获取英雄配置"
+          >
+            <template #icon>
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+            </template>
+          </EmptyState>
+        </div>
 
         <!-- Build content -->
         <div v-else class="build-layout">
@@ -111,6 +137,22 @@
                 <span class="meta-tag source-tag" :class="buildConfig.dataSource ?? 'local'">{{ sourceLabel }}</span>
               </div>
             </div>
+            <button class="refresh-btn" :disabled="refreshing" :title="'刷新数据'" @click="refreshBuilds">
+              <svg :class="{ spin: refreshing }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </button>
+            <button
+              class="favorite-btn"
+              :class="{ 'is-fav': isFavorite(buildConfig.championId) }"
+              :title="isFavorite(buildConfig.championId) ? '取消收藏' : '收藏英雄'"
+              @click="toggleFavorite(buildConfig.championId)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" :fill="isFavorite(buildConfig.championId) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+            </button>
             <div v-if="buildConfig.skillOrder?.length" class="skill-order">
               <span class="skill-label">技能加点</span>
               <div class="skill-keys">
@@ -159,19 +201,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { useAppStore } from '@/stores';
 import { EmptyState, ChampionIcon, LoadingSpinner } from '@/components/common';
 import RuneDisplay from '@/components/rune/RuneDisplay.vue';
 import ItemBuildDisplay from '@/components/rune/ItemBuildDisplay.vue';
 import { useRuneBuilder } from '@/composables/useRuneBuilder';
-import { CHAMPION_ID_MAP } from '@lol-assistant/shared';
+import { useFavoriteChampions } from '@/composables/useFavoriteChampions';
+import { CHAMPION_ID_MAP, CHAMPION_CN_NAME_MAP, CHAMPION_TITLE_MAP, getChampionDisplayName } from '@lol-assistant/shared';
 
+const route = useRoute();
 const appStore = useAppStore();
+const { isFavorite, toggleFavorite, favoriteIds, removeFavorite } = useFavoriteChampions();
+
+const favoriteChampions = computed(() => {
+  return favoriteIds.value.map((id) => ({
+    id,
+    name: getChampionDisplayName(id),
+  }));
+});
 
 const {
   buildConfig,
   loading,
+  refreshing,
   error,
   applying,
   applySuccess,
@@ -181,6 +235,7 @@ const {
   sourceLabel,
   currentChampionId,
   fetchBuilds,
+  refreshBuilds,
   applyRune,
   selectRune,
   selectItem,
@@ -193,34 +248,44 @@ const showDropdown = ref(false);
 // Champion list
 const allChampions = computed(() => {
   return Object.entries(CHAMPION_ID_MAP)
-    .map(([id, name]) => ({ id: Number(id), name }))
-    .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+    .map(([id, name]) => ({
+      id: Number(id),
+      name,
+      cnName: CHAMPION_CN_NAME_MAP[Number(id)] ?? '',
+      title: CHAMPION_TITLE_MAP[Number(id)] ?? '',
+      displayName: getChampionDisplayName(Number(id)),
+    }))
+    .sort((a, b) => a.cnName.localeCompare(b.cnName, 'zh-CN'));
 });
 
 const filteredChampions = computed(() => {
   const q = searchQuery.value.trim().toLowerCase();
   if (!q) return allChampions.value;
   return allChampions.value.filter((c) =>
-    c.name.toLowerCase().includes(q),
+    c.name.toLowerCase().includes(q)
+    || c.cnName.includes(q)
+    || c.title.includes(q),
   );
 });
 
 const loadingChampName = computed(() => {
   if (currentChampionId.value) {
-    return CHAMPION_ID_MAP[currentChampionId.value] ?? '英雄';
+    return getChampionDisplayName(currentChampionId.value);
   }
   return '英雄';
 });
 
 function selectChampion(championId: number) {
   showDropdown.value = false;
-  searchQuery.value = CHAMPION_ID_MAP[championId] ?? '';
+  searchQuery.value = getChampionDisplayName(championId);
   fetchBuilds(championId);
 }
 
 function clearSearch() {
   searchQuery.value = '';
   showDropdown.value = false;
+  buildConfig.value = null;
+  currentChampionId.value = null;
 }
 
 function roleLabel(role: string): string {
@@ -253,7 +318,7 @@ function handleChampSelectEvent(event: unknown) {
 
   const me = data.myTeam.find((m) => m.cellId === data.localPlayerCellId);
   if (me && me.championId > 0 && me.championId !== currentChampionId.value) {
-    searchQuery.value = CHAMPION_ID_MAP[me.championId] ?? '';
+    searchQuery.value = getChampionDisplayName(me.championId);
     fetchBuilds(me.championId);
   }
 }
@@ -261,6 +326,15 @@ function handleChampSelectEvent(event: unknown) {
 onMounted(() => {
   window.electronAPI.lcuSubscribe('/lol-champ-select/v1/session');
   unsubLCU = window.electronAPI.onLCUEvent(handleChampSelectEvent);
+
+  // 从路由查询参数加载英雄（例如从首页收藏点击进入）
+  const queryChampId = route.query.championId;
+  if (queryChampId) {
+    const champId = Number(queryChampId);
+    if (champId > 0) {
+      selectChampion(champId);
+    }
+  }
 });
 
 onUnmounted(() => {
@@ -453,16 +527,112 @@ onUnmounted(() => {
   background: var(--color-bg-hover);
 }
 
+.champ-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
 .champ-label {
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
   color: var(--color-text-primary);
 }
 
+.champ-title {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .dropdown-overlay {
   position: fixed;
   inset: 0;
   z-index: -1;
+}
+
+/* Loading */
+.start-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.favorites-section {
+  background: var(--color-bg-card);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border-light);
+  padding: var(--space-5);
+}
+
+.section-title {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--space-3);
+}
+
+.favorites-grid {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.favorite-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  position: relative;
+}
+
+.favorite-item:hover {
+  background: var(--color-bg-hover);
+}
+
+.favorite-name {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  max-width: 64px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.favorite-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: var(--color-bg-active);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.favorite-item:hover .favorite-remove {
+  display: flex;
+}
+
+.favorite-remove:hover {
+  background: var(--color-error);
+  color: #ffffff;
 }
 
 /* Loading */
@@ -570,6 +740,59 @@ onUnmounted(() => {
 }
 
 /* Skill order */
+.refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: var(--color-bg-active);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.favorite-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.favorite-btn:hover {
+  background: var(--color-bg-active);
+  color: var(--color-gold);
+  border-color: var(--color-gold);
+}
+
+.favorite-btn.is-fav {
+  color: var(--color-gold);
+  border-color: var(--color-gold);
+  background: rgba(255, 215, 0, 0.08);
+}
+
 .skill-order {
   display: flex;
   flex-direction: column;
@@ -630,5 +853,13 @@ onUnmounted(() => {
 .footer-note {
   font-size: var(--text-xs);
   color: var(--color-text-placeholder);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
 }
 </style>

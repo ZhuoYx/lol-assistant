@@ -54,7 +54,14 @@
             class="item-slot"
           >
             <div class="item-icon starting">
-              <span class="item-id">{{ itemId }}</span>
+              <img
+                v-if="getItemImgUrl(itemId)"
+                class="item-img"
+                :src="getItemImgUrl(itemId)"
+                :alt="getItemName(itemId)"
+                @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+              />
+              <span v-else class="item-id">{{ itemId }}</span>
             </div>
             <span class="item-name">{{ getItemName(itemId) }}</span>
           </div>
@@ -72,7 +79,14 @@
           <template v-for="(itemId, idx) in currentBuild.items" :key="itemId">
             <div class="item-slot">
               <div class="item-icon core">
-                <span class="item-id">{{ itemId }}</span>
+                <img
+                  v-if="getItemImgUrl(itemId)"
+                  class="item-img"
+                  :src="getItemImgUrl(itemId)"
+                  :alt="getItemName(itemId)"
+                  @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+                />
+                <span v-else class="item-id">{{ itemId }}</span>
               </div>
               <span class="item-name">{{ getItemName(itemId) }}</span>
             </div>
@@ -104,7 +118,14 @@
         <div class="items-row">
           <div class="item-slot">
             <div class="item-icon boots">
-              <span class="item-id">{{ currentBuild.boots }}</span>
+              <img
+                v-if="getItemImgUrl(currentBuild.boots)"
+                class="item-img"
+                :src="getItemImgUrl(currentBuild.boots)"
+                :alt="getItemName(currentBuild.boots)"
+                @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+              />
+              <span v-else class="item-id">{{ currentBuild.boots }}</span>
             </div>
             <span class="item-name">{{ getItemName(currentBuild.boots) }}</span>
           </div>
@@ -117,7 +138,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { ItemBuild } from '@lol-assistant/shared';
-import { ITEM_ID_MAP } from '@lol-assistant/shared';
+import { ITEM_ID_MAP, getItemIconUrl } from '@lol-assistant/shared';
+
+const DDRAGON_VERSION = '16.5.1';
 
 const props = withDefaults(defineProps<{
   itemBuilds: ItemBuild[];
@@ -136,12 +159,19 @@ const currentBuild = computed(() => {
 });
 
 function getItemName(id: number): string {
-  return ITEM_ID_MAP[id] ?? `#${id}`;
+  return ITEM_ID_MAP[id] ?? '';
+}
+
+function getItemImgUrl(id: number): string {
+  if (!id || id <= 0) return '';
+  return getItemIconUrl(id, DDRAGON_VERSION);
 }
 
 function formatPercent(v: number): string {
   if (!v) return '—';
-  return `${(v * 100).toFixed(1)}%`;
+  // 值大于1视为已经是百分比（如 52.3），否则视为小数（如 0.523）
+  const pct = v > 1 ? v : v * 100;
+  return `${pct.toFixed(1)}%`;
 }
 
 function formatSample(v: number): string {
@@ -346,6 +376,13 @@ function formatSample(v: number): string {
   font-size: 9px;
   font-family: var(--font-mono);
   color: var(--color-text-tertiary);
+}
+
+.item-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
 }
 
 .item-name {

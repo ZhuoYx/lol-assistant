@@ -173,6 +173,11 @@ export class ScraperManager implements IChampionDataScraper {
     await this.storage.clearAll();
   }
 
+  /** 清除指定英雄的缓存数据 */
+  async clearChampionCache(championId: number): Promise<void> {
+    await this.storage.clearChampionData(championId);
+  }
+
   /** 销毁 */
   destroy(): void {
     this.scheduler.destroy();

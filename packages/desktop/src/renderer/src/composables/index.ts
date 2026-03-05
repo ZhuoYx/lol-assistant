@@ -5,4 +5,5 @@ export { useLiveGame } from './useLiveGame';
 export { useScraperData } from './useScraperData';
 export { useDraftAssistant } from './useDraftAssistant';
 export { useRuneBuilder } from './useRuneBuilder';
+export { useFavoriteChampions } from './useFavoriteChampions';
 export { useGameNotification } from './useGameNotification';

@@ -48,6 +48,7 @@ interface ElectronAPI {
 
   // 第三方数据
   getChampionBuilds: (championId: number) => Promise<import('@lol-assistant/shared').ChampionBuilds>;
+  refreshChampionBuilds: (championId: number) => Promise<void>;
   getChampionCounters: (championId: number) => Promise<import('@lol-assistant/shared').ChampionCounters>;
   updateScraperData: () => Promise<void>;
   getScraperDataVersion: () => Promise<import('@lol-assistant/shared').ScraperDataVersion | null>;

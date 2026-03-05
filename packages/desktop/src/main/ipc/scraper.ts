@@ -19,6 +19,17 @@ export function registerScraperIpcHandlers(): void {
     }
   });
 
+  // 刷新英雄构建数据（清除缓存后重新获取）
+  ipcMain.handle('scraper:refreshChampionBuilds', async (_event, championId: number) => {
+    try {
+      await scraperManager.clearChampionCache(championId);
+      logger.info(`已清除英雄 ${championId} 的缓存`);
+    } catch (err) {
+      logger.error(`IPC scraper:refreshChampionBuilds 失败 (championId=${championId}):`, err);
+      throw err;
+    }
+  });
+
   // 获取英雄克制关系
   ipcMain.handle('scraper:getChampionCounters', async (_event, championId: number) => {
     try {

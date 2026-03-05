@@ -55,12 +55,12 @@ export class OPGGScraper implements IChampionDataScraper {
   private webClient: AxiosInstance;
   private region: string;
 
-  constructor(region = 'global') {
+  constructor(region = 'KR') {
     this.region = region;
 
-    // 内部 API 客户端（首选方案）
+    // 内部 API 客户端（使用新域名，仅支持 Tier 列表）
     this.api = axios.create({
-      baseURL: 'https://lol-web-api.op.gg/api/v1.0/internal/bypass',
+      baseURL: 'https://lol-api-champion.op.gg/api',
       timeout: REQUEST_TIMEOUT,
       headers: {
         'User-Agent':
@@ -104,30 +104,34 @@ export class OPGGScraper implements IChampionDataScraper {
   }
 
   /** 通过内部 API 获取 Tier 列表 */
-  private async fetchTierListFromAPI(queueType: string): Promise<ChampionTier[]> {
+  private async fetchTierListFromAPI(_queueType: string): Promise<ChampionTier[]> {
     const results: ChampionTier[] = [];
+
+    // 新 API 支持按位置查询，一次请求一个位置
     const roles = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
 
     for (const role of roles) {
       try {
-        const response = await this.api.get('/meta/champions', {
-          params: {
-            hl: 'zh_CN',
-            game_type: queueType,
-            position: role,
-            region: this.region,
-          },
+        const response = await this.api.get(`/${this.region}/champions/ranked`, {
+          params: { position: role },
         });
 
         const champions = response.data?.data ?? [];
         for (const champ of champions) {
+          // 新 API 数据结构：average_stats 包含整体数据，positions 数组包含分位置数据
+          const posData = champ.positions?.find(
+            (p: Record<string, unknown>) => p.name === role,
+          );
+          const stats = posData?.stats ?? champ.average_stats ?? {};
+          const tierData = posData?.tier_data ?? champ.average_stats?.tier_data ?? {};
+
           results.push({
             championId: champ.id,
             role: REVERSE_ROLE_MAP[role] ?? role.toLowerCase(),
-            tier: this.mapAPITier(champ.tier_data?.tier ?? 0),
-            winRate: champ.tier_data?.win_rate ?? 0,
-            pickRate: champ.tier_data?.pick_rate ?? 0,
-            banRate: champ.tier_data?.ban_rate ?? 0,
+            tier: this.mapAPITier(tierData.tier ?? 0),
+            winRate: (stats.win_rate ?? 0) * 100,
+            pickRate: (stats.pick_rate ?? 0) * 100,
+            banRate: (stats.ban_rate ?? 0) * 100,
           });
         }
 
@@ -214,79 +218,14 @@ export class OPGGScraper implements IChampionDataScraper {
   // ─── 英雄构建 ──────────────────────────────────────────
 
   async getChampionBuilds(championId: number, role?: string): Promise<ChampionBuilds> {
-    const position = role ? (ROLE_MAP[role] ?? role.toUpperCase()) : undefined;
-
-    try {
-      return await this.fetchBuildsFromAPI(championId, position);
-    } catch (apiError) {
-      logger.warn(`OP.GG API 获取英雄 ${championId} 构建失败，尝试网页解析:`, apiError);
-      try {
-        return await this.fetchBuildsFromWeb(championId, position);
-      } catch (webError) {
-        logger.error(`OP.GG 网页解析英雄 ${championId} 构建也失败:`, webError);
-        throw webError;
-      }
-    }
+    // OP.GG 构建 API 已不可用，网页有 Cloudflare 反爬会长时间挂起，直接快速失败以便降级
+    throw new Error('OP.GG 构建数据当前不可用，跳过以加速降级');
   }
 
   /** 通过内部 API 获取英雄构建 */
-  private async fetchBuildsFromAPI(championId: number, position?: string): Promise<ChampionBuilds> {
-    const params: Record<string, string> = {
-      hl: 'zh_CN',
-      region: this.region,
-    };
-    if (position) params.position = position;
-
-    const response = await this.api.get(`/meta/champions/${championId}/build`, { params });
-    const data = response.data?.data;
-
-    if (!data) {
-      throw new Error(`API 未返回构建数据: championId=${championId}`);
-    }
-
-    const runeBuilds: RuneBuild[] = [];
-    const runePages = data.rune_pages ?? [];
-    for (const page of runePages) {
-      runeBuilds.push({
-        name: page.name ?? `符文配置 ${runeBuilds.length + 1}`,
-        winRate: page.win_rate ?? 0,
-        pickRate: page.pick_rate ?? 0,
-        sampleSize: page.play_count ?? page.sample_size ?? 0,
-        primaryTree: page.primary_page_id ?? page.primary_tree ?? 0,
-        primaryPerks: page.primary_rune_ids ?? [],
-        secondaryTree: page.secondary_page_id ?? page.secondary_tree ?? 0,
-        secondaryPerks: page.secondary_rune_ids ?? [],
-        statShards: page.stat_mod_ids ?? page.stat_shards ?? [],
-      });
-    }
-
-    const itemBuilds: ItemBuild[] = [];
-    const coreItems = data.core_items ?? [];
-    for (const build of coreItems) {
-      itemBuilds.push({
-        name: build.name ?? `出装方案 ${itemBuilds.length + 1}`,
-        winRate: build.win_rate ?? 0,
-        pickRate: build.pick_rate ?? 0,
-        sampleSize: build.play_count ?? build.sample_size ?? 0,
-        items: (build.ids ?? build.items ?? []).map(Number),
-        startingItems: (data.starter_items?.[0]?.ids ?? []).map(Number),
-        boots: data.boots?.[0]?.ids?.[0] ?? 0,
-      });
-    }
-
-    const skillOrder: string[] = data.skill_masteries?.[0]?.ids
-      ? data.skill_masteries[0].ids.map(String)
-      : data.skills?.order ?? [];
-
-    return {
-      championId,
-      role: position ? (REVERSE_ROLE_MAP[position] ?? position.toLowerCase()) : 'mid',
-      patch: data.version ?? data.patch ?? '',
-      dataSource: 'opgg',
-      runeBuilds,
-      itemBuilds,
-      skillOrder,
-    };
+  private async fetchBuildsFromAPI(_championId: number, _position?: string): Promise<ChampionBuilds> {
+    // 新版 OP.GG API (lol-api-champion.op.gg) 不提供构建端点，快速降级
+    throw new Error('OP.GG 构建 API 已迁移，当前不可用');
   }
 
   /** 通过网页解析获取英雄构建 */
@@ -369,58 +308,15 @@ export class OPGGScraper implements IChampionDataScraper {
   // ─── 英雄克制 ──────────────────────────────────────────
 
   async getChampionCounters(championId: number, role?: string): Promise<ChampionCounters> {
-    const position = role ? (ROLE_MAP[role] ?? role.toUpperCase()) : undefined;
-
-    try {
-      return await this.fetchCountersFromAPI(championId, position);
-    } catch (apiError) {
-      logger.warn(`OP.GG API 获取英雄 ${championId} 克制关系失败，尝试网页解析:`, apiError);
-      try {
-        return await this.fetchCountersFromWeb(championId, position);
-      } catch (webError) {
-        logger.error(`OP.GG 网页解析英雄 ${championId} 克制关系也失败:`, webError);
-        throw webError;
-      }
-    }
+    // OP.GG 克制 API 已不可用，网页有 Cloudflare 反爬会长时间挂起，直接快速失败以便降级
+    throw new Error('OP.GG 克制数据当前不可用，跳过以加速降级');
   }
 
   /** 通过内部 API 获取克制关系 */
-  private async fetchCountersFromAPI(championId: number, position?: string): Promise<ChampionCounters> {
-    const params: Record<string, string> = {
-      hl: 'zh_CN',
-      region: this.region,
-    };
-    if (position) params.position = position;
-
-    const response = await this.api.get(`/meta/champions/${championId}/counters`, { params });
-    const data = response.data?.data;
-
-    if (!data) {
-      throw new Error(`API 未返回克制数据: championId=${championId}`);
-    }
-
-    const hardCounters: CounterInfo[] = (data.counters ?? data.hard_counters ?? [])
-      .slice(0, 10)
-      .map((c: Record<string, unknown>) => ({
-        championId: c.champion_id ?? c.id,
-        winRate: c.win_rate ?? c.winRate ?? 0,
-        sampleSize: c.play_count ?? c.sample_size ?? 0,
-      }));
-
-    const easyMatchups: CounterInfo[] = (data.easy_matchups ?? data.weak_against ?? [])
-      .slice(0, 10)
-      .map((c: Record<string, unknown>) => ({
-        championId: c.champion_id ?? c.id,
-        winRate: c.win_rate ?? c.winRate ?? 0,
-        sampleSize: c.play_count ?? c.sample_size ?? 0,
-      }));
-
-    return {
-      championId,
-      role: position ? (REVERSE_ROLE_MAP[position] ?? position.toLowerCase()) : 'mid',
-      hardCounters,
-      easyMatchups,
-    };
+  private async fetchCountersFromAPI(_championId: number, _position?: string): Promise<ChampionCounters> {
+    // 新版 OP.GG API 的 counters 数据内嵌在 tier 列表结果中，
+    // 但数据量太少（仅含少量对手），不适合直接使用，快速降级到网页解析
+    throw new Error('OP.GG 克制关系 API 已迁移，当前不可用');
   }
 
   /** 通过网页解析获取克制关系 */

@@ -1,9 +1,15 @@
 /**
  * Lolalytics 数据爬取器（备选数据源）
- * Lolalytics 使用内部 API 提供统计数据，页面结构相对稳定
+ *
+ * 新版 API 端点：https://a1.lolalytics.com/mega/
+ * 关键参数变更：
+ *   - c = 英雄英文名（小写，如 "alistar"），不再是数字 ID
+ *   - tier = "emerald_plus"（固定）
+ *   - queue = "ranked"（而非 "420"）
+ *   - patch = 具体版本号（如 "16.5"），不再支持 "default"
+ * 有效 ep 值：rune, build-itemset, counter, tier, front
  */
 import axios, { type AxiosInstance } from 'axios';
-import * as cheerio from 'cheerio';
 import type {
   IChampionDataScraper,
   ChampionTier,
@@ -13,6 +19,7 @@ import type {
   ItemBuild,
   CounterInfo,
 } from '@lol-assistant/shared';
+import { CHAMPION_ID_MAP } from '@lol-assistant/shared';
 import { logger } from '../utils/logger';
 
 /** Lolalytics 角色映射 */
@@ -36,14 +43,18 @@ const REVERSE_ROLE_MAP: Record<string, string> = {
 /** 请求超时时间 */
 const REQUEST_TIMEOUT = 15_000;
 
+/** 默认查询参数 */
+const DEFAULT_TIER = 'emerald_plus';
+const DEFAULT_QUEUE = 'ranked';
+const DEFAULT_REGION = 'all';
+
 export class LolalyticsScraper implements IChampionDataScraper {
   private api: AxiosInstance;
-  private webClient: AxiosInstance;
+  private currentPatch: string | null = null;
 
   constructor() {
-    // Lolalytics 内部 API
     this.api = axios.create({
-      baseURL: 'https://ax.lolalytics.com',
+      baseURL: 'https://a1.lolalytics.com',
       timeout: REQUEST_TIMEOUT,
       headers: {
         'User-Agent':
@@ -54,142 +65,138 @@ export class LolalyticsScraper implements IChampionDataScraper {
         Origin: 'https://lolalytics.com',
       },
     });
+  }
 
-    // 网页客户端
-    this.webClient = axios.create({
-      baseURL: 'https://lolalytics.com',
-      timeout: REQUEST_TIMEOUT,
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+  // ─── 内部工具 ──────────────────────────────────────────
+
+  /** 获取当前版本号（缓存） */
+  private async getPatch(): Promise<string> {
+    if (this.currentPatch) return this.currentPatch;
+
+    try {
+      const response = await this.api.get('/mega/', {
+        params: {
+          ep: 'front',
+          v: '1',
+          patch: '30', // front 端点使用任意 patch 参数，返回中包含实际 patches
+          tier: DEFAULT_TIER,
+          queue: DEFAULT_QUEUE,
+          region: DEFAULT_REGION,
+        },
+      });
+      const patches = response.data?.patches;
+      if (Array.isArray(patches) && patches.length > 0) {
+        this.currentPatch = patches[0];
+        logger.info(`Lolalytics 当前版本: ${this.currentPatch}`);
+        return this.currentPatch!;
+      }
+    } catch (err) {
+      logger.warn('获取 Lolalytics 当前版本失败:', err);
+    }
+
+    // 降级：尝试从当前日期推算版本号
+    throw new Error('无法获取当前游戏版本号');
+  }
+
+  /** 将英雄 ID 转换为英文名（小写） */
+  private getChampionName(championId: number): string {
+    const name = CHAMPION_ID_MAP[championId];
+    if (!name) throw new Error(`未知英雄 ID: ${championId}`);
+    return name.toLowerCase();
+  }
+
+  /** 从主符文 ID 推断符文树 ID */
+  private getRuneTreeId(keystoneOrPerkId: number): number {
+    // 符文 ID 格式：8xyz，其中 8x00 是 tree ID
+    // 例如 8439 (Aftershock) -> 8400 (Resolve)
+    return Math.floor(keystoneOrPerkId / 100) * 100;
+  }
+
+  /** 通用 API 请求 */
+  private async apiRequest(ep: string, extraParams: Record<string, string> = {}) {
+    const patch = await this.getPatch();
+    const response = await this.api.get('/mega/', {
+      params: {
+        ep,
+        v: '1',
+        patch,
+        tier: DEFAULT_TIER,
+        queue: DEFAULT_QUEUE,
+        region: DEFAULT_REGION,
+        ...extraParams,
       },
     });
+
+    const data = response.data;
+    if (!data || data.status === 404 || data.status === 4041 || data.status === 4042) {
+      throw new Error(`Lolalytics API 返回错误: ep=${ep}, status=${data?.status ?? 'empty'}`);
+    }
+    return data;
   }
 
   // ─── Tier 列表 ──────────────────────────────────────────
 
   async getChampionTierList(queue: 'ranked_solo' | 'ranked_flex'): Promise<ChampionTier[]> {
-    const queueParam = queue === 'ranked_solo' ? '420' : '440';
-
-    try {
-      return await this.fetchTierListFromAPI(queueParam);
-    } catch (apiError) {
-      logger.warn('Lolalytics API 获取 Tier 列表失败，尝试网页解析:', apiError);
-      try {
-        return await this.fetchTierListFromWeb(queueParam);
-      } catch (webError) {
-        logger.error('Lolalytics 网页解析 Tier 列表也失败:', webError);
-        throw webError;
-      }
-    }
+    return this.fetchTierListFromAPI(queue);
   }
 
-  /** 通过 API 获取 Tier 列表 */
-  private async fetchTierListFromAPI(queueId: string): Promise<ChampionTier[]> {
+  private async fetchTierListFromAPI(queue: 'ranked_solo' | 'ranked_flex'): Promise<ChampionTier[]> {
     const results: ChampionTier[] = [];
+    const patch = await this.getPatch();
 
-    const response = await this.api.get('/tierlist/2', {
-      params: {
-        lane: 'default',
-        patch: 'default',
-        tier: 'all',
-        queue: queueId,
-        region: 'all',
-      },
-    });
+    // Tier API 需要 lane 参数，逐位置查询
+    const lanes = ['top', 'jungle', 'middle', 'bottom', 'support'];
 
-    const data = response.data;
-    if (!data) throw new Error('API 未返回数据');
+    for (const lane of lanes) {
+      try {
+        const response = await this.api.get('/mega/', {
+          params: {
+            ep: 'tier',
+            v: '1',
+            patch,
+            lane,
+            tier: DEFAULT_TIER,
+            queue: queue === 'ranked_solo' ? DEFAULT_QUEUE : 'flex',
+            region: DEFAULT_REGION,
+          },
+        });
 
-    // Lolalytics API 返回格式通常是按英雄 ID 分组的数据
-    const champData = data.cid ?? data;
-    if (typeof champData === 'object') {
-      for (const [champId, info] of Object.entries(champData)) {
-        const id = parseInt(champId, 10);
-        if (isNaN(id)) continue;
+        const data = response.data;
+        if (!data?.tier) continue;
 
-        const champInfo = info as Record<string, unknown>;
-        const lanes = champInfo.lane as Record<string, unknown> | undefined;
+        const roleKey = REVERSE_ROLE_MAP[lane] ?? lane;
 
-        if (lanes) {
-          // 每个位置单独生成一条记录
-          for (const [lane, laneData] of Object.entries(lanes)) {
-            const roleKey = REVERSE_ROLE_MAP[lane] ?? lane;
-            const ld = laneData as Record<string, number>;
+        // tier 数据结构：{ "1": { lane: { [lane]: { cid: { [champId]: {...} } } } } }
+        // 数字键代表 tier 等级
+        for (const [tierLevel, tierData] of Object.entries(data.tier)) {
+          const laneData = (tierData as Record<string, Record<string, Record<string, Record<string, unknown>>>>)?.lane?.[lane]?.cid;
+          if (!laneData) continue;
+
+          for (const [champIdStr, champData] of Object.entries(laneData)) {
+            const champId = parseInt(champIdStr, 10);
+            if (isNaN(champId)) continue;
+
+            const cd = champData as Record<string, number>;
             results.push({
-              championId: id,
+              championId: champId,
               role: roleKey,
-              tier: this.calculateTier(ld.wr ?? 0, ld.pr ?? 0),
-              winRate: ld.wr ?? 0,
-              pickRate: ld.pr ?? 0,
-              banRate: ld.br ?? (champInfo.br as number) ?? 0,
+              tier: this.mapTierLevel(parseInt(tierLevel, 10)),
+              winRate: cd.wr ?? 0,
+              pickRate: cd.pr ?? 0,
+              banRate: cd.br ?? 0,
             });
           }
-        } else {
-          // 无位置信息，使用整体数据
-          results.push({
-            championId: id,
-            role: 'mid',
-            tier: this.calculateTier(
-              (champInfo.wr as number) ?? 0,
-              (champInfo.pr as number) ?? 0,
-            ),
-            winRate: (champInfo.wr as number) ?? 0,
-            pickRate: (champInfo.pr as number) ?? 0,
-            banRate: (champInfo.br as number) ?? 0,
-          });
         }
+
+        // 避免请求过快
+        await this.delay(200);
+      } catch (err) {
+        logger.warn(`Lolalytics 获取 ${lane} Tier 数据失败:`, err);
       }
     }
 
     if (results.length === 0) {
-      throw new Error('未获取到任何 Tier 数据');
-    }
-
-    return results;
-  }
-
-  /** 通过网页解析获取 Tier 列表 */
-  private async fetchTierListFromWeb(queueId: string): Promise<ChampionTier[]> {
-    const results: ChampionTier[] = [];
-    const tierParam = queueId === '420' ? 'ranked' : 'flex';
-
-    const response = await this.webClient.get(`/lol/tierlist/`, {
-      params: { tier: tierParam },
-    });
-
-    const $ = cheerio.load(response.data);
-
-    // 尝试从 script 标签提取 JSON 数据
-    $('script').each((_, el) => {
-      const text = $(el).text();
-      if (text.includes('__NEXT_DATA__') || text.includes('tierlist')) {
-        try {
-          const jsonMatch = text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const data = JSON.parse(jsonMatch[0]);
-            const champions = data?.props?.pageProps?.data ?? data?.champions ?? [];
-            for (const champ of champions) {
-              results.push({
-                championId: champ.id ?? champ.champion_id,
-                role: champ.role ?? champ.lane ?? 'mid',
-                tier: this.calculateTier(champ.win_rate ?? champ.wr ?? 0, champ.pick_rate ?? champ.pr ?? 0),
-                winRate: champ.win_rate ?? champ.wr ?? 0,
-                pickRate: champ.pick_rate ?? champ.pr ?? 0,
-                banRate: champ.ban_rate ?? champ.br ?? 0,
-              });
-            }
-          }
-        } catch {
-          // 跳过无效 JSON
-        }
-      }
-    });
-
-    if (results.length === 0) {
-      throw new Error('网页解析未获取到任何 Tier 数据');
+      throw new Error('Lolalytics 未获取到任何 Tier 数据');
     }
 
     return results;
@@ -198,183 +205,113 @@ export class LolalyticsScraper implements IChampionDataScraper {
   // ─── 英雄构建 ──────────────────────────────────────────
 
   async getChampionBuilds(championId: number, role?: string): Promise<ChampionBuilds> {
-    const lane = role ? (ROLE_MAP[role] ?? role) : 'default';
+    const champName = this.getChampionName(championId);
+    const lane = role ? (ROLE_MAP[role] ?? role) : 'all';
 
-    try {
-      return await this.fetchBuildsFromAPI(championId, lane);
-    } catch (apiError) {
-      logger.warn(`Lolalytics API 获取英雄 ${championId} 构建失败，尝试网页解析:`, apiError);
-      try {
-        return await this.fetchBuildsFromWeb(championId, lane);
-      } catch (webError) {
-        logger.error(`Lolalytics 网页解析英雄 ${championId} 构建也失败:`, webError);
-        throw webError;
-      }
-    }
-  }
-
-  /** 通过 API 获取英雄构建 */
-  private async fetchBuildsFromAPI(championId: number, lane: string): Promise<ChampionBuilds> {
-    const response = await this.api.get('/mega/2', {
-      params: {
-        ep: 'champion',
-        v: '1',
-        patch: 'default',
-        c: championId,
-        lane,
-        tier: 'all',
-        queue: '420',
-        region: 'all',
-      },
-    });
-
-    const data = response.data;
-    if (!data) throw new Error(`API 未返回构建数据: championId=${championId}`);
+    // 并行请求符文和出装数据
+    const [runeData, itemData] = await Promise.all([
+      this.apiRequest('rune', { c: champName, lane }),
+      this.apiRequest('build-itemset', { c: champName, lane }).catch(() => null),
+    ]);
 
     const runeBuilds: RuneBuild[] = [];
     const itemBuilds: ItemBuild[] = [];
     const skillOrder: string[] = [];
 
-    // 解析符文数据
-    const runes = data.runes ?? data.topRunes;
-    if (runes) {
-      const runeEntries = Array.isArray(runes) ? runes : Object.values(runes);
-      for (const rune of runeEntries.slice(0, 3)) {
-        const r = rune as Record<string, unknown>;
+    // ── 解析符文 ──
+    const summary = runeData?.summary?.runes;
+    if (summary) {
+      // "pick" = 最高选取率符文配置
+      if (summary.pick) {
+        const pick = summary.pick;
+        const priPerks = pick.set?.pri ?? [];
+        const secPerks = pick.set?.sec ?? [];
+        const mods = pick.set?.mod ?? [];
+
         runeBuilds.push({
-          name: (r.name as string) ?? `符文配置 ${runeBuilds.length + 1}`,
-          winRate: (r.wr as number) ?? (r.win_rate as number) ?? 0,
-          pickRate: (r.pr as number) ?? (r.pick_rate as number) ?? 0,
-          sampleSize: (r.n as number) ?? (r.count as number) ?? 0,
-          primaryTree: (r.primary_tree as number) ?? (r.primaryTree as number) ?? 0,
-          primaryPerks: ((r.primary as number[]) ?? (r.primaryPerks as number[]) ?? []),
-          secondaryTree: (r.secondary_tree as number) ?? (r.secondaryTree as number) ?? 0,
-          secondaryPerks: ((r.secondary as number[]) ?? (r.secondaryPerks as number[]) ?? []),
-          statShards: ((r.stat as number[]) ?? (r.statShards as number[]) ?? []),
+          name: '最高选取率',
+          winRate: pick.wr ?? 0,
+          pickRate: 0, // pick 配置的选取率需要另外计算
+          sampleSize: pick.n ?? 0,
+          primaryTree: priPerks.length > 0 ? this.getRuneTreeId(priPerks[0]) : 0,
+          primaryPerks: priPerks,
+          secondaryTree: secPerks.length > 0 ? this.getRuneTreeId(secPerks[0]) : 0,
+          secondaryPerks: secPerks,
+          statShards: mods,
+        });
+      }
+
+      // "win" = 最高胜率符文配置
+      if (summary.win) {
+        const win = summary.win;
+        const priPerks = win.set?.pri ?? [];
+        const secPerks = win.set?.sec ?? [];
+        const mods = win.set?.mod ?? [];
+
+        runeBuilds.push({
+          name: '最高胜率',
+          winRate: win.wr ?? 0,
+          pickRate: 0,
+          sampleSize: win.n ?? 0,
+          primaryTree: priPerks.length > 0 ? this.getRuneTreeId(priPerks[0]) : 0,
+          primaryPerks: priPerks,
+          secondaryTree: secPerks.length > 0 ? this.getRuneTreeId(secPerks[0]) : 0,
+          secondaryPerks: secPerks,
+          statShards: mods,
         });
       }
     }
 
-    // 解析装备数据
-    const items = data.items ?? data.topItems ?? data.coreItems;
-    if (items) {
-      const itemEntries = Array.isArray(items) ? items : Object.values(items);
-      for (const item of itemEntries.slice(0, 3)) {
-        const i = item as Record<string, unknown>;
-        itemBuilds.push({
-          name: (i.name as string) ?? `出装方案 ${itemBuilds.length + 1}`,
-          winRate: (i.wr as number) ?? (i.win_rate as number) ?? 0,
-          pickRate: (i.pr as number) ?? (i.pick_rate as number) ?? 0,
-          sampleSize: (i.n as number) ?? (i.count as number) ?? 0,
-          items: ((i.ids as number[]) ?? (i.items as number[]) ?? []).map(Number),
-          startingItems: ((data.startItems?.[0]?.ids as number[]) ?? []).map(Number),
-          boots: (data.boots?.[0]?.id as number) ?? 0,
-        });
-      }
-    }
+    // ── 解析出装 ──
+    if (itemData?.itemSets) {
+      const sets = itemData.itemSets;
 
-    // 解析技能加点
-    const skills = data.skills ?? data.skillOrder;
-    if (skills) {
-      if (Array.isArray(skills)) {
-        skillOrder.push(...skills.map(String));
-      } else if (typeof skills === 'object') {
-        const topSkill = Object.values(skills)[0] as Record<string, unknown> | undefined;
-        if (topSkill?.order) {
-          skillOrder.push(...(topSkill.order as string[]).map(String));
+      // itemSet1 = 单件核心装，格式: [["itemId", pickCount, winCount], ...]
+      // itemSet2 = 两件套，格式: [["itemId1_itemId2", pickCount, winCount], ...]
+      // itemSet3 = 三件套
+
+      // 从 itemSet1 提取最热门的起始装备
+      const startingItems: number[] = [];
+      if (sets.itemSet1) {
+        const topItems = (sets.itemSet1 as [string, number, number][])
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 2);
+        for (const [itemId] of topItems) {
+          startingItems.push(parseInt(itemId, 10));
+        }
+      }
+
+      // 从 itemSet2 或 itemSet3 提取核心出装
+      const itemSetKey = sets.itemSet3 ? 'itemSet3' : 'itemSet2';
+      const coreItems = sets[itemSetKey] as [string, number, number][] | undefined;
+
+      if (coreItems && coreItems.length > 0) {
+        // 按选取率排序取前 3
+        const sorted = [...coreItems].sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+        for (const [itemIds, pickCount, winCount] of sorted) {
+          const items = itemIds.split('_').map(Number);
+          const wr = pickCount > 0 ? (winCount / pickCount) * 100 : 0;
+
+          itemBuilds.push({
+            name: `出装方案 ${itemBuilds.length + 1}`,
+            winRate: Math.round(wr * 100) / 100,
+            pickRate: 0,
+            sampleSize: pickCount,
+            items,
+            startingItems,
+            boots: 0, // boots 数据不在 itemset 端点中
+          });
         }
       }
     }
 
-    const roleKey = REVERSE_ROLE_MAP[lane] ?? lane;
+    const roleKey = lane === 'all' ? (runeData?.header?.defaultLane ?? 'mid') : lane;
 
     return {
       championId,
-      role: roleKey === 'default' ? 'mid' : roleKey,
-      patch: (data.patch as string) ?? (data.version as string) ?? '',
-      dataSource: 'lolalytics',
-      runeBuilds,
-      itemBuilds,
-      skillOrder,
-    };
-  }
-
-  /** 通过网页解析获取英雄构建 */
-  private async fetchBuildsFromWeb(championId: number, lane: string): Promise<ChampionBuilds> {
-    const laneParam = lane === 'default' ? '' : lane;
-    const url = laneParam
-      ? `/lol/champion/${championId}/build/${laneParam}/`
-      : `/lol/champion/${championId}/build/`;
-
-    const response = await this.webClient.get(url);
-    const $ = cheerio.load(response.data);
-
-    const runeBuilds: RuneBuild[] = [];
-    const itemBuilds: ItemBuild[] = [];
-    const skillOrder: string[] = [];
-    let patch = '';
-
-    // 从内嵌 script 提取数据
-    $('script').each((_, el) => {
-      const text = $(el).text();
-      if (text.includes('__NEXT_DATA__')) {
-        try {
-          const jsonMatch = text.match(/\{[\s\S]*\}/);
-          if (!jsonMatch) return;
-          const data = JSON.parse(jsonMatch[0]);
-          const buildData = data?.props?.pageProps?.data;
-
-          if (buildData) {
-            patch = buildData.patch ?? buildData.version ?? '';
-
-            // 解析符文
-            const runes = buildData.runes ?? [];
-            for (const r of (Array.isArray(runes) ? runes : []).slice(0, 3)) {
-              runeBuilds.push({
-                name: r.name ?? `符文配置 ${runeBuilds.length + 1}`,
-                winRate: r.wr ?? r.win_rate ?? 0,
-                pickRate: r.pr ?? r.pick_rate ?? 0,
-                sampleSize: r.n ?? r.count ?? 0,
-                primaryTree: r.primary_tree ?? 0,
-                primaryPerks: r.primary ?? [],
-                secondaryTree: r.secondary_tree ?? 0,
-                secondaryPerks: r.secondary ?? [],
-                statShards: r.stat ?? [],
-              });
-            }
-
-            // 解析出装
-            const items = buildData.items ?? buildData.coreItems ?? [];
-            for (const i of (Array.isArray(items) ? items : []).slice(0, 3)) {
-              itemBuilds.push({
-                name: i.name ?? `出装方案 ${itemBuilds.length + 1}`,
-                winRate: i.wr ?? i.win_rate ?? 0,
-                pickRate: i.pr ?? i.pick_rate ?? 0,
-                sampleSize: i.n ?? i.count ?? 0,
-                items: (i.ids ?? i.items ?? []).map(Number),
-                startingItems: (buildData.startItems?.[0]?.ids ?? []).map(Number),
-                boots: buildData.boots?.[0]?.id ?? 0,
-              });
-            }
-
-            // 解析技能
-            const skills = buildData.skills ?? buildData.skillOrder;
-            if (Array.isArray(skills)) {
-              skillOrder.push(...skills.map(String));
-            }
-          }
-        } catch {
-          // 跳过解析失败
-        }
-      }
-    });
-
-    const roleKey = REVERSE_ROLE_MAP[lane] ?? lane;
-
-    return {
-      championId,
-      role: roleKey === 'default' ? 'mid' : roleKey,
-      patch,
+      role: REVERSE_ROLE_MAP[roleKey] ?? roleKey,
+      patch: this.currentPatch ?? '',
       dataSource: 'lolalytics',
       runeBuilds,
       itemBuilds,
@@ -385,131 +322,42 @@ export class LolalyticsScraper implements IChampionDataScraper {
   // ─── 英雄克制 ──────────────────────────────────────────
 
   async getChampionCounters(championId: number, role?: string): Promise<ChampionCounters> {
-    const lane = role ? (ROLE_MAP[role] ?? role) : 'default';
+    const champName = this.getChampionName(championId);
+    const lane = role ? (ROLE_MAP[role] ?? role) : 'all';
 
-    try {
-      return await this.fetchCountersFromAPI(championId, lane);
-    } catch (apiError) {
-      logger.warn(`Lolalytics API 获取英雄 ${championId} 克制关系失败，尝试网页解析:`, apiError);
-      try {
-        return await this.fetchCountersFromWeb(championId, lane);
-      } catch (webError) {
-        logger.error(`Lolalytics 网页解析英雄 ${championId} 克制关系也失败:`, webError);
-        throw webError;
+    const data = await this.apiRequest('counter', { c: champName, lane });
+
+    const hardCounters: CounterInfo[] = [];
+    const easyMatchups: CounterInfo[] = [];
+
+    // counters 数组：按 vsWr 降序排列（对手胜率最高的排前面 = 克制我方）
+    const counters = data.counters;
+    if (Array.isArray(counters)) {
+      // 前 10 个：克制我方（对手胜率高）
+      for (const c of counters.slice(0, 10)) {
+        hardCounters.push({
+          championId: c.cid,
+          winRate: c.vsWr ?? 0,
+          sampleSize: c.n ?? 0,
+        });
+      }
+
+      // 后 10 个：我方克制（对手胜率低）
+      const reversed = [...counters].reverse();
+      for (const c of reversed.slice(0, 10)) {
+        easyMatchups.push({
+          championId: c.cid,
+          winRate: c.vsWr ?? 0,
+          sampleSize: c.n ?? 0,
+        });
       }
     }
-  }
 
-  /** 通过 API 获取克制关系 */
-  private async fetchCountersFromAPI(championId: number, lane: string): Promise<ChampionCounters> {
-    const response = await this.api.get('/mega/2', {
-      params: {
-        ep: 'champion',
-        v: '1',
-        patch: 'default',
-        c: championId,
-        lane,
-        tier: 'all',
-        queue: '420',
-        region: 'all',
-      },
-    });
-
-    const data = response.data;
-    if (!data) throw new Error(`API 未返回克制数据: championId=${championId}`);
-
-    const hardCounters: CounterInfo[] = [];
-    const easyMatchups: CounterInfo[] = [];
-
-    // Lolalytics 通常返回对线数据：enemy[championId] = { wr, n, ... }
-    const enemies = data.enemy ?? data.matchups ?? {};
-    const entries: [string, Record<string, number>][] = Object.entries(enemies);
-
-    // 按胜率排序找出克制和被克制关系
-    const sortedByWR = entries
-      .filter(([, v]) => (v.n ?? v.count ?? 0) >= 50)
-      .map(([id, v]) => ({
-        championId: parseInt(id, 10),
-        winRate: v.wr ?? v.win_rate ?? 50,
-        sampleSize: v.n ?? v.count ?? 0,
-      }))
-      .filter((e) => !isNaN(e.championId));
-
-    // 对手胜率高 = 克制我方英雄
-    sortedByWR
-      .sort((a, b) => a.winRate - b.winRate)
-      .slice(0, 10)
-      .forEach((c) => hardCounters.push(c));
-
-    // 对手胜率低 = 被我方英雄克制
-    sortedByWR
-      .sort((a, b) => b.winRate - a.winRate)
-      .slice(0, 10)
-      .forEach((c) => easyMatchups.push(c));
-
-    const roleKey = REVERSE_ROLE_MAP[lane] ?? lane;
+    const roleKey = lane === 'all' ? (data?.stats?.defaultLane ?? 'mid') : lane;
 
     return {
       championId,
-      role: roleKey === 'default' ? 'mid' : roleKey,
-      hardCounters,
-      easyMatchups,
-    };
-  }
-
-  /** 通过网页解析获取克制关系 */
-  private async fetchCountersFromWeb(championId: number, lane: string): Promise<ChampionCounters> {
-    const laneParam = lane === 'default' ? '' : lane;
-    const url = laneParam
-      ? `/lol/champion/${championId}/counter/${laneParam}/`
-      : `/lol/champion/${championId}/counter/`;
-
-    const response = await this.webClient.get(url);
-    const $ = cheerio.load(response.data);
-
-    const hardCounters: CounterInfo[] = [];
-    const easyMatchups: CounterInfo[] = [];
-
-    // 从内嵌 script 提取数据
-    $('script').each((_, el) => {
-      const text = $(el).text();
-      if (text.includes('__NEXT_DATA__')) {
-        try {
-          const jsonMatch = text.match(/\{[\s\S]*\}/);
-          if (!jsonMatch) return;
-          const data = JSON.parse(jsonMatch[0]);
-          const counterData = data?.props?.pageProps?.data;
-
-          if (counterData) {
-            const counters = counterData.counters ?? counterData.hard_counters ?? [];
-            for (const c of (Array.isArray(counters) ? counters : []).slice(0, 10)) {
-              hardCounters.push({
-                championId: c.champion_id ?? c.id,
-                winRate: c.win_rate ?? c.wr ?? 0,
-                sampleSize: c.play_count ?? c.n ?? 0,
-              });
-            }
-
-            const easy = counterData.easy_matchups ?? counterData.weak_against ?? [];
-            for (const c of (Array.isArray(easy) ? easy : []).slice(0, 10)) {
-              easyMatchups.push({
-                championId: c.champion_id ?? c.id,
-                winRate: c.win_rate ?? c.wr ?? 0,
-                sampleSize: c.play_count ?? c.n ?? 0,
-              });
-            }
-          }
-        } catch {
-          // 跳过解析失败
-        }
-      }
-    });
-
-    const roleKey = REVERSE_ROLE_MAP[lane] ?? lane;
-
-    return {
-      championId,
-      role: roleKey === 'default' ? 'mid' : roleKey,
+      role: REVERSE_ROLE_MAP[roleKey] ?? roleKey,
       hardCounters,
       easyMatchups,
     };
@@ -517,18 +365,20 @@ export class LolalyticsScraper implements IChampionDataScraper {
 
   // ─── 工具方法 ──────────────────────────────────────────
 
-  /** 根据胜率和选取率计算 Tier */
-  private calculateTier(winRate: number, pickRate: number): ChampionTier['tier'] {
-    // 综合评分 = 胜率权重(70%) + 选取率权重(30%)
-    const wrScore = winRate > 53 ? 3 : winRate > 51 ? 2 : winRate > 49 ? 1 : 0;
-    const prScore = pickRate > 10 ? 3 : pickRate > 5 ? 2 : pickRate > 2 ? 1 : 0;
-    const score = wrScore * 0.7 + prScore * 0.3;
+  /** 映射 Tier 等级数字到字符串 */
+  private mapTierLevel(level: number): ChampionTier['tier'] {
+    switch (level) {
+      case 0: return 'S+';
+      case 1: return 'S';
+      case 2: return 'A';
+      case 3: return 'B';
+      case 4: return 'C';
+      default: return 'D';
+    }
+  }
 
-    if (score >= 2.5) return 'S+';
-    if (score >= 2.0) return 'S';
-    if (score >= 1.5) return 'A';
-    if (score >= 1.0) return 'B';
-    if (score >= 0.5) return 'C';
-    return 'D';
+  /** 延迟 */
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

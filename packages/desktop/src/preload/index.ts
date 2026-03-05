@@ -66,6 +66,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ─── 第三方数据 ────────────────────────────────────────
   getChampionBuilds: (championId: number) =>
     ipcRenderer.invoke('scraper:getChampionBuilds', championId),
+  refreshChampionBuilds: (championId: number) =>
+    ipcRenderer.invoke('scraper:refreshChampionBuilds', championId),
   getChampionCounters: (championId: number) =>
     ipcRenderer.invoke('scraper:getChampionCounters', championId),
   updateScraperData: () => ipcRenderer.invoke('scraper:updateData'),
