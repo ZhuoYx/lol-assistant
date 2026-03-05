@@ -43,7 +43,6 @@ export const LCU_ENDPOINTS = {
   PERKS_PAGES: '/lol-perks/v1/pages',
   FRIENDS: '/lol-chat/v1/friends',
   GAMEFLOW_SESSION: '/lol-gameflow/v1/session',
-  CAREER_STATS: '/lol-career-stats/v1/summoner-stats',
   CHAMPION_MASTERY: '/lol-collections/v1/inventories',
   MATCH_HISTORY_BY_PUUID: '/lol-match-history/v1/products/lol',
 } as const;

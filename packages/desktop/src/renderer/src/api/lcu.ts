@@ -33,9 +33,8 @@ export class LCUAPIProvider implements IAPIProvider {
     return window.electronAPI.getRankStats(puuid);
   }
 
-  async getChampionStats(_puuid: string): Promise<ChampionStats[]> {
-    // Will be implemented in Task 6 with actual LCU career-stats API call
-    return [];
+  async getChampionStats(puuid: string): Promise<ChampionStats[]> {
+    return window.electronAPI.getChampionStats(puuid);
   }
 
   async getLiveGameAnalysis(): Promise<LiveGameAnalysis> {

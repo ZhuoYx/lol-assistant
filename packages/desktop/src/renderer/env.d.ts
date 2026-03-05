@@ -30,6 +30,9 @@ interface ElectronAPI {
   // 排位
   getRankStats: (puuid: string) => Promise<import('@lol-assistant/shared').RankStats>;
 
+  // 英雄统计
+  getChampionStats: (puuid: string) => Promise<import('@lol-assistant/shared').ChampionStats[]>;
+
   // 缓存
   clearCache: () => Promise<void>;
   getCacheStats: () => Promise<import('@lol-assistant/shared').CacheStats>;

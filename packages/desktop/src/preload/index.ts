@@ -41,6 +41,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ─── 排位 ──────────────────────────────────────────────
   getRankStats: (puuid: string) => ipcRenderer.invoke('rank:getStats', puuid),
 
+  // ─── 英雄统计 ────────────────────────────────────────────
+  getChampionStats: (puuid: string) => ipcRenderer.invoke('champion:getStats', puuid),
+
   // ─── 缓存 ──────────────────────────────────────────────
   clearCache: () => ipcRenderer.invoke('cache:clear'),
   getCacheStats: () => ipcRenderer.invoke('cache:getStats'),

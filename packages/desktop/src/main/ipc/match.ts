@@ -13,7 +13,7 @@ import { getChampionDisplayName, calculateKDA } from '@lol-assistant/shared';
  * LCU 返回: { games: { games: [...], gameCount } }
  * 每个 game: { gameId, gameCreation, gameDuration, gameMode, gameType, participants: [{ stats, championId, ... }] }
  */
-function transformMatchList(raw: unknown): MatchList {
+export function transformMatchList(raw: unknown): MatchList {
   const data = raw as Record<string, unknown>;
 
   // 兼容两种格式：直接 { matches, totalGames } 或 LCU 原始 { games: { games, gameCount } }
@@ -116,7 +116,6 @@ function transformMatchDetail(raw: unknown): MatchDetail {
     typeof (data.participants[0] as Record<string, unknown>).kills === 'number' &&
     typeof (data.participants[0] as Record<string, unknown>).summonerName === 'string'
   ) {
-    logger.debug('transformMatchDetail: 已是标准格式，补充 MVP/SVP 和 tagLine');
     const result = data as unknown as MatchDetail;
     const identities = (data.participantIdentities ?? []) as Record<string, unknown>[];
     // 补充 participantId 和 tagLine（如果缺失）
@@ -176,15 +175,12 @@ function transformMatchDetail(raw: unknown): MatchDetail {
     objectives: (t.objectives ?? {}) as Record<string, { first: boolean; kills: number }>,
   }));
 
-  logger.debug(`transformMatchDetail: teams=${teams.length}, teams win=[${teams.map(t => t.win).join(',')}]`);
 
   // 转换 participants
   const rawParticipants = (data.participants ?? []) as Record<string, unknown>[];
   const participantIdentities = (data.participantIdentities ?? []) as Record<string, unknown>[];
 
-  logger.debug(`transformMatchDetail: rawParticipants=${rawParticipants.length}, identities=${participantIdentities.length}`);
   if (rawParticipants.length > 0) {
-    logger.debug(`transformMatchDetail: participant[0] keys: ${Object.keys(rawParticipants[0]).join(', ')}`);
     const p0stats = rawParticipants[0].stats as Record<string, unknown> | undefined;
     if (p0stats) {
       logger.debug(`transformMatchDetail: participant[0].stats keys: ${Object.keys(p0stats).join(', ')}`);
@@ -313,8 +309,6 @@ function transformMatchDetail(raw: unknown): MatchDetail {
     }
   }
 
-  logger.debug(`transformMatchDetail: 最终 participants=${participants.length}, first kills=${participants[0]?.kills}`);
-
   return {
     gameId,
     queueId,
@@ -361,40 +355,48 @@ async function enrichMatchListMvp(matches: MatchSummary[]): Promise<void> {
   }
 }
 
+/**
+ * 获取战绩列表核心逻辑（含缓存、数据转换、MVP/SVP）
+ * 可被 match:getList IPC handler 和 champion:getStats 等其他模块复用
+ */
+export async function fetchMatchList(params: MatchListParams): Promise<MatchList> {
+  const puuid = params.puuid;
+  const cacheKey = `list_${puuid ?? 'me'}_${params.begIndex ?? 0}_${params.endIndex ?? 20}_q${params.queue ?? 'all'}_c${params.championId ?? 'all'}`;
+  const cached = cacheStore.get<MatchList>('matchList', cacheKey);
+  if (cached) return cached;
+
+  // LCU API 不支持 queue 参数，先拿全部数据再前端过滤
+  const apiParams: MatchListParams = {
+    ...params,
+    puuid: undefined,  // 移除 puuid，API 不需要
+    queue: undefined,  // 移除 queue，避免 400 错误
+  };
+
+  // 如果指定了 puuid，使用按 PUUID 查询的接口；否则使用当前用户接口
+  const raw = puuid
+    ? await lcuAPI.getMatchListByPUUID(puuid, apiParams)
+    : await lcuAPI.getMatchList(apiParams);
+  const matchList = transformMatchList(raw);
+
+  // 按队列类型过滤
+  if (params.queue !== undefined) {
+    matchList.matches = matchList.matches.filter(m => m.queueId === params.queue);
+    matchList.totalGames = matchList.matches.length;
+  }
+
+  // 批量请求详情以填充 MVP/SVP（带缓存，并发限制）
+  await enrichMatchListMvp(matchList.matches);
+
+  logger.debug(`fetchMatchList 转换完成: ${matchList.matches.length} 场, 共 ${matchList.totalGames} 场`);
+  cacheStore.set('matchList', cacheKey, matchList);
+  return matchList;
+}
+
 export function registerMatchIpcHandlers(): void {
   // 获取战绩列表（含 MVP/SVP，通过批量请求详情计算）
   ipcMain.handle('match:getList', async (_event, params: MatchListParams) => {
     try {
-      const puuid = params.puuid;
-      const cacheKey = `list_${puuid ?? 'me'}_${params.begIndex ?? 0}_${params.endIndex ?? 20}_q${params.queue ?? 'all'}_c${params.championId ?? 'all'}`;
-      const cached = cacheStore.get('matchList', cacheKey);
-      if (cached) return cached;
-
-      // LCU API 不支持 queue 参数，先拿全部数据再前端过滤
-      const apiParams: MatchListParams = {
-        ...params,
-        puuid: undefined,  // 移除 puuid，API 不需要
-        queue: undefined,  // 移除 queue，避免 400 错误
-      };
-
-      // 如果指定了 puuid，使用按 PUUID 查询的接口；否则使用当前用户接口
-      const raw = puuid
-        ? await lcuAPI.getMatchListByPUUID(puuid, apiParams)
-        : await lcuAPI.getMatchList(apiParams);
-      const matchList = transformMatchList(raw);
-
-      // 按队列类型过滤
-      if (params.queue !== undefined) {
-        matchList.matches = matchList.matches.filter(m => m.queueId === params.queue);
-        matchList.totalGames = matchList.matches.length;
-      }
-
-      // 批量请求详情以填充 MVP/SVP（带缓存，并发限制）
-      await enrichMatchListMvp(matchList.matches);
-
-      logger.debug(`match:getList 转换完成: ${matchList.matches.length} 场, 共 ${matchList.totalGames} 场`);
-      cacheStore.set('matchList', cacheKey, matchList);
-      return matchList;
+      return await fetchMatchList(params);
     } catch (err) {
       logger.error('IPC match:getList 失败:', err);
       throw err;

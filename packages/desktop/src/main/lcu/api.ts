@@ -9,10 +9,8 @@ import type {
   MatchDetail,
   MatchListParams,
   RankStats,
-  ChampionStats,
 } from '@lol-assistant/shared';
 import { lcuClient } from './client';
-import { logger } from '../utils/logger';
 
 /**
  * LCU API 封装
@@ -83,15 +81,6 @@ export const lcuAPI = {
   async getChampionMastery(summonerId: number): Promise<unknown[]> {
     return lcuClient.get<unknown[]>(
       `${LCU_ENDPOINTS.CHAMPION_MASTERY}/${summonerId}/champion-mastery`,
-    );
-  },
-
-  /**
-   * 获取英雄统计（通过 PUUID）
-   */
-  async getChampionStats(puuid: string): Promise<ChampionStats[]> {
-    return lcuClient.get<ChampionStats[]>(
-      `${LCU_ENDPOINTS.CAREER_STATS}/${puuid}`,
     );
   },
 

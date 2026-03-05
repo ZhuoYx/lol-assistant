@@ -19,6 +19,7 @@ import { registerLogIpcHandlers } from './log';
 import { registerAppIpcHandlers } from './app';
 import { registerPerksIpcHandlers } from './perks';
 import { registerProxyIpcHandlers } from './proxy';
+import { registerChampionIpcHandlers } from './champion';
 
 /**
  * 注册所有 IPC 处理器
@@ -65,6 +66,9 @@ export function registerAllIpcHandlers(): void {
 
   // 局域网代理
   registerProxyIpcHandlers();
+
+  // 英雄统计
+  registerChampionIpcHandlers();
 
   // WebSocket 事件转发
   registerWebSocketForwarding();
