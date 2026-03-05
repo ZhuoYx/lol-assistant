@@ -10,7 +10,7 @@
         </div>
       </div>
 
-      <!-- Stats Grid -->
+      <!-- Core Stats Grid -->
       <div class="detail-stats">
         <div class="detail-stat">
           <span class="ds-value" :class="winRateClass">{{ winRateText }}</span>
@@ -31,6 +31,30 @@
         <div class="detail-stat">
           <span class="ds-value">{{ stat.avgAssists.toFixed(1) }}</span>
           <span class="ds-label">平均助攻</span>
+        </div>
+      </div>
+
+      <!-- Extra Stats -->
+      <div class="extra-stats">
+        <div class="extra-stat-item">
+          <span class="extra-icon">⏱</span>
+          <span class="extra-label">平均时长</span>
+          <span class="extra-value">{{ avgDurationText }}</span>
+        </div>
+        <div v-if="stat.mvpCount > 0" class="extra-stat-item">
+          <span class="extra-icon mvp-icon">★</span>
+          <span class="extra-label">MVP</span>
+          <span class="extra-value mvp-value">{{ stat.mvpCount }} 次</span>
+        </div>
+        <div v-if="stat.svpCount > 0" class="extra-stat-item">
+          <span class="extra-icon svp-icon">☆</span>
+          <span class="extra-label">SVP</span>
+          <span class="extra-value svp-value">{{ stat.svpCount }} 次</span>
+        </div>
+        <div class="extra-stat-item">
+          <span class="extra-icon">📅</span>
+          <span class="extra-label">最近使用</span>
+          <span class="extra-value">{{ lastPlayedText }}</span>
         </div>
       </div>
 
@@ -78,6 +102,26 @@ const kdaClass = computed(() => {
   if (props.stat.avgKDA >= 2.5) return 'kda-good';
   return '';
 });
+
+const avgDurationText = computed(() => {
+  if (!props.stat || !props.stat.avgGameDuration) return '-';
+  const totalSec = props.stat.avgGameDuration;
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${min}:${String(sec).padStart(2, '0')}`;
+});
+
+const lastPlayedText = computed(() => {
+  if (!props.stat || !props.stat.lastPlayed) return '-';
+  const now = Date.now();
+  const diff = now - props.stat.lastPlayed;
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days === 0) return '今天';
+  if (days === 1) return '昨天';
+  if (days < 7) return `${days} 天前`;
+  if (days < 30) return `${Math.floor(days / 7)} 周前`;
+  return `${Math.floor(days / 30)} 个月前`;
+});
 </script>
 
 <style scoped>
@@ -118,7 +162,7 @@ const kdaClass = computed(() => {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: var(--space-3);
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-4);
 }
 
 .detail-stat {
@@ -148,6 +192,44 @@ const kdaClass = computed(() => {
 .kda-excellent { color: var(--color-gold); }
 .kda-good { color: var(--color-win); }
 
+/* Extra Stats */
+.extra-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) 0;
+  margin-bottom: var(--space-3);
+  border-top: 1px solid var(--color-divider);
+}
+
+.extra-stat-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+.extra-icon {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.extra-label {
+  color: var(--color-text-tertiary);
+}
+
+.extra-value {
+  font-weight: var(--font-semibold);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+}
+
+.mvp-icon { color: var(--color-gold); opacity: 1; }
+.mvp-value { color: var(--color-gold); }
+.svp-icon { color: var(--color-text-secondary); opacity: 1; }
+.svp-value { color: var(--color-text-secondary); }
+
+/* Win/Loss Bar */
 .winloss-section {
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-divider);

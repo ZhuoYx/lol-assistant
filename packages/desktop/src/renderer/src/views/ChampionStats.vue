@@ -1,9 +1,16 @@
 <template>
   <div class="page champion-stats-page">
-    <header class="page-header">
-      <h1 class="page-title">英雄统计</h1>
-      <p class="page-subtitle">查看英雄使用数据与熟练度</p>
-    </header>
+    <!-- 查看他人数据时的返回横幅 -->
+    <div v-if="viewingOther" class="other-banner">
+      <button class="back-btn" @click="goBackToMine">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+        返回我的账号
+      </button>
+      <span class="other-name">{{ viewingSummonerName }} 的英雄统计</span>
+    </div>
 
     <!-- Search & Sort -->
     <div class="toolbar">
@@ -77,14 +84,21 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import type { ChampionStats } from '@lol-assistant/shared';
-import { useAppStore, useSummonerStore } from '@/stores';
+import { useAppStore, useSummonerStore, useRankStore, useMatchStore } from '@/stores';
 import { LoadingSpinner, EmptyState, ErrorDisplay } from '@/components/common';
 import ChampionStatsItem from '@/components/champion/ChampionStatsItem.vue';
 import ChampionDetail from '@/components/champion/ChampionDetail.vue';
 
+const router = useRouter();
 const appStore = useAppStore();
 const summonerStore = useSummonerStore();
+const rankStore = useRankStore();
+const matchStore = useMatchStore();
+
+const viewingOther = computed(() => summonerStore.isViewingOther);
+const viewingSummonerName = computed(() => summonerStore.viewingName);
 
 const championStats = ref<ChampionStats[]>([]);
 const loading = ref(false);
@@ -127,6 +141,19 @@ function onSelectChampion(id: number) {
   selectedChampionId.value = id;
 }
 
+function goBackToMine() {
+  summonerStore.resetToMe();
+  championStats.value = [];
+  selectedChampionId.value = null;
+  // 刷新首页需要的数据（段位 + 战绩）
+  const puuid = summonerStore.activePUUID;
+  if (puuid) {
+    rankStore.fetchRankStats(puuid);
+  }
+  matchStore.fetchMatchList(true);
+  router.replace('/');
+}
+
 async function fetchData() {
   const puuid = summonerStore.activePUUID;
   if (!puuid) return;
@@ -166,23 +193,42 @@ watch(() => summonerStore.activePUUID, (newPUUID, oldPUUID) => {
 .champion-stats-page {
   max-width: var(--content-max-width);
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
-.page-header {
-  margin-bottom: var(--space-4);
+/* 查看他人时的返回横幅 */
+.other-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 
-.page-title {
-  font-size: var(--text-2xl);
-  font-weight: var(--font-bold);
-  letter-spacing: -0.5px;
-  color: var(--color-text-primary);
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  color: var(--color-accent);
+  background: rgba(0, 113, 227, 0.06);
+  border: 1px solid rgba(0, 113, 227, 0.2);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
-.page-subtitle {
+.back-btn:hover {
+  background: rgba(0, 113, 227, 0.12);
+  border-color: rgba(0, 113, 227, 0.4);
+}
+
+.other-name {
   font-size: var(--text-sm);
-  color: var(--color-text-tertiary);
-  margin-top: var(--space-1);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
 }
 
 /* Toolbar */
@@ -190,7 +236,6 @@ watch(() => summonerStore.activePUUID, (newPUUID, oldPUUID) => {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
 }
 
 .search-box {
@@ -275,7 +320,7 @@ watch(() => summonerStore.activePUUID, (newPUUID, oldPUUID) => {
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-light);
   padding: var(--space-2);
-  max-height: calc(100vh - 300px);
+  max-height: calc(100vh - 180px);
   overflow-y: auto;
 }
 

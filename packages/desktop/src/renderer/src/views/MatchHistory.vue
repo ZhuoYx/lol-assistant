@@ -6,7 +6,7 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="15 18 9 12 15 6" />
         </svg>
-        返回我的战绩
+        返回我的账号
       </button>
       <span class="other-name">{{ otherSummonerName }} 的战绩</span>
 
@@ -210,7 +210,7 @@ function goBackToMine() {
     rankStore.fetchRankStats(puuid);
   }
   matchStore.fetchMatchList(true);
-  router.replace('/match-history');
+  router.replace('/');
   scrollToTop();
 }
 
