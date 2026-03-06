@@ -37,16 +37,11 @@
       <!-- Extra Stats -->
       <div class="extra-stats">
         <div class="extra-stat-item">
-          <span class="extra-icon">⏱</span>
-          <span class="extra-label">平均时长</span>
-          <span class="extra-value">{{ avgDurationText }}</span>
-        </div>
-        <div v-if="stat.mvpCount > 0" class="extra-stat-item">
           <span class="extra-icon mvp-icon">★</span>
           <span class="extra-label">MVP</span>
           <span class="extra-value mvp-value">{{ stat.mvpCount }} 次</span>
         </div>
-        <div v-if="stat.svpCount > 0" class="extra-stat-item">
+        <div class="extra-stat-item">
           <span class="extra-icon svp-icon">☆</span>
           <span class="extra-label">SVP</span>
           <span class="extra-value svp-value">{{ stat.svpCount }} 次</span>
@@ -101,14 +96,6 @@ const kdaClass = computed(() => {
   if (props.stat.avgKDA >= 4) return 'kda-excellent';
   if (props.stat.avgKDA >= 2.5) return 'kda-good';
   return '';
-});
-
-const avgDurationText = computed(() => {
-  if (!props.stat || !props.stat.avgGameDuration) return '-';
-  const totalSec = props.stat.avgGameDuration;
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  return `${min}:${String(sec).padStart(2, '0')}`;
 });
 
 const lastPlayedText = computed(() => {

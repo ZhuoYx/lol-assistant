@@ -10,8 +10,6 @@ export interface ChampionStats {
   avgDeaths: number;
   avgAssists: number;
   avgKDA: number;
-  /** 平均对局时长（秒） */
-  avgGameDuration: number;
   /** MVP 次数 */
   mvpCount: number;
   /** SVP 次数 */

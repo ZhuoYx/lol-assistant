@@ -121,6 +121,18 @@ interface ElectronAPI {
     localIP: string | null;
     address: string | null;
   }>;
+
+  // 客户端设置 - 自动接受
+  setAutoAccept: (enabled: boolean, delay: number) => Promise<{ success: boolean }>;
+  getAutoAccept: () => Promise<{ enabled: boolean; delay: number }>;
+
+  // 客户端设置 - 藏品背景皮肤
+  getBackdrop: (summonerId: number) => Promise<unknown>;
+  setBackdrop: (summonerId: number, championId: number, skinId: number) => Promise<{ success: boolean }>;
+
+  // 客户端设置 - 个性签名
+  getStatusMessage: () => Promise<string>;
+  setStatusMessage: (message: string) => Promise<{ success: boolean }>;
 }
 
 export {};

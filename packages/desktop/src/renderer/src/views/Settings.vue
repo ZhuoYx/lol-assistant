@@ -61,6 +61,134 @@
         </div>
       </section>
 
+      <!-- Auto Accept -->
+      <section class="settings-section">
+        <h2 class="section-title">对局</h2>
+        <div class="settings-card">
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">自动接受对局</span>
+              <span class="setting-desc">匹配成功后自动点击接受</span>
+            </div>
+            <div class="setting-control">
+              <n-switch v-model:value="autoAcceptEnabled" @update:value="onAutoAcceptChange" />
+            </div>
+          </div>
+          <template v-if="autoAcceptEnabled">
+            <div class="setting-divider" />
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-label">延迟时间</span>
+                <span class="setting-desc">接受前等待秒数（0 表示立即接受）</span>
+              </div>
+              <div class="setting-control delay-control">
+                <n-button size="tiny" :disabled="autoAcceptDelay <= 0" @click="adjustDelay(-1)">−</n-button>
+                <span class="delay-value">{{ autoAcceptDelay }}s</span>
+                <n-button size="tiny" :disabled="autoAcceptDelay >= 10" @click="adjustDelay(1)">+</n-button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </section>
+
+      <!-- Status Message -->
+      <section v-if="appStore.isConnected" class="settings-section">
+        <h2 class="section-title">个性签名</h2>
+        <div class="settings-card">
+          <div class="setting-row">
+            <div class="setting-info" style="flex: 1">
+              <div class="status-input-wrapper">
+                <input
+                  v-model="statusMessage"
+                  type="text"
+                  class="status-input"
+                  placeholder="输入个性签名..."
+                  maxlength="50"
+                  @keydown.enter="handleSaveStatus"
+                />
+              </div>
+            </div>
+          </div>
+          <div class="setting-divider" />
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-desc">点击保存将签名应用到客户端</span>
+            </div>
+            <div class="setting-control">
+              <n-button
+                size="small"
+                type="primary"
+                :loading="statusSaving"
+                :disabled="!statusMessage && !statusLoaded"
+                @click="handleSaveStatus"
+              >
+                保存签名
+              </n-button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Backdrop Skin -->
+      <section v-if="appStore.isConnected" class="settings-section">
+        <h2 class="section-title">藏品背景</h2>
+        <div class="settings-card">
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">背景英雄</span>
+              <span class="setting-desc">选择用于个人资料背景的英雄</span>
+            </div>
+            <div class="setting-control">
+              <n-select
+                v-model:value="backdropChampionId"
+                filterable
+                :options="championOptions"
+                placeholder="选择英雄"
+                size="small"
+                style="width: 140px"
+                @update:value="onBackdropChampionChange"
+              />
+            </div>
+          </div>
+          <template v-if="backdropChampionId">
+            <div class="setting-divider" />
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-label">背景皮肤</span>
+                <span class="setting-desc">选择该英雄的皮肤作为背景</span>
+              </div>
+              <div class="setting-control">
+                <n-select
+                  v-model:value="backdropSkinId"
+                  :options="skinOptions"
+                  placeholder="选择皮肤"
+                  size="small"
+                  style="width: 160px"
+                  :loading="skinsLoading"
+                />
+              </div>
+            </div>
+            <div class="setting-divider" />
+            <div class="setting-row">
+              <div class="setting-info">
+                <span class="setting-desc">点击应用将背景设置到客户端</span>
+              </div>
+              <div class="setting-control">
+                <n-button
+                  size="small"
+                  type="primary"
+                  :loading="backdropSaving"
+                  :disabled="!backdropSkinId"
+                  @click="handleSaveBackdrop"
+                >
+                  应用背景
+                </n-button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </section>
+
       <!-- Auto Update -->
       <section class="settings-section">
         <h2 class="section-title">更新</h2>
@@ -249,18 +377,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { NSelect, NSwitch, NButton, NProgress } from 'naive-ui';
-import { useAppStore } from '@/stores';
+import { NSelect, NSwitch, NButton, NProgress, useMessage } from 'naive-ui';
+import { useAppStore, useSummonerStore } from '@/stores';
 import { useCache } from '@/composables/useCache';
 import { useScraperData } from '@/composables/useScraperData';
-import { formatRelativeTime, formatFileSize } from '@lol-assistant/shared';
-import type { ScraperDataVersion } from '@lol-assistant/shared';
+import { formatRelativeTime, formatFileSize, CHAMPION_ID_MAP, CHAMPION_CN_NAME_MAP, getCDragonChampionDetailUrl } from '@lol-assistant/shared';
+import type { ScraperDataVersion, CDragonSkinData } from '@lol-assistant/shared';
 import QRCode from 'qrcode';
 
 const appStore = useAppStore();
+const summonerStore = useSummonerStore();
 const router = useRouter();
+const message = useMessage();
 const { clearCache: doClearCache } = useCache();
 const { updating: scraperUpdating, updateData } = useScraperData();
 
@@ -274,6 +404,31 @@ const clearingCache = ref(false);
 const cacheSize = ref(0);
 const cacheSizeText = ref('计算中...');
 const scraperVersion = ref<ScraperDataVersion | null>(null);
+
+// Auto Accept
+const autoAcceptEnabled = ref(false);
+const autoAcceptDelay = ref(0);
+
+// Status Message
+const statusMessage = ref('');
+const statusSaving = ref(false);
+const statusLoaded = ref(false);
+
+// Backdrop Skin
+const backdropChampionId = ref<number | null>(null);
+const backdropSkinId = ref<number | null>(null);
+const skinOptions = ref<Array<{ label: string; value: number }>>([]);
+const skinsLoading = ref(false);
+const backdropSaving = ref(false);
+
+const championOptions = computed(() => {
+  return Object.entries(CHAMPION_ID_MAP)
+    .map(([id, name]) => ({
+      label: CHAMPION_CN_NAME_MAP[Number(id)] || name,
+      value: Number(id),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'zh-CN'));
+});
 
 // LAN Proxy
 const lanProxyEnabled = ref(false);
@@ -444,6 +599,111 @@ function handleCopyAddress() {
   }
 }
 
+// ─── 自动接受 ──────────────────────────────────────────
+
+async function onAutoAcceptChange(value: boolean) {
+  autoAcceptEnabled.value = value;
+  await window.electronAPI.setAutoAccept(value, autoAcceptDelay.value);
+}
+
+async function adjustDelay(delta: number) {
+  autoAcceptDelay.value = Math.max(0, Math.min(10, autoAcceptDelay.value + delta));
+  if (autoAcceptEnabled.value) {
+    await window.electronAPI.setAutoAccept(true, autoAcceptDelay.value);
+  }
+}
+
+async function loadAutoAccept() {
+  try {
+    const state = await window.electronAPI.getAutoAccept();
+    autoAcceptEnabled.value = state.enabled;
+    autoAcceptDelay.value = state.delay;
+  } catch {
+    // ignore
+  }
+}
+
+// ─── 个性签名 ──────────────────────────────────────────
+
+async function loadStatusMessage() {
+  try {
+    statusMessage.value = await window.electronAPI.getStatusMessage();
+    statusLoaded.value = true;
+  } catch {
+    // ignore
+  }
+}
+
+async function handleSaveStatus() {
+  statusSaving.value = true;
+  try {
+    await window.electronAPI.setStatusMessage(statusMessage.value);
+    message.success('个性签名已更新');
+  } catch {
+    message.error('个性签名设置失败');
+  } finally {
+    statusSaving.value = false;
+  }
+}
+
+// ─── 藏品背景 ──────────────────────────────────────────
+
+async function onBackdropChampionChange(championId: number) {
+  backdropChampionId.value = championId;
+  backdropSkinId.value = null;
+  skinOptions.value = [];
+
+  if (!championId) return;
+
+  skinsLoading.value = true;
+  try {
+    // 通过 CDragon 获取英雄所有皮肤
+    const url = getCDragonChampionDetailUrl(championId);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`CDragon request failed: ${res.status}`);
+    const data = await res.json() as { skins?: CDragonSkinData[] };
+
+    const options = (data.skins ?? []).map((skin) => ({
+      label: skin.name,
+      value: skin.id,
+    }));
+
+    skinOptions.value = options;
+    if (options.length > 0) {
+      backdropSkinId.value = options[0].value;
+    }
+  } catch {
+    // CDragon 获取失败，使用默认皮肤
+    const baseSkinId = championId * 1000;
+    const champName = CHAMPION_CN_NAME_MAP[championId] || CHAMPION_ID_MAP[championId] || `英雄 ${championId}`;
+    skinOptions.value = [{ label: `${champName}（默认）`, value: baseSkinId }];
+    backdropSkinId.value = baseSkinId;
+  } finally {
+    skinsLoading.value = false;
+  }
+}
+
+async function handleSaveBackdrop() {
+  if (!backdropChampionId.value || !backdropSkinId.value) return;
+
+  const summoner = summonerStore.currentSummoner;
+  if (!summoner) return;
+
+  backdropSaving.value = true;
+  try {
+    await window.electronAPI.setBackdrop(
+      summoner.summonerId,
+      backdropChampionId.value,
+      backdropSkinId.value,
+    );
+    message.success('藏品背景已更新');
+  } catch {
+    message.error('藏品背景设置失败');
+  } finally {
+    backdropSaving.value = false;
+  }
+}
+
 async function loadProxyStatus() {
   try {
     const status = await window.electronAPI.getProxyStatus();
@@ -481,6 +741,10 @@ onMounted(() => {
   loadProxyStatus();
   loadUpdateStatus();
   initUpdateListeners();
+  loadAutoAccept();
+  if (appStore.isConnected) {
+    loadStatusMessage();
+  }
 });
 
 onUnmounted(() => {
@@ -675,5 +939,48 @@ onUnmounted(() => {
   background: rgba(48, 209, 88, 0.06);
   color: var(--color-success);
   border-top: 1px solid rgba(48, 209, 88, 0.1);
+}
+
+/* Auto Accept Delay */
+.delay-control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.delay-value {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  min-width: 28px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status Message */
+.status-input-wrapper {
+  margin-top: var(--space-2);
+}
+
+.status-input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-primary);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  font-family: var(--font-family);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.status-input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.12);
+}
+
+.status-input::placeholder {
+  color: var(--color-text-placeholder);
 }
 </style>

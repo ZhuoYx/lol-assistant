@@ -20,6 +20,7 @@ import { registerAppIpcHandlers } from './app';
 import { registerPerksIpcHandlers } from './perks';
 import { registerProxyIpcHandlers } from './proxy';
 import { registerChampionIpcHandlers } from './champion';
+import { registerClientSettingsIpcHandlers } from './client-settings';
 
 /**
  * 注册所有 IPC 处理器
@@ -69,6 +70,9 @@ export function registerAllIpcHandlers(): void {
 
   // 英雄统计
   registerChampionIpcHandlers();
+
+  // 客户端设置（自动接受、藏品背景、个性签名）
+  registerClientSettingsIpcHandlers();
 
   // WebSocket 事件转发
   registerWebSocketForwarding();

@@ -139,4 +139,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startProxy: () => ipcRenderer.invoke('proxy:start'),
   stopProxy: () => ipcRenderer.invoke('proxy:stop'),
   getProxyStatus: () => ipcRenderer.invoke('proxy:status'),
+
+  // ─── 客户端设置 ────────────────────────────────────────
+  // 自动接受
+  setAutoAccept: (enabled: boolean, delay: number) =>
+    ipcRenderer.invoke('client:setAutoAccept', enabled, delay),
+  getAutoAccept: () => ipcRenderer.invoke('client:getAutoAccept'),
+
+  // 藏品背景皮肤
+  getBackdrop: (summonerId: number) =>
+    ipcRenderer.invoke('client:getBackdrop', summonerId),
+  setBackdrop: (summonerId: number, championId: number, skinId: number) =>
+    ipcRenderer.invoke('client:setBackdrop', summonerId, championId, skinId),
+
+  // 个性签名
+  getStatusMessage: () => ipcRenderer.invoke('client:getStatusMessage'),
+  setStatusMessage: (message: string) =>
+    ipcRenderer.invoke('client:setStatusMessage', message),
 });

@@ -87,7 +87,7 @@ export function registerChampionIpcHandlers(): void {
       // 转换为 ChampionStats 数组
       const result: ChampionStats[] = [];
       for (const entry of statsMap.values()) {
-        const { championId, wins, losses, totalKills, totalDeaths, totalAssists, gamesPlayed, totalDuration, mvpCount, svpCount, lastPlayed } = entry;
+        const { championId, wins, losses, totalKills, totalDeaths, totalAssists, gamesPlayed, mvpCount, svpCount, lastPlayed } = entry;
         const winRate = gamesPlayed > 0 ? Math.round((wins / gamesPlayed) * 10000) / 10000 : 0;
         const avgKills = gamesPlayed > 0 ? Math.round((totalKills / gamesPlayed) * 100) / 100 : 0;
         const avgDeaths = gamesPlayed > 0 ? Math.round((totalDeaths / gamesPlayed) * 100) / 100 : 0;
@@ -95,7 +95,6 @@ export function registerChampionIpcHandlers(): void {
         const avgKDA = totalDeaths > 0
           ? Math.round(((totalKills + totalAssists) / totalDeaths) * 100) / 100
           : totalKills + totalAssists > 0 ? 999 : 0;
-        const avgGameDuration = gamesPlayed > 0 ? Math.round(totalDuration / gamesPlayed) : 0;
 
         result.push({
           championId,
@@ -108,7 +107,6 @@ export function registerChampionIpcHandlers(): void {
           avgDeaths,
           avgAssists,
           avgKDA,
-          avgGameDuration,
           mvpCount,
           svpCount,
           lastPlayed,

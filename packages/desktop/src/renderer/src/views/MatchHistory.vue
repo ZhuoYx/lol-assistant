@@ -1,5 +1,17 @@
 <template>
   <div class="page match-history-page">
+    <!-- Not connected -->
+    <div v-if="!appStore.isConnected" class="not-connected-card card">
+      <div class="state-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18.36 6.64a9 9 0 1 1-12.73 0" /><line x1="12" y1="2" x2="12" y2="12" />
+        </svg>
+      </div>
+      <p class="state-title">未连接客户端</p>
+      <p class="state-desc">请启动英雄联盟客户端以使用战绩查询功能</p>
+    </div>
+
+    <template v-else>
     <!-- Header: 仅在查看他人战绩时显示返回按钮 -->
     <div v-if="viewingOther" class="other-banner">
       <button class="back-btn" @click="goBackToMine">
@@ -105,13 +117,14 @@
         <LoadingSpinner v-else size="lg" text="加载战绩中..." centered />
       </div>
     </template>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useMatchStore, useSummonerStore, useRankStore } from '@/stores';
+import { useMatchStore, useSummonerStore, useRankStore, useAppStore } from '@/stores';
 import { LoadingSpinner, EmptyState, ErrorDisplay } from '@/components/common';
 import MatchFilter from '@/components/match/MatchFilter.vue';
 import MatchListItem from '@/components/match/MatchListItem.vue';
@@ -119,6 +132,7 @@ import MatchDetail from '@/components/match/MatchDetail.vue';
 
 const route = useRoute();
 const router = useRouter();
+const appStore = useAppStore();
 const matchStore = useMatchStore();
 const summonerStore = useSummonerStore();
 const rankStore = useRankStore();
@@ -241,6 +255,32 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+
+.not-connected-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-10) var(--space-6);
+  min-height: 300px;
+}
+
+.state-icon {
+  color: var(--color-text-placeholder);
+  margin-bottom: var(--space-3);
+}
+
+.state-title {
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-1);
+}
+
+.state-desc {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary);
 }
 
 /* 查看他人战绩的横幅 */

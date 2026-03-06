@@ -126,6 +126,54 @@ export const lcuAPI = {
     return lcuClient.get<unknown[]>(LCU_ENDPOINTS.FRIENDS);
   },
 
+  // ─── 自动接受对局 ──────────────────────────────────────
+
+  /**
+   * 接受对局匹配
+   */
+  async acceptMatch(): Promise<void> {
+    await lcuClient.post('/lol-matchmaking/v1/ready-check/accept');
+  },
+
+  // ─── 藏品背景皮肤 ──────────────────────────────────────
+
+  /**
+   * 获取当前藏品背景配置
+   */
+  async getCollectionsBackdrop(summonerId: number): Promise<unknown> {
+    return lcuClient.get(`/lol-collections/v1/inventories/${summonerId}/backdrop`);
+  },
+
+  /**
+   * 设置藏品背景皮肤
+   * 通过 summoner-profile 端点设置，skinId 格式为 championId * 1000 + skinIndex
+   */
+  async setCollectionsBackdrop(_summonerId: number, data: { championId: number; skinId: number }): Promise<unknown> {
+    return lcuClient.post('/lol-summoner/v1/current-summoner/summoner-profile', {
+      key: 'backgroundSkinId',
+      value: data.skinId,
+    });
+  },
+
+  // ─── 个性签名 ──────────────────────────────────────────
+
+  /**
+   * 获取当前聊天信息（含个性签名）
+   */
+  async getChatMe(): Promise<unknown> {
+    return lcuClient.get('/lol-chat/v1/me');
+  },
+
+  /**
+   * 修改个性签名
+   */
+  async setStatusMessage(statusMessage: string): Promise<unknown> {
+    return lcuClient.request('/lol-chat/v1/me', {
+      method: 'PUT',
+      data: { statusMessage },
+    });
+  },
+
   /**
    * 通用 LCU API 请求（供未封装的端点使用）
    */

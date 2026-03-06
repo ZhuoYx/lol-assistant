@@ -12,10 +12,12 @@ import { pollForLOLClient } from './utils/process';
 import { lcuClient } from './lcu/client';
 import { lcuWebSocket } from './lcu/websocket';
 import { registerAllIpcHandlers } from './ipc/index';
+import { isAutoAcceptEnabled, getAutoAcceptDelay } from './ipc/client-settings';
 import { assetCacheManager } from './assets/index';
 import { lanProxyServer } from './proxy/server';
 import { appUpdater } from './updater/index';
 import { cacheStore } from './cache/store';
+import { lcuAPI } from './lcu/api';
 import type { LCUEvent, GamePhase } from '@lol-assistant/shared';
 
 /** 主窗口 */
@@ -30,6 +32,8 @@ let isMiniMode = false;
 let isQuitting = false;
 /** 上一次游戏阶段 */
 let lastGamePhase: GamePhase = 'None';
+/** 自动接受定时器 */
+let autoAcceptTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** 窗口尺寸配置 */
 const WINDOW_CONFIG = {
@@ -190,6 +194,23 @@ function handleGamePhaseChange(phase: GamePhase): void {
 
   // 转发到渲染进程
   mainWindow?.webContents.send('game:phase-change', phase);
+
+  // 自动接受对局
+  if (phase === 'ReadyCheck' && isAutoAcceptEnabled()) {
+    if (autoAcceptTimer) clearTimeout(autoAcceptTimer);
+    const delay = getAutoAcceptDelay() * 1000;
+    autoAcceptTimer = setTimeout(async () => {
+      try {
+        await lcuAPI.acceptMatch();
+        logger.info('已自动接受对局');
+      } catch (err) {
+        logger.warn('自动接受对局失败:', err);
+      }
+    }, delay);
+  } else if (phase !== 'ReadyCheck' && autoAcceptTimer) {
+    clearTimeout(autoAcceptTimer);
+    autoAcceptTimer = null;
+  }
 
   // 进入选人阶段：自动激活窗口 + 系统通知
   if (phase === 'ChampSelect') {
