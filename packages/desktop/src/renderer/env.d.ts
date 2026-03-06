@@ -52,6 +52,7 @@ interface ElectronAPI {
   getChampionCounters: (championId: number) => Promise<import('@lol-assistant/shared').ChampionCounters>;
   updateScraperData: () => Promise<void>;
   getScraperDataVersion: () => Promise<import('@lol-assistant/shared').ScraperDataVersion | null>;
+  getAramTierList: () => Promise<import('@lol-assistant/shared').AramChampionTier[]>;
 
   // 符文页管理
   getPerksPages: () => Promise<unknown[]>;
@@ -133,6 +134,9 @@ interface ElectronAPI {
   // 客户端设置 - 个性签名
   getStatusMessage: () => Promise<string>;
   setStatusMessage: (message: string) => Promise<{ success: boolean }>;
+
+  // ARAM 板凳英雄交换
+  benchSwap: (championId: number) => Promise<{ success: boolean }>;
 }
 
 export {};

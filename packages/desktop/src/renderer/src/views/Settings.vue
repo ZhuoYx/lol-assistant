@@ -29,7 +29,7 @@
       </section>
 
       <!-- Window -->
-      <section class="settings-section">
+      <!-- <section class="settings-section">
         <h2 class="section-title">窗口</h2>
         <div class="settings-card">
           <div class="setting-row">
@@ -59,7 +59,7 @@
             </div>
           </div>
         </div>
-      </section>
+      </section> -->
 
       <!-- Auto Accept -->
       <section class="settings-section">

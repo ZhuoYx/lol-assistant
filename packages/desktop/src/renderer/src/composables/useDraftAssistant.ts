@@ -1,8 +1,8 @@
 import { onMounted, onUnmounted, ref, computed, watch, type Ref } from 'vue';
 import { useAppStore } from '@/stores/app';
 import { useChampionStore } from '@/stores/champion';
-import type { ChampionCounters, CounterInfo } from '@lol-assistant/shared';
-import { CHAMPION_ID_MAP, CHAMPION_COUNTERS } from '@lol-assistant/shared';
+import type { ChampionCounters, CounterInfo, AramChampionTier } from '@lol-assistant/shared';
+import { CHAMPION_ID_MAP, CHAMPION_CN_NAME_MAP, CHAMPION_COUNTERS } from '@lol-assistant/shared';
 
 /** 选人阶段玩家 pick / ban 信息 */
 export interface ChampSelectAction {
@@ -29,6 +29,9 @@ export interface ChampSelectSession {
   actions: ChampSelectAction[][];
   localPlayerCellId: number;
   timer: { phase: string; adjustedTimeLeftInPhase: number };
+  // ARAM 相关字段
+  benchEnabled?: boolean;
+  benchChampions?: Array<{ championId: number }>;
 }
 
 /** 推荐数据 */
@@ -55,6 +58,16 @@ export function useDraftAssistant() {
   const dataSource = ref<'opgg' | 'lolalytics' | 'local' | null>(null);
   const dataVersion = ref<string | null>(null);
 
+  // ARAM tier 数据
+  const aramTierMap = ref<Map<number, AramChampionTier>>(new Map());
+  const aramTierLoading = ref(false);
+
+  // 当前队列 ID (用于区分大乱斗 450 / 海克斯大乱斗 2400+)
+  const currentQueueId = ref<number>(0);
+
+  // Bench swap 状态
+  const swappingChampionId = ref<number | null>(null);
+
   // Counter data cache: championId -> ChampionCounters
   const counterCache = ref<Map<number, ChampionCounters>>(new Map());
 
@@ -66,6 +79,23 @@ export function useDraftAssistant() {
   // ─── Computed ──────────────────────────────────────────
 
   const isInChampSelect = computed(() => appStore.gamePhase === 'ChampSelect');
+
+  /** 是否为 ARAM (大乱斗/海克斯大乱斗) 模式 */
+  const isAram = computed(() => session.value?.benchEnabled === true);
+
+  /** 是否为海克斯大乱斗（queueId >= 2400） */
+  const isHextechAram = computed(() => currentQueueId.value >= 2400);
+
+  /** 当前模式名称 */
+  const aramModeName = computed(() => {
+    if (!isAram.value) return '';
+    return isHextechAram.value ? '海克斯大乱斗' : '大乱斗';
+  });
+
+  /** ARAM 板凳英雄列表 */
+  const benchChampions = computed(() =>
+    (session.value?.benchChampions ?? []).map((c) => c.championId).filter((id) => id > 0),
+  );
 
   /** 我方已选英雄（包括正在确认的） */
   const myTeamPicks = computed<ChampSelectMember[]>(() => {
@@ -173,7 +203,57 @@ export function useDraftAssistant() {
   // ─── Actions ──────────────────────────────────────────
 
   function getChampName(id: number): string {
-    return CHAMPION_ID_MAP[id] ?? `#${id}`;
+    return CHAMPION_CN_NAME_MAP[id] ?? CHAMPION_ID_MAP[id] ?? `#${id}`;
+  }
+
+  /** 获取英雄 ARAM tier 信息 */
+  function getAramTier(championId: number): AramChampionTier | undefined {
+    return aramTierMap.value.get(championId);
+  }
+
+  /** 获取 ARAM Tier 列表数据 */
+  async function fetchAramTierList() {
+    if (aramTierMap.value.size > 0 || aramTierLoading.value) return;
+    aramTierLoading.value = true;
+    try {
+      const tierList = await window.electronAPI.getAramTierList();
+      if (Array.isArray(tierList)) {
+        const map = new Map<number, AramChampionTier>();
+        for (const t of tierList) {
+          map.set(t.championId, t);
+        }
+        aramTierMap.value = map;
+      }
+    } catch {
+      // 静默失败
+    } finally {
+      aramTierLoading.value = false;
+    }
+  }
+
+  /** 获取当前队列 ID（从 gameflow session 获取） */
+  async function fetchCurrentQueueId() {
+    try {
+      const gameflow = await window.electronAPI.analyzeLiveGame() as { queueId?: number } | null;
+      if (gameflow && typeof gameflow === 'object' && 'queueId' in gameflow) {
+        currentQueueId.value = (gameflow as { queueId: number }).queueId;
+      }
+    } catch {
+      // 静默失败，可能不在对局中
+    }
+  }
+
+  /** 交换板凳英雄 */
+  async function benchSwapChampion(championId: number) {
+    if (swappingChampionId.value !== null) return;
+    swappingChampionId.value = championId;
+    try {
+      await window.electronAPI.benchSwap(championId);
+    } catch (err) {
+      console.error('板凳英雄交换失败:', err);
+    } finally {
+      swappingChampionId.value = null;
+    }
   }
 
   async function fetchCountersForEnemy(championId: number) {
@@ -234,6 +314,14 @@ export function useDraftAssistant() {
     });
   }
 
+  // Watch for ARAM mode -> fetch tier data + queue ID
+  watch(isAram, (val) => {
+    if (val) {
+      fetchAramTierList();
+      fetchCurrentQueueId();
+    }
+  }, { immediate: true });
+
   // Watch for enemy picks changing -> fetch counters
   watch(
     () => enemyTeamPicks.value.map((m) => m.championId).join(','),
@@ -270,6 +358,10 @@ export function useDraftAssistant() {
     loading,
     error,
     isInChampSelect,
+    isAram,
+    isHextechAram,
+    aramModeName,
+    benchChampions,
     myTeamPicks,
     enemyTeamPicks,
     bannedChampionIds,
@@ -283,5 +375,9 @@ export function useDraftAssistant() {
     dataSource,
     dataVersion,
     getChampName,
+    getAramTier,
+    aramTierLoading,
+    benchSwapChampion,
+    swappingChampionId,
   };
 }

@@ -8,6 +8,16 @@ export interface ChampionTier {
   banRate: number;
 }
 
+/** ARAM 英雄 Tier 信息（大乱斗/海克斯大乱斗通用） */
+export interface AramChampionTier {
+  championId: number;
+  tier: 'S+' | 'S' | 'A' | 'B' | 'C' | 'D';
+  winRate: number;
+  pickRate: number;
+  rank: number;
+  games: number;
+}
+
 /** 英雄构建数据 */
 export interface ChampionBuilds {
   championId: number;

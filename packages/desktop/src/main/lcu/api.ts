@@ -135,6 +135,16 @@ export const lcuAPI = {
     await lcuClient.post('/lol-matchmaking/v1/ready-check/accept');
   },
 
+  // ─── ARAM 板凳英雄交换 ────────────────────────────────
+
+  /**
+   * 交换 ARAM 板凳上的英雄（用板凳英雄替换自己当前的英雄）
+   * @param championId 板凳上要交换的英雄 ID
+   */
+  async benchSwap(championId: number): Promise<void> {
+    await lcuClient.post(`/lol-champ-select/v1/session/bench/swap/${championId}`);
+  },
+
   // ─── 藏品背景皮肤 ──────────────────────────────────────
 
   /**

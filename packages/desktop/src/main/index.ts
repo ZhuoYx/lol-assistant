@@ -96,9 +96,9 @@ function createWindow(): void {
  * 创建系统托盘
  */
 function createTray(): void {
-  // 使用默认图标（后续替换为自定义图标）
-  const icon = nativeImage.createEmpty();
-  tray = new Tray(icon);
+  const iconPath = join(__dirname, '../../resources/icons/icon.ico');
+  const icon = nativeImage.createFromPath(iconPath);
+  tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
   tray.setToolTip('英雄联盟助手');
 
   const contextMenu = Menu.buildFromTemplate([
@@ -276,6 +276,19 @@ function initLCUConnection(): void {
     lastGamePhase = 'None';
     // 重新开始轮询
     startProcessPolling();
+  });
+
+  // WebSocket 意外断开时，立即检查进程是否还活着
+  lcuWebSocket.on('disconnected', async () => {
+    if (lcuClient.isConnected()) {
+      logger.info('WebSocket 断开，立即检查 LCU 连接...');
+      try {
+        await lcuClient.request('/riotclient/auth-token', { timeout: 3000 });
+      } catch {
+        // 请求失败会触发 client 内部的失败计数 -> handleConnectionLost
+        logger.warn('WebSocket 断开后 LCU 请求失败，可能客户端已关闭');
+      }
+    }
   });
 
   // 转发 WebSocket 事件到渲染进程

@@ -81,6 +81,19 @@ export function registerClientSettingsIpcHandlers(): void {
     return { enabled: autoAcceptEnabled, delay: autoAcceptDelay };
   });
 
+  // ─── ARAM 板凳英雄交换 ────────────────────────────────
+
+  ipcMain.handle('client:benchSwap', async (_event, championId: number) => {
+    try {
+      await lcuAPI.benchSwap(championId);
+      logger.info(`板凳英雄交换成功: championId=${championId}`);
+      return { success: true };
+    } catch (err) {
+      logger.error(`板凳英雄交换失败 (championId=${championId}):`, err);
+      throw err;
+    }
+  });
+
   // 暴露状态检查供 WebSocket 事件使用
   registerAutoAcceptState(() => autoAcceptEnabled, () => autoAcceptDelay);
 }

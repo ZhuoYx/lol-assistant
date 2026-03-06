@@ -14,6 +14,7 @@ import type {
   ChampionBuilds,
   ChampionCounters,
   ScraperDataVersion,
+  AramChampionTier,
 } from '@lol-assistant/shared';
 import { CHAMPION_COUNTERS } from '@lol-assistant/shared';
 import { OPGGScraper } from './opgg';
@@ -27,6 +28,10 @@ export class ScraperManager implements IChampionDataScraper {
   private lolalytics: LolalyticsScraper;
   private storage: ScraperStorage;
   private scheduler: ScraperScheduler;
+
+  /** ARAM Tier 数据内存缓存 (1 小时过期) */
+  private aramTierCache: { data: AramChampionTier[]; expiresAt: number } | null = null;
+  private static ARAM_CACHE_TTL = 60 * 60 * 1000; // 1 小时
 
   constructor() {
     this.opgg = new OPGGScraper();
@@ -49,6 +54,37 @@ export class ScraperManager implements IChampionDataScraper {
   /** 获取数据版本信息 */
   async getDataVersion(): Promise<ScraperDataVersion | null> {
     return this.storage.getDataVersion();
+  }
+
+  /**
+   * 获取 ARAM（大乱斗）英雄 Tier 列表
+   * 数据源：Lolalytics ARAM tier endpoint
+   * 带 1 小时内存缓存
+   */
+  async getAramTierList(): Promise<AramChampionTier[]> {
+    // 检查缓存
+    if (this.aramTierCache && Date.now() < this.aramTierCache.expiresAt) {
+      logger.info(`ARAM Tier 列表缓存命中 (${this.aramTierCache.data.length} 英雄)`);
+      return this.aramTierCache.data;
+    }
+
+    try {
+      logger.info('从 Lolalytics 获取 ARAM Tier 列表...');
+      const tierList = await this.lolalytics.getAramTierList();
+      this.aramTierCache = {
+        data: tierList,
+        expiresAt: Date.now() + ScraperManager.ARAM_CACHE_TTL,
+      };
+      return tierList;
+    } catch (err) {
+      logger.warn('获取 ARAM Tier 列表失败:', err);
+      // 返回缓存的过期数据（如果有）
+      if (this.aramTierCache) {
+        logger.info('返回过期的 ARAM Tier 缓存数据');
+        return this.aramTierCache.data;
+      }
+      return [];
+    }
   }
 
   // ─── IChampionDataScraper 实现 ─────────────────────────

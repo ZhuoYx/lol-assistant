@@ -60,6 +60,16 @@ export function registerScraperIpcHandlers(): void {
       throw err;
     }
   });
+
+  // 获取 ARAM Tier 列表（大乱斗/海克斯大乱斗英雄强度排名）
+  ipcMain.handle('scraper:getAramTierList', async () => {
+    try {
+      return await scraperManager.getAramTierList();
+    } catch (err) {
+      logger.error('IPC scraper:getAramTierList 失败:', err);
+      throw err;
+    }
+  });
 }
 
 /** 获取爬取器管理器（供其他模块使用） */

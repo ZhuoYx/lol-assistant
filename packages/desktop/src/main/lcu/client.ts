@@ -29,11 +29,11 @@ const RECONNECT_CONFIG = {
 /** 请求超时（毫秒） */
 const REQUEST_TIMEOUT = 10000;
 
-/** 连接健康检查间隔（毫秒） */
-const HEALTH_CHECK_INTERVAL = 15000;
+/** 连接健康检查间隔（毫秒）— 5 秒更及时地检测到断开 */
+const HEALTH_CHECK_INTERVAL = 5000;
 
 /** 连续请求失败多少次后判定连接断开 */
-const MAX_CONSECUTIVE_FAILURES = 3;
+const MAX_CONSECUTIVE_FAILURES = 2;
 
 /**
  * LCU 客户端连接管理器

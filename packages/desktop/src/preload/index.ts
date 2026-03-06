@@ -72,6 +72,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('scraper:getChampionCounters', championId),
   updateScraperData: () => ipcRenderer.invoke('scraper:updateData'),
   getScraperDataVersion: () => ipcRenderer.invoke('scraper:getDataVersion'),
+  getAramTierList: () => ipcRenderer.invoke('scraper:getAramTierList'),
 
   // ─── 符文页管理 ────────────────────────────────────────
   getPerksPages: () => ipcRenderer.invoke('perks:getPages'),
@@ -156,4 +157,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getStatusMessage: () => ipcRenderer.invoke('client:getStatusMessage'),
   setStatusMessage: (message: string) =>
     ipcRenderer.invoke('client:setStatusMessage', message),
+
+  // ARAM 板凳英雄交换
+  benchSwap: (championId: number) =>
+    ipcRenderer.invoke('client:benchSwap', championId),
 });

@@ -15,6 +15,7 @@ import type {
   ChampionTier,
   ChampionBuilds,
   ChampionCounters,
+  AramChampionTier,
   RuneBuild,
   ItemBuild,
   CounterInfo,
@@ -132,6 +133,69 @@ export class LolalyticsScraper implements IChampionDataScraper {
       throw new Error(`Lolalytics API 返回错误: ep=${ep}, status=${data?.status ?? 'empty'}`);
     }
     return data;
+  }
+
+  // ─── ARAM Tier 列表 ────────────────────────────────────
+
+  /**
+   * 获取 ARAM（大乱斗/海克斯大乱斗）Tier 列表
+   * Lolalytics API: ep=tier, queue=aram, lane=all
+   */
+  async getAramTierList(): Promise<AramChampionTier[]> {
+    const patch = await this.getPatch();
+    const results: AramChampionTier[] = [];
+
+    try {
+      const response = await this.api.get('/mega/', {
+        params: {
+          ep: 'tier',
+          v: '1',
+          patch,
+          lane: 'all',
+          tier: 'all',
+          queue: 'aram',
+          region: DEFAULT_REGION,
+        },
+      });
+
+      const data = response.data;
+      if (!data?.tier) {
+        throw new Error('Lolalytics ARAM API 未返回有效 tier 数据');
+      }
+
+      // tier 数据结构: { "1": { lane: { middle: { cid: { [champId]: { rank, wr, pr, games } } } } } }
+      for (const [tierLevel, tierData] of Object.entries(data.tier)) {
+        const laneData = (tierData as Record<string, Record<string, Record<string, Record<string, unknown>>>>)?.lane?.middle?.cid;
+        if (!laneData) continue;
+
+        for (const [champIdStr, champData] of Object.entries(laneData)) {
+          const champId = parseInt(champIdStr, 10);
+          if (isNaN(champId)) continue;
+
+          const cd = champData as Record<string, number>;
+          results.push({
+            championId: champId,
+            tier: this.mapTierLevel(parseInt(tierLevel, 10)),
+            winRate: cd.wr ?? 0,
+            pickRate: cd.pr ?? 0,
+            rank: cd.rank ?? 999,
+            games: cd.games ?? 0,
+          });
+        }
+      }
+    } catch (err) {
+      logger.warn('Lolalytics 获取 ARAM Tier 数据失败:', err);
+      throw err;
+    }
+
+    if (results.length === 0) {
+      throw new Error('Lolalytics 未获取到任何 ARAM Tier 数据');
+    }
+
+    // 按 rank 排序
+    results.sort((a, b) => a.rank - b.rank);
+    logger.info(`Lolalytics ARAM Tier: 获取到 ${results.length} 个英雄数据`);
+    return results;
   }
 
   // ─── Tier 列表 ──────────────────────────────────────────
