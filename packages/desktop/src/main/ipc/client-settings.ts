@@ -81,6 +81,16 @@ export function registerClientSettingsIpcHandlers(): void {
     return { enabled: autoAcceptEnabled, delay: autoAcceptDelay };
   });
 
+  // ─── 选人阶段 session 获取 ────────────────────────────
+
+  ipcMain.handle('client:getChampSelectSession', async () => {
+    try {
+      return await lcuAPI.getChampSelectSession();
+    } catch {
+      return null;
+    }
+  });
+
   // ─── ARAM 板凳英雄交换 ────────────────────────────────
 
   ipcMain.handle('client:benchSwap', async (_event, championId: number) => {

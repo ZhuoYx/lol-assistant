@@ -343,9 +343,23 @@ export function useDraftAssistant() {
     }
   }
 
+  // 主动获取当前选人 session（解决页面打开时选人已在进行中的情况）
+  async function fetchInitialSession() {
+    if (appStore.gamePhase !== 'ChampSelect') return;
+    try {
+      const data = await window.electronAPI.getChampSelectSession();
+      if (data && typeof data === 'object' && 'myTeam' in data) {
+        session.value = data as ChampSelectSession;
+      }
+    } catch {
+      // 静默失败
+    }
+  }
+
   onMounted(() => {
     subscribe();
     fetchDataVersionInfo();
+    fetchInitialSession();
   });
 
   onUnmounted(() => {

@@ -75,7 +75,7 @@
 
 <script setup lang="ts">
 import ChampionIcon from '../common/ChampionIcon.vue';
-import { CHAMPION_ID_MAP } from '@lol-assistant/shared';
+import { CHAMPION_ID_MAP, CHAMPION_CN_NAME_MAP } from '@lol-assistant/shared';
 import type { CounterRecommendation } from '@/composables/useDraftAssistant';
 import type { CounterInfo } from '@lol-assistant/shared';
 import { computed } from 'vue';
@@ -98,7 +98,7 @@ const sourceLabel = computed(() => {
 });
 
 function getChampName(id: number): string {
-  return CHAMPION_ID_MAP[id] ?? `#${id}`;
+  return CHAMPION_CN_NAME_MAP[id] ?? CHAMPION_ID_MAP[id] ?? `#${id}`;
 }
 
 function formatWr(rate: number): string {

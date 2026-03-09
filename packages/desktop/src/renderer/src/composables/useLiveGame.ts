@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useLiveGameStore } from '@/stores/live-game';
 import { useAppStore } from '@/stores/app';
 import type { GamePhase } from '@lol-assistant/shared';
@@ -47,6 +47,16 @@ export function useLiveGame() {
 
   onUnmounted(() => {
     unsubPhase?.();
+  });
+
+  // 当页面停留在对局分析时，如果 gamePhase 变为 InProgress 也自动获取
+  // 这处理了在页面已打开的状态下新对局开始的场景
+  watch(() => appStore.gamePhase, (phase) => {
+    if (phase === 'InProgress' || phase === 'GameStart') {
+      if (!liveGameStore.hasData && !liveGameStore.loading) {
+        analyze();
+      }
+    }
   });
 
   return {

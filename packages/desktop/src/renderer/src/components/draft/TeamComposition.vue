@@ -54,7 +54,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import ChampionIcon from '../common/ChampionIcon.vue';
-import { CHAMPION_ID_MAP } from '@lol-assistant/shared';
+import { CHAMPION_ID_MAP, CHAMPION_CN_NAME_MAP } from '@lol-assistant/shared';
 import type { ChampSelectMember } from '@/composables/useDraftAssistant';
 
 const ROLE_MAP: Record<string, string> = {
@@ -82,7 +82,7 @@ const slots = computed(() => {
 });
 
 function getChampName(id: number): string {
-  return CHAMPION_ID_MAP[id] ?? `#${id}`;
+  return CHAMPION_CN_NAME_MAP[id] ?? CHAMPION_ID_MAP[id] ?? `#${id}`;
 }
 
 function formatRole(role: string): string {

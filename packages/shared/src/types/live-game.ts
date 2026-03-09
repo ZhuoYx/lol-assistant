@@ -2,6 +2,7 @@
 export interface LiveGameAnalysis {
   gameId: number;
   gameMode: string;
+  queueId?: number;
   teams: LiveGameTeam[];
 }
 

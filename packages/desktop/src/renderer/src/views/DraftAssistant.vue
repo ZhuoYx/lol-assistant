@@ -346,7 +346,7 @@ const enemyBans = computed(() => {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: var(--space-4);
-  align-items: start;
+  align-items: stretch;
 }
 
 .vs-divider {

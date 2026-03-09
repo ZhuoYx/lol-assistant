@@ -47,10 +47,19 @@ export function useGameNotification() {
   }
 
   function handleMatchEnded() {
-    // 自动刷新战绩列表
-    matchStore.fetchMatchList(true).catch(() => {
-      // 静默失败
-    });
+    // 对局结束后 LCU 数据需要几秒才能写入，延迟刷新确保获取到最新战绩
+    setTimeout(() => {
+      matchStore.fetchMatchList(true).catch(() => {
+        // 静默失败
+      });
+    }, 3000);
+
+    // 再延迟一次确保数据可用
+    setTimeout(() => {
+      matchStore.fetchMatchList(true).catch(() => {
+        // 静默失败
+      });
+    }, 8000);
   }
 
   onMounted(() => {

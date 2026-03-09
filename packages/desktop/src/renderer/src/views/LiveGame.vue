@@ -150,9 +150,16 @@ const isInGame = computed(() => {
 
 const myPuuid = computed(() => summonerStore.currentSummoner?.puuid ?? '');
 
+const queueId = computed(() => analysis.value?.queueId ?? 0);
+const isFlexQueue = computed(() => queueId.value === 440);
+
 const myTier = computed(() => {
-  const solo = rankStore.rankStats?.queueMap?.RANKED_SOLO_5x5;
-  return solo?.tier ?? '';
+  const stats = rankStore.rankStats?.queueMap;
+  if (!stats) return '';
+  if (isFlexQueue.value) {
+    return stats.RANKED_FLEX_SR?.tier ?? stats.RANKED_SOLO_5x5?.tier ?? '';
+  }
+  return stats.RANKED_SOLO_5x5?.tier ?? stats.RANKED_FLEX_SR?.tier ?? '';
 });
 
 function handlePlayerClick(puuid: string) {

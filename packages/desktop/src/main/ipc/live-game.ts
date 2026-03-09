@@ -29,7 +29,7 @@ interface GameflowPlayer {
 interface GameflowSession {
   gameData: {
     gameId: number;
-    queue: { gameMode: string };
+    queue: { id: number; gameMode: string };
     teamOne: GameflowPlayer[];
     teamTwo: GameflowPlayer[];
   };
@@ -52,6 +52,7 @@ export function registerLiveGameIpcHandlers(): void {
       const { gameData } = session;
       const gameId = gameData.gameId;
       const gameMode = gameData.queue?.gameMode ?? 'UNKNOWN';
+      const queueId = gameData.queue?.id ?? 0;
 
       // 2. 提取所有玩家
       const teamOnePlayers = gameData.teamOne ?? [];
@@ -59,13 +60,14 @@ export function registerLiveGameIpcHandlers(): void {
 
       // 3. 并发获取每位玩家的详细数据
       const [team1, team2] = await Promise.all([
-        fetchTeamData(teamOnePlayers, 100),
-        fetchTeamData(teamTwoPlayers, 200),
+        fetchTeamData(teamOnePlayers, 100, queueId),
+        fetchTeamData(teamTwoPlayers, 200, queueId),
       ]);
 
       const analysis: LiveGameAnalysis = {
         gameId,
         gameMode,
+        queueId,
         teams: [team1, team2],
       };
 
@@ -90,9 +92,10 @@ export function registerLiveGameIpcHandlers(): void {
 async function fetchTeamData(
   players: GameflowPlayer[],
   teamId: number,
+  queueId: number = 0,
 ): Promise<LiveGameTeam> {
   const results = await Promise.allSettled(
-    players.map((p) => limit(() => fetchPlayerData(p))),
+    players.map((p) => limit(() => fetchPlayerData(p, queueId))),
   );
 
   const teamPlayers: LiveGamePlayer[] = results.map((result, idx) => {
@@ -112,7 +115,7 @@ async function fetchTeamData(
 /**
  * 获取单个玩家的详细数据
  */
-async function fetchPlayerData(player: GameflowPlayer): Promise<LiveGamePlayer> {
+async function fetchPlayerData(player: GameflowPlayer, queueId: number = 0): Promise<LiveGamePlayer> {
   const { puuid, summonerId, championId, summonerName: rawName } = player;
 
   // 并发请求：段位、英雄熟练度、近期战绩
@@ -122,17 +125,25 @@ async function fetchPlayerData(player: GameflowPlayer): Promise<LiveGamePlayer> 
     lcuAPI.getMatchListByPUUID(puuid, { begIndex: 0, endIndex: 10 }),
   ]);
 
-  // 段位信息
+  // 段位信息：根据队列类型优先显示对应段位
+  // 灵活排位 queueId=440 显示灵活段位，其余显示单双段位
   let tier = '';
   let division = '';
   let leaguePoints = 0;
   if (rankResult.status === 'fulfilled') {
     const ranked = rankResult.value;
-    const soloQueue = ranked.queueMap?.RANKED_SOLO_5x5;
-    if (soloQueue) {
-      tier = soloQueue.tier ?? '';
-      division = soloQueue.division ?? '';
-      leaguePoints = soloQueue.leaguePoints ?? 0;
+    const isFlexQueue = queueId === 440;
+    const primaryQueue = isFlexQueue
+      ? ranked.queueMap?.RANKED_FLEX_SR
+      : ranked.queueMap?.RANKED_SOLO_5x5;
+    const fallbackQueue = isFlexQueue
+      ? ranked.queueMap?.RANKED_SOLO_5x5
+      : ranked.queueMap?.RANKED_FLEX_SR;
+    const queueInfo = primaryQueue?.tier ? primaryQueue : fallbackQueue;
+    if (queueInfo) {
+      tier = queueInfo.tier ?? '';
+      division = queueInfo.division ?? '';
+      leaguePoints = queueInfo.leaguePoints ?? 0;
     }
   }
 
@@ -179,13 +190,13 @@ async function fetchPlayerData(player: GameflowPlayer): Promise<LiveGamePlayer> 
         }
       }
 
-      recentWinRate = matches.length > 0 ? Math.round((wins / matches.length) * 100) : 0;
+      recentWinRate = matches.length > 0 ? wins / matches.length : 0;
       recentKDA = totalDeaths > 0
         ? Math.round(((totalKills + totalAssists) / totalDeaths) * 100) / 100
         : totalKills + totalAssists > 0 ? 999 : 0;
 
       championGamesPlayed = champGames;
-      championWinRate = champGames > 0 ? Math.round((champWins / champGames) * 100) : 0;
+      championWinRate = champGames > 0 ? champWins / champGames : 0;
     }
   }
 

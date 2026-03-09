@@ -137,6 +137,9 @@ interface ElectronAPI {
 
   // ARAM 板凳英雄交换
   benchSwap: (championId: number) => Promise<{ success: boolean }>;
+
+  // 选人阶段 session
+  getChampSelectSession: () => Promise<unknown | null>;
 }
 
 export {};

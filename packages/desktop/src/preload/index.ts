@@ -161,4 +161,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ARAM 板凳英雄交换
   benchSwap: (championId: number) =>
     ipcRenderer.invoke('client:benchSwap', championId),
+
+  // 选人阶段 session
+  getChampSelectSession: () => ipcRenderer.invoke('client:getChampSelectSession'),
 });
