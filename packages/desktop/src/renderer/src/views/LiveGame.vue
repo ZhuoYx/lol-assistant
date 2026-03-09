@@ -85,6 +85,13 @@
           />
         </div>
 
+        <!-- Spell Cooldowns -->
+        <SpellCooldowns
+          v-if="myChampId"
+          :my-champ-id="myChampId"
+          :enemy-champ-id="enemyLaneChampId"
+        />
+
         <!-- Strength legend -->
         <div class="legend-bar">
           <span class="legend-title">实力标记</span>
@@ -122,6 +129,7 @@ import { useLiveGame } from '@/composables/useLiveGame';
 import { EmptyState, LoadingSpinner, ErrorDisplay } from '@/components/common';
 import LiveGamePanel from '@/components/live-game/LiveGamePanel.vue';
 import TeamPanel from '@/components/live-game/TeamPanel.vue';
+import SpellCooldowns from '@/components/live-game/SpellCooldowns.vue';
 
 const appStore = useAppStore();
 const summonerStore = useSummonerStore();
@@ -168,6 +176,45 @@ function handlePlayerClick(puuid: string) {
     query: { puuid },
   });
 }
+
+/** 我方英雄 ID */
+const myChampId = computed(() => {
+  if (!blueTeam.value || !myPuuid.value) return 0;
+  // 先在蓝队找
+  let me = blueTeam.value.players.find(p => p.puuid === myPuuid.value);
+  if (!me && redTeam.value) {
+    me = redTeam.value.players.find(p => p.puuid === myPuuid.value);
+  }
+  return me?.championId ?? 0;
+});
+
+/** 我的位置 */
+const myPosition = computed(() => {
+  if (!blueTeam.value || !myPuuid.value) return '';
+  let me = blueTeam.value.players.find(p => p.puuid === myPuuid.value);
+  if (!me && redTeam.value) {
+    me = redTeam.value.players.find(p => p.puuid === myPuuid.value);
+  }
+  return me?.position ?? '';
+});
+
+/** 我在哪个队伍 */
+const myTeamId = computed(() => {
+  if (blueTeam.value?.players.some(p => p.puuid === myPuuid.value)) return 100;
+  if (redTeam.value?.players.some(p => p.puuid === myPuuid.value)) return 200;
+  return 0;
+});
+
+/** 对位敌方英雄 ID：同位置的敌方英雄 */
+const enemyLaneChampId = computed(() => {
+  if (!myPosition.value || !myTeamId.value) return 0;
+  const enemyTeam = myTeamId.value === 100 ? redTeam.value : blueTeam.value;
+  if (!enemyTeam) return 0;
+  const laneOpponent = enemyTeam.players.find(p =>
+    (p.position ?? '').toUpperCase() === myPosition.value.toUpperCase()
+  );
+  return laneOpponent?.championId ?? 0;
+});
 </script>
 
 <style scoped>

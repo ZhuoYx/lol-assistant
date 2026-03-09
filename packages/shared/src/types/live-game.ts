@@ -29,6 +29,11 @@ export interface LiveGamePlayer {
   /** 近期表现 */
   recentWinRate: number;
   recentKDA: number;
+  /** 分路位置 (TOP, JUNGLE, MIDDLE, BOTTOM, UTILITY) */
+  position?: string;
+  /** 召唤师技能 ID */
+  spell1Id?: number;
+  spell2Id?: number;
   /** 数据加载状态 */
   dataStatus: 'loaded' | 'loading' | 'failed';
 }

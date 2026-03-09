@@ -11,7 +11,7 @@
           {{ participant.summonerName }}
           <span v-if="participant.tagLine" class="pr-id">#{{ participant.tagLine }}</span>
         </span>
-        <span class="pr-lane">{{ laneLabel }}</span>
+        <span v-if="showLane && laneLabel" class="pr-lane">{{ laneLabel }}</span>
       </div>
     </div>
     <div class="pr-kda">
@@ -68,6 +68,7 @@ const props = defineProps<{
   isMe?: boolean;
   maxDamage?: number;
   maxDamageTaken?: number;
+  showLane?: boolean;
 }>();
 
 defineEmits<{

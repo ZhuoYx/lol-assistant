@@ -9,6 +9,7 @@
 
     <div class="card-main">
       <div class="card-left">
+        <span v-if="positionLabel" class="position-tag">{{ positionLabel }}</span>
         <ChampionIcon
           :champion-id="player.championId"
           :name="player.championName"
@@ -23,8 +24,8 @@
           </div>
 
           <div v-if="player.dataStatus === 'loaded'" class="tier-row">
-            <TierIcon :tier="player.tier" :division="player.division" size="sm" />
-            <span class="lp-text">{{ player.leaguePoints }} LP</span>
+            <TierIcon :tier="player.tier || 'UNRANKED'" :division="player.tier ? player.division : ''" size="sm" />
+            <span v-if="player.tier" class="lp-text">{{ player.leaguePoints }} LP</span>
           </div>
           <div v-else-if="player.dataStatus === 'loading'" class="tier-row">
             <span class="status-loading">
@@ -86,6 +87,19 @@ const TIER_ORDER: Record<string, number> = {
   MASTER: 8, GRANDMASTER: 9, CHALLENGER: 10,
 };
 
+const POSITION_LABEL: Record<string, string> = {
+  TOP: '上',
+  JUNGLE: '野',
+  MIDDLE: '中',
+  BOTTOM: '下',
+  UTILITY: '辅',
+  top: '上',
+  jungle: '野',
+  middle: '中',
+  bottom: '下',
+  utility: '辅',
+};
+
 const props = withDefaults(defineProps<{
   player: LiveGamePlayer;
   myTier?: string;
@@ -112,6 +126,12 @@ const strengthClass = computed(() => {
   if (diff <= -2) return 'much-lower';
   if (diff === -1) return 'lower';
   return 'even';
+});
+
+const positionLabel = computed(() => {
+  const pos = props.player.position;
+  if (!pos) return '';
+  return POSITION_LABEL[pos] ?? POSITION_LABEL[pos.toUpperCase()] ?? '';
 });
 
 function handleClick() {
@@ -199,6 +219,20 @@ function kdaClass(kda: number): string {
   gap: var(--space-3);
   min-width: 0;
   flex: 1;
+}
+
+.position-tag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+  font-weight: var(--font-bold);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
 }
 
 .player-info {

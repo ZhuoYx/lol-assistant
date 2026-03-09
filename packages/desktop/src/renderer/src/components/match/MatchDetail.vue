@@ -40,6 +40,7 @@
             :is-me="p.puuid === currentPUUID"
             :max-damage="allMaxDamage"
             :max-damage-taken="allMaxDamageTaken"
+            :show-lane="isRanked"
             @click-player="$emit('viewPlayer', p.puuid)"
           />
         </div>
@@ -121,9 +122,34 @@ const allMaxDamageTaken = computed(() => {
   );
 });
 
+const POSITION_ORDER: Record<string, number> = {
+  TOP: 1,
+  JUNGLE: 2,
+  MIDDLE: 3,
+  MID: 3,
+  BOTTOM: 4,
+  ADC: 4,
+  UTILITY: 5,
+  SUPPORT: 5,
+};
+
+const isRanked = computed(() => {
+  const queueId = props.detail?.queueId ?? 0;
+  return queueId === 420 || queueId === 440;
+});
+
 function getTeamParticipants(teamId: number) {
   if (!props.detail) return [];
-  return props.detail.participants.filter((p) => p.teamId === teamId);
+  const players = props.detail.participants.filter((p) => p.teamId === teamId);
+  // 排位赛按位置排序
+  if (isRanked.value) {
+    players.sort((a, b) => {
+      const orderA = POSITION_ORDER[a.lane?.toUpperCase() ?? ''] ?? 99;
+      const orderB = POSITION_ORDER[b.lane?.toUpperCase() ?? ''] ?? 99;
+      return orderA - orderB;
+    });
+  }
+  return players;
 }
 </script>
 

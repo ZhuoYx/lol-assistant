@@ -23,6 +23,9 @@ interface GameflowPlayer {
   summonerName?: string;
   championId: number;
   teamId: number;
+  selectedPosition?: string;
+  spell1Id?: number;
+  spell2Id?: number;
 }
 
 /** Gameflow session 结构（LCU 原始格式） */
@@ -86,6 +89,27 @@ export function registerLiveGameIpcHandlers(): void {
   });
 }
 
+/** 位置排序优先级 */
+const POSITION_ORDER: Record<string, number> = {
+  TOP: 1,
+  JUNGLE: 2,
+  MIDDLE: 3,
+  BOTTOM: 4,
+  UTILITY: 5,
+  // LCU 可能使用的其他格式
+  top: 1,
+  jungle: 2,
+  middle: 3,
+  bottom: 4,
+  utility: 5,
+  MID: 3,
+  ADC: 4,
+  SUPPORT: 5,
+  SUP: 5,
+  FILL: 6,
+  UNSELECTED: 7,
+};
+
 /**
  * 并发获取一个队伍所有玩家的数据
  */
@@ -107,6 +131,13 @@ async function fetchTeamData(
     const raw = players[idx];
     logger.warn(`玩家 ${raw.puuid} 数据获取失败:`, result.reason);
     return createFailedPlayer(raw);
+  });
+
+  // 按位置排序：上路 > 打野 > 中路 > 下路 > 辅助
+  teamPlayers.sort((a, b) => {
+    const orderA = POSITION_ORDER[(a.position ?? '').toUpperCase()] ?? 99;
+    const orderB = POSITION_ORDER[(b.position ?? '').toUpperCase()] ?? 99;
+    return orderA - orderB;
   });
 
   return { teamId, players: teamPlayers };
@@ -167,8 +198,15 @@ async function fetchPlayerData(player: GameflowPlayer, queueId: number = 0): Pro
   let recentKDA = 0;
   let championWinRate = 0;
   if (recentResult.status === 'fulfilled') {
-    const matchList = recentResult.value;
-    const matches = matchList.matches ?? [];
+    const matchList = recentResult.value as Record<string, unknown>;
+    // LCU 原始格式: { games: { games: [...], gameCount } } 或标准格式 { matches: [...] }
+    let matches: Record<string, unknown>[] = [];
+    if (Array.isArray(matchList.matches)) {
+      matches = matchList.matches;
+    } else if (matchList.games && typeof matchList.games === 'object') {
+      const gamesWrapper = matchList.games as Record<string, unknown>;
+      matches = (Array.isArray(gamesWrapper.games) ? gamesWrapper.games : []) as Record<string, unknown>[];
+    }
 
     if (matches.length > 0) {
       let wins = 0;
@@ -179,14 +217,25 @@ async function fetchPlayerData(player: GameflowPlayer, queueId: number = 0): Pro
       let champGames = 0;
 
       for (const match of matches) {
-        if (match.win) wins++;
-        totalKills += match.kills ?? 0;
-        totalDeaths += match.deaths ?? 0;
-        totalAssists += match.assists ?? 0;
+        // 兼容两种格式：stats 嵌套或直接在 match 上
+        const stats = (match.stats && typeof match.stats === 'object' ? match.stats : match) as Record<string, unknown>;
+        const participants = (match.participants ?? []) as Record<string, unknown>[];
+        // 列表中只有一个 participant（当前玩家）
+        const participant = participants[0];
+        const pStats = participant
+          ? ((participant.stats && typeof participant.stats === 'object' ? participant.stats : participant) as Record<string, unknown>)
+          : stats;
 
-        if (match.championId === championId) {
+        const isWin = Boolean(pStats.win ?? stats.win ?? match.win);
+        if (isWin) wins++;
+        totalKills += (pStats.kills ?? stats.kills ?? 0) as number;
+        totalDeaths += (pStats.deaths ?? stats.deaths ?? 0) as number;
+        totalAssists += (pStats.assists ?? stats.assists ?? 0) as number;
+
+        const matchChampId = (participant?.championId ?? match.championId ?? 0) as number;
+        if (matchChampId === championId) {
           champGames++;
-          if (match.win) champWins++;
+          if (isWin) champWins++;
         }
       }
 
@@ -213,6 +262,9 @@ async function fetchPlayerData(player: GameflowPlayer, queueId: number = 0): Pro
     championMasteryLevel,
     recentWinRate,
     recentKDA,
+    position: player.selectedPosition ?? '',
+    spell1Id: player.spell1Id ?? 0,
+    spell2Id: player.spell2Id ?? 0,
     dataStatus: 'loaded',
   };
 }
@@ -234,6 +286,9 @@ function createFailedPlayer(player: GameflowPlayer): LiveGamePlayer {
     championMasteryLevel: 0,
     recentWinRate: 0,
     recentKDA: 0,
+    position: player.selectedPosition ?? '',
+    spell1Id: player.spell1Id ?? 0,
+    spell2Id: player.spell2Id ?? 0,
     dataStatus: 'failed',
   };
 }

@@ -11,6 +11,7 @@
       <div class="meta-row">
         <span class="result-text">{{ match.win ? '胜利' : '失败' }}</span>
         <span class="mode-tag" :class="queueTagClass">{{ queueName }}</span>
+        <span v-if="isRanked && laneName" class="lane-tag">{{ laneName }}</span>
       </div>
     </div>
     <div class="kda-section">
@@ -74,6 +75,27 @@ const queueTagClass = computed(() => {
   if (fun.includes(queueId) || props.match.gameMode === 'URF' || props.match.gameMode === 'CHERRY') return 'tag-fun';
   if (bot.includes(queueId)) return 'tag-bot';
   return 'tag-normal';
+});
+
+const LANE_NAME_MAP: Record<string, string> = {
+  TOP: '上路',
+  JUNGLE: '打野',
+  MIDDLE: '中路',
+  MID: '中路',
+  BOTTOM: '下路',
+  ADC: '下路',
+  UTILITY: '辅助',
+  SUPPORT: '辅助',
+};
+
+const isRanked = computed(() => {
+  const queueId = props.match.queueId;
+  return queueId === 420 || queueId === 440;
+});
+
+const laneName = computed(() => {
+  const lane = props.match.lane?.toUpperCase() ?? '';
+  return LANE_NAME_MAP[lane] ?? '';
 });
 </script>
 
@@ -180,6 +202,16 @@ const queueTagClass = computed(() => {
 .tag-bot {
   background: rgba(162, 132, 94, 0.12);
   color: #a2845e;
+}
+
+.lane-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-medium);
+  white-space: nowrap;
+  background: rgba(120, 120, 140, 0.12);
+  color: var(--color-text-secondary);
 }
 
 .kda-section {
