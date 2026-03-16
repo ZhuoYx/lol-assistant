@@ -1,18 +1,26 @@
 <template>
   <div class="rune-display">
-    <!-- Header: tabs for multiple rune builds -->
+    <!-- Header: selector for multiple rune builds -->
     <div class="rune-header">
       <h3 class="section-title">符文推荐</h3>
-      <div v-if="runeBuilds.length > 1" class="rune-tabs">
-        <button
-          v-for="(rune, idx) in runeBuilds"
-          :key="idx"
-          class="rune-tab"
-          :class="{ active: selectedIndex === idx }"
-          @click="$emit('select', idx)"
+      <div v-if="runeBuilds.length > 1" class="rune-selector-wrap">
+        <select
+          class="rune-selector"
+          :value="selectedIndex"
+          @change="$emit('select', Number(($event.target as HTMLSelectElement).value))"
         >
-          {{ rune.name || `配置 ${idx + 1}` }}
-        </button>
+          <option
+            v-for="(rune, idx) in runeBuilds"
+            :key="idx"
+            :value="idx"
+          >
+            {{ rune.name || `配置 ${idx + 1}` }}
+            {{ rune.winRate ? `(${formatPercent(rune.winRate)})` : '' }}
+          </option>
+        </select>
+        <svg class="selector-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
       </div>
     </div>
 
@@ -234,14 +242,19 @@ function formatSample(v: number): string {
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-light);
   overflow: hidden;
+  min-width: 0; /* 防止 grid 子项溢出 */
+  display: flex;
+  flex-direction: column;
 }
 
 .rune-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-4) var(--space-5);
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border-light);
+  min-width: 0;
 }
 
 .section-title {
@@ -249,41 +262,54 @@ function formatSample(v: number): string {
   font-weight: var(--font-semibold);
   color: var(--color-text-primary);
   letter-spacing: -0.2px;
+  flex-shrink: 0;
 }
 
-.rune-tabs {
+.rune-selector-wrap {
+  position: relative;
   display: flex;
-  gap: var(--space-1);
-  background: var(--color-bg-secondary);
-  border-radius: var(--radius-md);
-  padding: 2px;
+  align-items: center;
+  min-width: 0;
 }
 
-.rune-tab {
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-xs);
+.rune-selector {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 4px 28px 4px 10px;
+  font-size: 11px;
   font-weight: var(--font-medium);
-  color: var(--color-text-secondary);
-  background: transparent;
-  border: none;
+  color: var(--color-text-primary);
   cursor: pointer;
+  outline: none;
+  font-family: var(--font-family);
   transition: all var(--transition-fast);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.rune-tab:hover {
-  color: var(--color-text-primary);
+.rune-selector:hover {
+  border-color: var(--color-accent);
 }
 
-.rune-tab.active {
-  background: var(--color-bg-card);
-  color: var(--color-text-primary);
-  box-shadow: var(--shadow-xs);
+.rune-selector:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.12);
+}
+
+.selector-arrow {
+  position: absolute;
+  right: 8px;
+  pointer-events: none;
+  color: var(--color-text-tertiary);
 }
 
 .rune-empty {
-  padding: var(--space-10) var(--space-5);
+  padding: var(--space-10) var(--space-4);
   text-align: center;
 }
 
@@ -297,8 +323,8 @@ function formatSample(v: number): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-5);
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   background: var(--color-bg-secondary);
 }
 
@@ -306,18 +332,18 @@ function formatSample(v: number): string {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
 }
 
 .stat-label {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--color-text-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
 }
 
 .stat-value {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: var(--font-semibold);
   color: var(--color-text-primary);
   font-family: var(--font-mono);
@@ -329,32 +355,36 @@ function formatSample(v: number): string {
 
 .stat-divider {
   width: 1px;
-  height: 24px;
+  height: 20px;
   background: var(--color-border);
+  flex-shrink: 0;
 }
 
 /* Rune trees */
 .rune-content {
-  padding: var(--space-4) var(--space-5) var(--space-5);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  flex: 1;
 }
 
 .rune-trees {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-4);
-  margin-top: var(--space-3);
+  gap: var(--space-3);
+  margin-top: var(--space-2);
 }
 
 .rune-tree {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .tree-header {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
 }
 
 .tree-dot {
@@ -365,27 +395,31 @@ function formatSample(v: number): string {
 }
 
 .tree-icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
   object-fit: contain;
 }
 
 .tree-name {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: var(--font-semibold);
   color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tree-type {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--color-text-tertiary);
   margin-left: auto;
+  flex-shrink: 0;
 }
 
 .perk-grid {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-1);
   flex-wrap: wrap;
 }
 
@@ -394,8 +428,8 @@ function formatSample(v: number): string {
 }
 
 .perk-icon {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-md);
   background: var(--color-bg-secondary);
   border: 1.5px solid var(--color-border);
@@ -406,14 +440,14 @@ function formatSample(v: number): string {
 }
 
 .keystone .perk-icon {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-lg);
   border-width: 2px;
 }
 
 .perk-id {
-  font-size: 9px;
+  font-size: 8px;
   font-family: var(--font-mono);
   color: var(--color-text-tertiary);
 }
@@ -426,28 +460,28 @@ function formatSample(v: number): string {
 }
 
 .keystone .perk-id {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: var(--font-semibold);
   color: var(--color-text-secondary);
 }
 
 /* Stat shards */
 .stat-shards {
-  margin-top: var(--space-4);
-  padding-top: var(--space-3);
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
   border-top: 1px solid var(--color-border-light);
 }
 
 .shards-label {
-  font-size: var(--text-xs);
+  font-size: 10px;
   color: var(--color-text-tertiary);
   display: block;
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
 }
 
 .shards-row {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .shard-slot {
@@ -455,8 +489,8 @@ function formatSample(v: number): string {
 }
 
 .shard-icon {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--radius-full);
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
@@ -466,7 +500,7 @@ function formatSample(v: number): string {
 }
 
 .shard-id {
-  font-size: 8px;
+  font-size: 7px;
   font-family: var(--font-mono);
   color: var(--color-text-tertiary);
 }
@@ -485,14 +519,14 @@ function formatSample(v: number): string {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  margin-top: var(--space-4);
-  padding: var(--space-2) var(--space-4);
-  height: 40px;
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  height: 36px;
   border-radius: var(--radius-lg);
   border: none;
   background: var(--color-accent);
   color: #ffffff;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: var(--font-semibold);
   cursor: pointer;
   transition: all var(--transition-normal);

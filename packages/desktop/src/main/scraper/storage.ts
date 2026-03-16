@@ -32,7 +32,7 @@ import { logger } from '../utils/logger';
 interface ScraperMeta {
   patch: string;
   lastUpdated: number;
-  source: 'opgg' | 'lolalytics' | 'local';
+  source: 'opgg' | 'local';
 }
 
 export class ScraperStorage {

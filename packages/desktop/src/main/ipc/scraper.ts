@@ -61,6 +61,16 @@ export function registerScraperIpcHandlers(): void {
     }
   });
 
+  // 获取英雄排名列表
+  ipcMain.handle('scraper:getChampionRankings', async (_event, position?: string, tier?: string) => {
+    try {
+      return await scraperManager.getChampionRankings(position, tier);
+    } catch (err) {
+      logger.error(`IPC scraper:getChampionRankings 失败 (position=${position}, tier=${tier}):`, err);
+      throw err;
+    }
+  });
+
   // 获取 ARAM Tier 列表（大乱斗/海克斯大乱斗英雄强度排名）
   ipcMain.handle('scraper:getAramTierList', async () => {
     try {

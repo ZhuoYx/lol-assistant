@@ -73,6 +73,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateScraperData: () => ipcRenderer.invoke('scraper:updateData'),
   getScraperDataVersion: () => ipcRenderer.invoke('scraper:getDataVersion'),
   getAramTierList: () => ipcRenderer.invoke('scraper:getAramTierList'),
+  getChampionRankings: (position?: string, tier?: string) =>
+    ipcRenderer.invoke('scraper:getChampionRankings', position, tier),
 
   // ─── 符文页管理 ────────────────────────────────────────
   getPerksPages: () => ipcRenderer.invoke('perks:getPages'),

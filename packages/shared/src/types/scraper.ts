@@ -23,10 +23,14 @@ export interface ChampionBuilds {
   championId: number;
   role: string;
   patch: string;
-  dataSource: 'opgg' | 'lolalytics' | 'local';
+  dataSource: 'opgg' | 'local';
   runeBuilds: RuneBuild[];
   itemBuilds: ItemBuild[];
   skillOrder: string[];
+  /** 技能优先级（如 ["Q","E","W"]，仅 3 个主/副/三） */
+  skillPriority?: string[];
+  /** 该英雄实际可用的位置列表（来自 API 数据） */
+  availableRoles?: string[];
 }
 
 /** 符文构建 */
@@ -72,7 +76,29 @@ export interface CounterInfo {
 export interface ScraperDataVersion {
   patch: string;
   lastUpdated: number;
-  source: 'opgg' | 'lolalytics' | 'local';
+  source: 'opgg' | 'local';
+}
+
+/** 英雄排名信息（来自 OP.GG） */
+export interface ChampionRanking {
+  championId: number;
+  position: string;
+  tier: number;           // 1-5 对应 OP/S/A/B/C
+  rank: number;           // 同 tier 内排名
+  rankPrev: number;       // 上期排名
+  winRate: number;        // 0-1
+  pickRate: number;       // 0-1
+  banRate: number;        // 0-1
+  kda: number;
+  games: number;          // 总场次
+}
+
+/** 英雄排名列表响应 */
+export interface ChampionRankingList {
+  rankings: ChampionRanking[];
+  patch: string;
+  tier: string;           // 段位筛选
+  position: string;       // 位置筛选
 }
 
 /** 爬取器接口 */

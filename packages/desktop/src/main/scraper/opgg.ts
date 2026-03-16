@@ -13,6 +13,8 @@ import type {
   ChampionTier,
   ChampionBuilds,
   ChampionCounters,
+  ChampionRanking,
+  ChampionRankingList,
   RuneBuild,
   ItemBuild,
   CounterInfo,
@@ -113,7 +115,8 @@ export class OPGGScraper implements IChampionDataScraper {
       signal,
     });
 
-    const champions = response.data?.data ?? [];
+    const rawData = response.data;
+    const champions = rawData?.data ?? rawData ?? [];
     const results: ChampionTier[] = [];
 
     for (const champ of champions) {
@@ -165,7 +168,13 @@ export class OPGGScraper implements IChampionDataScraper {
     role?: string,
     signal?: AbortSignal,
   ): Promise<ChampionBuilds> {
-    const position = this.normalizePosition(role);
+    // 如果未指定位置，先查询该英雄的最佳位置
+    let position: PositionType;
+    if (role) {
+      position = this.normalizePosition(role);
+    } else {
+      position = await this.detectBestPosition(championId, signal);
+    }
 
     logger.info(`从 OP.GG API 获取英雄 ${championId} 构建 (position=${position})...`);
 
@@ -176,17 +185,26 @@ export class OPGGScraper implements IChampionDataScraper {
       signal,
     });
 
-    const data = response.data;
-    const patch = data?.meta?.version ?? '';
+    // OPGG API 返回的数据在 response.data.data 下
+    const rawData = response.data;
+    const innerData = rawData?.data ?? rawData;
+    const patch = rawData?.meta?.version ?? '';
+
+    // 提取该英雄实际可用的位置列表
+    const positions = innerData?.positions ?? [];
+    const availableRoles: string[] = positions
+      .map((p: Record<string, unknown>) => (p.name ?? '').toString().toLowerCase())
+      .filter((r: string) => r && r !== 'none');
 
     // 解析符文
-    const runeBuilds = this.parseRuneBuilds(data);
+    const runeBuilds = this.parseRuneBuilds(innerData);
 
     // 解析出装
-    const itemBuilds = this.parseItemBuilds(data);
+    const itemBuilds = this.parseItemBuilds(innerData);
 
     // 解析技能加点
-    const skillOrder = this.parseSkillOrder(data);
+    const skillOrder = this.parseSkillOrder(innerData);
+    const skillPriority = this.parseSkillPriority(innerData);
 
     logger.info(
       `英雄 ${championId} 构建获取成功：` +
@@ -201,6 +219,8 @@ export class OPGGScraper implements IChampionDataScraper {
       runeBuilds,
       itemBuilds,
       skillOrder,
+      skillPriority,
+      availableRoles,
     };
   }
 
@@ -222,8 +242,9 @@ export class OPGGScraper implements IChampionDataScraper {
       signal,
     });
 
-    const data = response.data;
-    const counters = this.parseCounters(data);
+    const rawData = response.data;
+    const innerData = rawData?.data ?? rawData;
+    const counters = this.parseCounters(innerData);
 
     logger.info(
       `英雄 ${championId} 克制关系获取成功：` +
@@ -237,6 +258,111 @@ export class OPGGScraper implements IChampionDataScraper {
     };
   }
 
+  // ─── 英雄排名 ──────────────────────────────────────────
+
+  /**
+   * 获取英雄排名列表（支持段位和分路筛选）
+   */
+  async getChampionRankings(
+    position?: string,
+    tier?: string,
+    signal?: AbortSignal,
+  ): Promise<ChampionRankingList> {
+    const usedTier = (tier ?? this.tier) as TierType;
+    const usedPosition = position ? this.normalizePosition(position) : 'none';
+
+    logger.info(`从 OP.GG API 获取英雄排名 (position=${usedPosition}, tier=${usedTier})...`);
+
+    const response = await this.http.get(`/api/${this.region}/champions/ranked`, {
+      params: { tier: usedTier },
+      signal,
+    });
+
+    const rawData = response.data;
+    const champions = rawData?.data ?? rawData ?? [];
+    const patch = rawData?.meta?.version ?? '';
+
+    const rankings: ChampionRanking[] = [];
+
+    for (const champ of champions) {
+      const positions = champ.positions ?? [];
+
+      if (usedPosition === 'none') {
+        // 不筛选位置：返回每个英雄每个位置的数据
+        if (positions.length === 0) {
+          // 没有位置数据，用 average_stats
+          const stats = champ.average_stats ?? {};
+          const tierData = stats.tier_data ?? {};
+          rankings.push({
+            championId: champ.id,
+            position: '',
+            tier: tierData.tier ?? stats.tier ?? 5,
+            rank: tierData.rank ?? stats.rank ?? 999,
+            rankPrev: tierData.rank_prev ?? tierData.rank ?? 999,
+            winRate: stats.win_rate ?? 0,
+            pickRate: stats.pick_rate ?? 0,
+            banRate: stats.ban_rate ?? 0,
+            kda: stats.kda ?? 0,
+            games: stats.play ?? 0,
+          });
+        } else {
+          for (const pos of positions) {
+            const stats = pos.stats ?? {};
+            const tierData = stats.tier_data ?? {};
+            rankings.push({
+              championId: champ.id,
+              position: (pos.name ?? '').toString().toLowerCase(),
+              tier: tierData.tier ?? 5,
+              rank: tierData.rank ?? 999,
+              rankPrev: tierData.rank_prev ?? tierData.rank ?? 999,
+              winRate: stats.win_rate ?? 0,
+              pickRate: stats.pick_rate ?? 0,
+              banRate: stats.ban_rate ?? 0,
+              kda: stats.kda ?? 0,
+              games: stats.play ?? 0,
+            });
+          }
+        }
+      } else {
+        // 筛选特定位置
+        const pos = positions.find(
+          (p: any) => (p.name ?? '').toString().toLowerCase() === usedPosition,
+        );
+        if (pos) {
+          const stats = pos.stats ?? {};
+          const tierData = stats.tier_data ?? {};
+          rankings.push({
+            championId: champ.id,
+            position: usedPosition,
+            tier: tierData.tier ?? 5,
+            rank: tierData.rank ?? 999,
+            rankPrev: tierData.rank_prev ?? tierData.rank ?? 999,
+            winRate: stats.win_rate ?? 0,
+            pickRate: stats.pick_rate ?? 0,
+            banRate: stats.ban_rate ?? 0,
+            kda: stats.kda ?? 0,
+            games: stats.play ?? 0,
+          });
+        }
+      }
+    }
+
+    // 按 tier 升序 -> rank 升序排列
+    rankings.sort((a, b) => {
+      if (a.tier !== b.tier) return a.tier - b.tier;
+      return a.rank - b.rank;
+    });
+
+    logger.info(`英雄排名获取成功：${rankings.length} 条记录`);
+
+    return {
+      rankings,
+      patch,
+      tier: usedTier,
+      position: usedPosition,
+    };
+  }
+
   // ─── 数据解析方法 ──────────────────────────────────────
 
   /** 解析符文构建 */
@@ -245,17 +371,39 @@ export class OPGGScraper implements IChampionDataScraper {
 
     const runePages = (data as any)?.rune_pages ?? [];
     for (const page of runePages) {
-      runeBuilds.push({
-        name: page.name ?? `符文配置 ${runeBuilds.length + 1}`,
-        winRate: page.win_rate ?? 0,
-        pickRate: page.pick_rate ?? 0,
-        sampleSize: page.play_count ?? page.sample_count ?? 0,
-        primaryTree: page.primary_page_id ?? 0,
-        primaryPerks: page.primary_rune_ids ?? [],
-        secondaryTree: page.secondary_page_id ?? 0,
-        secondaryPerks: page.secondary_rune_ids ?? [],
-        statShards: page.stat_mod_ids ?? [],
-      });
+      // OPGG API: rune_pages[].builds[] 包含具体的符文配置变种
+      const builds = page.builds ?? [];
+      if (builds.length > 0) {
+        // 取使用率最高的变种作为该符文页的推荐
+        for (const build of builds) {
+          runeBuilds.push({
+            name: `符文配置 ${runeBuilds.length + 1}`,
+            winRate: build.play > 0 ? (build.win / build.play) : 0,
+            pickRate: build.pick_rate ?? page.pick_rate ?? 0,
+            sampleSize: build.play ?? 0,
+            primaryTree: build.primary_page_id ?? page.primary_page_id ?? 0,
+            primaryPerks: build.primary_rune_ids ?? [],
+            secondaryTree: build.secondary_page_id ?? page.secondary_page_id ?? 0,
+            secondaryPerks: build.secondary_rune_ids ?? [],
+            statShards: build.stat_mod_ids ?? [],
+          });
+          // 每个 rune_page 只取第一个（最热门的）build 变种
+          break;
+        }
+      } else {
+        // 兼容旧格式（rune_pages 直接有具体符文信息）
+        runeBuilds.push({
+          name: page.name ?? `符文配置 ${runeBuilds.length + 1}`,
+          winRate: page.play > 0 ? (page.win / page.play) : (page.win_rate ?? 0),
+          pickRate: page.pick_rate ?? 0,
+          sampleSize: page.play ?? page.play_count ?? page.sample_count ?? 0,
+          primaryTree: page.primary_page_id ?? 0,
+          primaryPerks: page.primary_rune_ids ?? [],
+          secondaryTree: page.secondary_page_id ?? 0,
+          secondaryPerks: page.secondary_rune_ids ?? [],
+          statShards: page.stat_mod_ids ?? [],
+        });
+      }
     }
 
     return runeBuilds;
@@ -271,14 +419,16 @@ export class OPGGScraper implements IChampionDataScraper {
     const boots = d?.boots ?? [];
 
     for (const build of coreItems) {
+      const play = build.play ?? build.play_count ?? build.sample_count ?? 0;
+      const win = build.win ?? 0;
       itemBuilds.push({
-        name: build.name ?? `出装方案 ${itemBuilds.length + 1}`,
-        winRate: build.win_rate ?? 0,
+        name: `出装方案 ${itemBuilds.length + 1}`,
+        winRate: play > 0 ? (win / play) : (build.win_rate ?? 0),
         pickRate: build.pick_rate ?? 0,
-        sampleSize: build.play_count ?? build.sample_count ?? 0,
+        sampleSize: play,
         items: (build.ids ?? []).map(Number),
         startingItems: (starterItems[0]?.ids ?? []).map(Number),
-        boots: boots[0]?.ids?.[0] ?? 0,
+        boots: boots[0]?.ids?.[0] ? Number(boots[0].ids[0]) : 0,
       });
     }
 
@@ -289,10 +439,31 @@ export class OPGGScraper implements IChampionDataScraper {
   private parseSkillOrder(data: Record<string, unknown>): string[] {
     const d = data as any;
 
-    // 优先使用 skill_masteries，然后 skills
+    // OPGG API 结构：
+    // skill_masteries[].ids 是优先级（如 ["Q", "E", "W"]，仅 3 个）
+    // skill_masteries[].builds[].order 是完整加点顺序（如 ["Q","E","W","Q","Q","R",...]）
+    // 注意：order 通常只有 15 个条目（缺少 16-18 级），需要自动补齐
     const skillMasteries = d?.skill_masteries ?? [];
-    if (skillMasteries.length > 0 && skillMasteries[0]?.ids) {
-      return skillMasteries[0].ids.map(String);
+    if (skillMasteries.length > 0) {
+      const mastery = skillMasteries[0];
+
+      // 优先使用 builds[0].order —— 完整的加点顺序
+      const builds = mastery?.builds ?? [];
+      if (builds.length > 0 && Array.isArray(builds[0]?.order) && builds[0].order.length > 0) {
+        const order: string[] = builds[0].order.map(String);
+
+        // 如果不足 18 级，自动补齐剩余技能点
+        if (order.length < 18) {
+          this.completeSkillOrder(order);
+        }
+
+        return order.slice(0, 18);
+      }
+
+      // 降级：仅有优先级顺序（3 个技能，无完整加点）
+      if (mastery?.ids?.length > 0) {
+        return mastery.ids.map(String);
+      }
     }
 
     const skills = d?.skills;
@@ -300,6 +471,61 @@ export class OPGGScraper implements IChampionDataScraper {
       return skills.order.map(String);
     }
 
+    return [];
+  }
+
+  /** 自动补齐技能加点到 18 级 */
+  private completeSkillOrder(order: string[]): void {
+    // 统计每个技能当前的等级
+    const counts: Record<string, number> = { Q: 0, W: 0, E: 0, R: 0 };
+    for (const skill of order) {
+      const key = skill.toUpperCase();
+      if (key in counts) counts[key]++;
+    }
+
+    // 最大等级限制
+    const maxLevel: Record<string, number> = { Q: 5, W: 5, E: 5, R: 3 };
+
+    while (order.length < 18) {
+      const level = order.length + 1; // 下一个要分配的等级
+
+      // R 技能在 6/11/16 级，如果还没满 3 级且到了 R 级别
+      if (counts.R < maxLevel.R && (level === 6 || level === 11 || level === 16)) {
+        order.push('R');
+        counts.R++;
+        continue;
+      }
+
+      // 按剩余空间分配普通技能（Q > E > W 或根据已有模式）
+      let allocated = false;
+      for (const skill of ['Q', 'E', 'W']) {
+        if (counts[skill] < maxLevel[skill]) {
+          order.push(skill);
+          counts[skill]++;
+          allocated = true;
+          break;
+        }
+      }
+
+      // 如果普通技能都满了，尝试 R
+      if (!allocated) {
+        if (counts.R < maxLevel.R) {
+          order.push('R');
+          counts.R++;
+        } else {
+          break; // 所有技能都已满级，退出
+        }
+      }
+    }
+  }
+
+  /** 解析技能优先级（仅 3 个主/副/三，如 ["Q","E","W"]） */
+  private parseSkillPriority(data: Record<string, unknown>): string[] {
+    const d = data as any;
+    const skillMasteries = d?.skill_masteries ?? [];
+    if (skillMasteries.length > 0 && skillMasteries[0]?.ids?.length > 0) {
+      return skillMasteries[0].ids.map(String);
+    }
     return [];
   }
 
@@ -316,10 +542,15 @@ export class OPGGScraper implements IChampionDataScraper {
     const countersData = d?.counters ?? [];
 
     for (const counter of countersData) {
+      const play = counter.play ?? counter.play_count ?? 0;
+      const win = counter.win ?? 0;
+      // 计算胜率百分比（OPGG 返回的是绝对数值）
+      const winRate = play > 0 ? (win / play) * 100 : (counter.win_rate ?? 0);
+
       const info: CounterInfo = {
         championId: counter.champion_id ?? counter.id,
-        winRate: counter.win ?? counter.win_rate ?? 0,
-        sampleSize: counter.play ?? counter.play_count ?? 0,
+        winRate,
+        sampleSize: play,
       };
 
       // 对手胜率 > 50% 说明我方劣势（对方克制我）
@@ -343,6 +574,48 @@ export class OPGGScraper implements IChampionDataScraper {
   }
 
   // ─── 工具方法 ──────────────────────────────────────────
+
+  /**
+   * 检测英雄的最佳位置（最高出场率）
+   * 通过查询 Tier 列表 API 获取英雄在各个位置的数据
+   */
+  private async detectBestPosition(championId: number, signal?: AbortSignal): Promise<PositionType> {
+    try {
+      const response = await this.http.get(`/api/${this.region}/champions/ranked`, {
+        params: { tier: this.tier },
+        signal,
+      });
+
+      const rawData = response.data;
+      const champions = rawData?.data ?? rawData ?? [];
+
+      // 找到目标英雄
+      const champ = champions.find((c: any) => c.id === championId);
+      if (!champ) return 'mid';
+
+      const positions = champ.positions ?? [];
+      if (positions.length === 0) return 'mid';
+
+      // 找到 role_rate 最高的位置
+      let bestPosition: PositionType = 'mid';
+      let maxRoleRate = -1;
+
+      for (const pos of positions) {
+        const roleRate = pos?.stats?.role_rate ?? 0;
+        if (roleRate > maxRoleRate) {
+          maxRoleRate = roleRate;
+          const name = (pos.name ?? '').toString().toLowerCase();
+          bestPosition = this.normalizePosition(name);
+        }
+      }
+
+      logger.info(`英雄 ${championId} 最佳位置检测: ${bestPosition} (role_rate=${(maxRoleRate * 100).toFixed(1)}%)`);
+      return bestPosition;
+    } catch (err) {
+      logger.warn(`检测英雄 ${championId} 最佳位置失败，降级使用 mid:`, err);
+      return 'mid';
+    }
+  }
 
   /** 标准化位置参数 */
   private normalizePosition(role?: string): PositionType {

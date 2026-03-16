@@ -84,14 +84,13 @@ const props = defineProps<{
   recommendations: CounterRecommendation[];
   weaknesses: { championId: number; championName: string; easyMatchups: CounterInfo[] }[];
   fetching: boolean;
-  dataSource: 'opgg' | 'lolalytics' | 'local' | null;
+  dataSource: 'opgg' | 'local' | null;
   dataVersion: string | null;
 }>();
 
 const sourceLabel = computed(() => {
   switch (props.dataSource) {
     case 'opgg': return 'OP.GG';
-    case 'lolalytics': return 'Lolalytics';
     case 'local': return '本地数据';
     default: return '';
   }
@@ -162,11 +161,6 @@ function wrClass(rate: number): string {
 .source-badge.opgg {
   background: rgba(0, 113, 227, 0.08);
   color: var(--color-accent);
-}
-
-.source-badge.lolalytics {
-  background: rgba(48, 209, 88, 0.08);
-  color: var(--color-success);
 }
 
 .source-badge.local {

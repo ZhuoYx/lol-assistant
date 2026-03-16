@@ -5,13 +5,14 @@
  * 1. 通过 /lol-gameflow/v1/session 获取当前对局 session
  * 2. 并发请求每位玩家数据（Promise.allSettled 容错，p-limit 控制并发 ≤5）
  * 3. 聚合数据为 LiveGameAnalysis 结构返回
+ * 4. 通过战绩交叉对比检测预组队（双排/多排）
  */
 import { ipcMain } from 'electron';
 import pLimit from 'p-limit';
 import { lcuAPI } from '../lcu/api';
 import { logger } from '../utils/logger';
 import { ErrorCode, createAppError } from '@lol-assistant/shared';
-import type { LiveGameAnalysis, LiveGameTeam, LiveGamePlayer } from '@lol-assistant/shared';
+import type { LiveGameAnalysis, LiveGameTeam, LiveGamePlayer, RecentMatchSummary } from '@lol-assistant/shared';
 
 /** 并发数限制 */
 const limit = pLimit(5);
@@ -38,6 +39,9 @@ interface GameflowSession {
   };
   phase: string;
 }
+
+/** 预组队检测阈值：同队中有 N 场以上相同对局认为是预组队 */
+const PREMADE_THRESHOLD = 2;
 
 export function registerLiveGameIpcHandlers(): void {
   ipcMain.handle('live-game:analyze', async () => {
@@ -66,6 +70,10 @@ export function registerLiveGameIpcHandlers(): void {
         fetchTeamData(teamOnePlayers, 100, queueId),
         fetchTeamData(teamTwoPlayers, 200, queueId),
       ]);
+
+      // 4. 检测预组队
+      team1.premadeGroups = detectPremadeGroups(team1.players);
+      team2.premadeGroups = detectPremadeGroups(team2.players);
 
       const analysis: LiveGameAnalysis = {
         gameId,
@@ -144,6 +152,72 @@ async function fetchTeamData(
 }
 
 /**
+ * 检测预组队分组
+ * 算法：比较每两个玩家的近期战绩，如果有 >= PREMADE_THRESHOLD 场相同 gameId，
+ * 则认为他们是预组队。使用并查集合并重叠的组。
+ */
+function detectPremadeGroups(players: LiveGamePlayer[]): string[][] {
+  const loadedPlayers = players.filter(p => p.dataStatus === 'loaded' && p.recentMatches && p.recentMatches.length > 0);
+  if (loadedPlayers.length < 2) return [];
+
+  // 构建每个玩家的 gameId 集合
+  const playerGameIds = new Map<string, Set<number>>();
+  for (const p of loadedPlayers) {
+    const gameIds = new Set((p.recentMatches ?? []).map(m => m.gameId));
+    playerGameIds.set(p.puuid, gameIds);
+  }
+
+  // 并查集
+  const parent = new Map<string, string>();
+  for (const p of loadedPlayers) {
+    parent.set(p.puuid, p.puuid);
+  }
+
+  function find(x: string): string {
+    if (parent.get(x) !== x) {
+      parent.set(x, find(parent.get(x)!));
+    }
+    return parent.get(x)!;
+  }
+
+  function union(x: string, y: string): void {
+    const rx = find(x);
+    const ry = find(y);
+    if (rx !== ry) parent.set(rx, ry);
+  }
+
+  // 两两比较玩家的 gameId 交集
+  for (let i = 0; i < loadedPlayers.length; i++) {
+    for (let j = i + 1; j < loadedPlayers.length; j++) {
+      const p1 = loadedPlayers[i];
+      const p2 = loadedPlayers[j];
+      const ids1 = playerGameIds.get(p1.puuid)!;
+      const ids2 = playerGameIds.get(p2.puuid)!;
+
+      let commonCount = 0;
+      for (const gid of ids1) {
+        if (ids2.has(gid)) commonCount++;
+      }
+
+      if (commonCount >= PREMADE_THRESHOLD) {
+        union(p1.puuid, p2.puuid);
+      }
+    }
+  }
+
+  // 收集分组
+  const groups = new Map<string, string[]>();
+  for (const p of loadedPlayers) {
+    const root = find(p.puuid);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root)!.push(p.puuid);
+  }
+
+  // 只返回 >= 2 人的组（单人不算预组队）
+  return Array.from(groups.values()).filter(g => g.length >= 2);
+}
+
+/**
  * 获取单个玩家的详细数据
  */
 async function fetchPlayerData(player: GameflowPlayer, queueId: number = 0): Promise<LiveGamePlayer> {
@@ -197,6 +271,8 @@ async function fetchPlayerData(player: GameflowPlayer, queueId: number = 0): Pro
   let recentWinRate = 0;
   let recentKDA = 0;
   let championWinRate = 0;
+  const recentMatches: RecentMatchSummary[] = [];
+
   if (recentResult.status === 'fulfilled') {
     const matchList = recentResult.value as Record<string, unknown>;
     // LCU 原始格式: { games: { games: [...], gameCount } } 或标准格式 { matches: [...] }
@@ -228,15 +304,31 @@ async function fetchPlayerData(player: GameflowPlayer, queueId: number = 0): Pro
 
         const isWin = Boolean(pStats.win ?? stats.win ?? match.win);
         if (isWin) wins++;
-        totalKills += (pStats.kills ?? stats.kills ?? 0) as number;
-        totalDeaths += (pStats.deaths ?? stats.deaths ?? 0) as number;
-        totalAssists += (pStats.assists ?? stats.assists ?? 0) as number;
+        const kills = (pStats.kills ?? stats.kills ?? 0) as number;
+        const deaths = (pStats.deaths ?? stats.deaths ?? 0) as number;
+        const assists = (pStats.assists ?? stats.assists ?? 0) as number;
+        totalKills += kills;
+        totalDeaths += deaths;
+        totalAssists += assists;
 
         const matchChampId = (participant?.championId ?? match.championId ?? 0) as number;
         if (matchChampId === championId) {
           champGames++;
           if (isWin) champWins++;
         }
+
+        // 构建近期战绩摘要
+        recentMatches.push({
+          gameId: (match.gameId ?? 0) as number,
+          championId: matchChampId,
+          win: isWin,
+          kills,
+          deaths,
+          assists,
+          queueId: (match.queueId ?? 0) as number,
+          gameDuration: (match.gameDuration ?? 0) as number,
+          gameCreation: (match.gameCreation ?? 0) as number,
+        });
       }
 
       recentWinRate = matches.length > 0 ? wins / matches.length : 0;
@@ -262,6 +354,7 @@ async function fetchPlayerData(player: GameflowPlayer, queueId: number = 0): Pro
     championMasteryLevel,
     recentWinRate,
     recentKDA,
+    recentMatches,
     position: player.selectedPosition ?? '',
     spell1Id: player.spell1Id ?? 0,
     spell2Id: player.spell2Id ?? 0,
@@ -286,6 +379,7 @@ function createFailedPlayer(player: GameflowPlayer): LiveGamePlayer {
     championMasteryLevel: 0,
     recentWinRate: 0,
     recentKDA: 0,
+    recentMatches: [],
     position: player.selectedPosition ?? '',
     spell1Id: player.spell1Id ?? 0,
     spell2Id: player.spell2Id ?? 0,

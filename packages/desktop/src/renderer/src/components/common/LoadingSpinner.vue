@@ -49,9 +49,9 @@ defineProps<{
 }
 
 .lg .spinner {
-  width: 36px;
-  height: 36px;
-  border-width: 3px;
+  width: 48px;
+  height: 48px;
+  border-width: 3.5px;
 }
 
 .spinner-text {

@@ -38,6 +38,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '符文出装', icon: 'rune' },
   },
   {
+    path: '/champion-ranking',
+    name: 'ChampionRanking',
+    component: () => import('@/views/ChampionRanking.vue'),
+    meta: { title: '英雄排名', icon: 'ranking' },
+  },
+  {
     path: '/settings',
     name: 'Settings',
     component: () => import('@/views/Settings.vue'),

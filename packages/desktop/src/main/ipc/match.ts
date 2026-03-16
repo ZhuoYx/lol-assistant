@@ -9,6 +9,91 @@ import type { MatchListParams, MatchList, MatchSummary, MatchDetail, Participant
 import { getChampionDisplayName, calculateKDA } from '@lol-assistant/shared';
 
 /**
+ * 从 LCU 原始数据中推断玩家的位置（lane）
+ * 优先级：individualPosition > teamPosition > lane + role 组合推断
+ *
+ * 核心问题：Riot API 有多个字段表达"位置"：
+ * - individualPosition / teamPosition：新版 API 直接给出 TOP/JUNGLE/MIDDLE/BOTTOM/UTILITY
+ * - timeline.lane + timeline.role：老版 API 的组合表示
+ *   - lane=BOTTOM + role=DUO_CARRY → ADC (BOTTOM)
+ *   - lane=BOTTOM + role=DUO_SUPPORT → 辅助 (UTILITY)
+ * - stats.lane / stats.role：兜底字段
+ *
+ * 本函数统一处理所有情况，返回 TOP/JUNGLE/MIDDLE/BOTTOM/UTILITY 中的一个
+ */
+function inferLane(fields: {
+  individualPosition?: string;
+  teamPosition?: string;
+  timelineLane?: string;
+  timelineRole?: string;
+  rawLane?: string;
+  rawRole?: string;
+}): string {
+  const {
+    individualPosition = '',
+    teamPosition = '',
+    timelineLane = '',
+    timelineRole = '',
+    rawLane = '',
+    rawRole = '',
+  } = fields;
+
+  // 合并所有 role 信息，用于辅助/ADC 的强制修正
+  const effectiveRole = timelineRole || rawRole;
+
+  // ★ 最高优先级：role 字段明确为 DUO_SUPPORT / DUO_CARRY 时，直接确定位置
+  // Riot 的 individualPosition / teamPosition 是算法推测，可能完全错误
+  //（如辅助英雄游走时间长被判为中路），但 role 是基于选位/行为的明确标记
+  if (effectiveRole === 'DUO_SUPPORT' || effectiveRole === 'SUPPORT') {
+    return 'UTILITY';
+  }
+  if (effectiveRole === 'DUO_CARRY') {
+    return 'BOTTOM';
+  }
+
+  // 1. individualPosition（排除 BOTTOM，因为无法区分 ADC/辅助，上面已处理有 role 的情况）
+  if (individualPosition && individualPosition !== 'NONE' && individualPosition !== 'Invalid') {
+    return individualPosition;
+  }
+
+  // 2. teamPosition 次之
+  if (teamPosition && teamPosition !== 'NONE' && teamPosition !== 'Invalid') {
+    return teamPosition;
+  }
+
+  // 3. 通过 lane 兜底
+  const baseLane = (timelineLane && timelineLane !== 'NONE') ? timelineLane : rawLane;
+
+  if (baseLane && baseLane !== 'NONE') {
+    return baseLane;
+  }
+
+  return '';
+}
+
+/**
+ * 对已有 lane 字段进行纠正（用于"已是标准格式"的数据）
+ * LCU 数据中 lane 可能完全错误（如辅助被标为 MIDDLE），需要结合 role 字段修正
+ *
+ * role 字段优先级高于 lane：
+ * - role=DUO_SUPPORT/SUPPORT → 一定是辅助 → UTILITY
+ * - role=DUO_CARRY → 一定是 ADC → BOTTOM
+ */
+function correctLane(lane: string, role: string): string {
+  // role 明确为辅助时，无论 lane 是什么值，都修正为 UTILITY
+  if (role === 'DUO_SUPPORT' || role === 'SUPPORT') {
+    return 'UTILITY';
+  }
+
+  // role 明确为 ADC 时，修正为 BOTTOM
+  if (role === 'DUO_CARRY') {
+    return 'BOTTOM';
+  }
+
+  return lane || '';
+}
+
+/**
  * 将 LCU 原始战绩数据转换为标准 MatchList 格式
  * LCU 返回: { games: { games: [...], gameCount } }
  * 每个 game: { gameId, gameCreation, gameDuration, gameMode, gameType, participants: [{ stats, championId, ... }] }
@@ -18,9 +103,15 @@ export function transformMatchList(raw: unknown): MatchList {
 
   // 兼容两种格式：直接 { matches, totalGames } 或 LCU 原始 { games: { games, gameCount } }
   if (data.matches && Array.isArray(data.matches)) {
-    // 已是标准格式，但仍需补充 MVP/SVP 计算
+    // 已是标准格式，但仍需补充 MVP/SVP 计算 + 位置纠正
     const result = data as unknown as MatchList;
     for (const match of result.matches) {
+      // 修正位置：标准格式中 lane 可能不准确，需要结合 role 修正
+      const oldLane = match.lane;
+      match.lane = correctLane(match.lane, match.role);
+      if (oldLane !== match.lane) {
+        logger.debug(`[matchList-std] gameId=${match.gameId}, lane corrected: ${oldLane} → ${match.lane} (role=${match.role})`);
+      }
       // 如果已经有 MVP/SVP 标记则跳过
       if (match.isMVP || match.isSVP) continue;
       // 列表数据无法获得同队其他玩家 KDA，保持原值
@@ -75,6 +166,23 @@ export function transformMatchList(raw: unknown): MatchList {
     }
     // participants.length <= 1: 无法比较，不标记 MVP/SVP
 
+    // lane/position 信息：使用统一的位置推断函数
+    const timeline = (player.timeline ?? {}) as Record<string, unknown>;
+    const rawRole = (playerStats.role ?? player.role ?? timeline.role ?? '') as string;
+
+    const inferFields = {
+      individualPosition: (playerStats.individualPosition ?? player.individualPosition ?? '') as string,
+      teamPosition: (playerStats.teamPosition ?? player.teamPosition ?? '') as string,
+      timelineLane: (timeline.lane ?? '') as string,
+      timelineRole: (timeline.role ?? playerStats.role ?? '') as string,
+      rawLane: (playerStats.lane ?? player.lane ?? '') as string,
+      rawRole,
+    };
+    const effectiveLane = inferLane(inferFields);
+
+    logger.debug(`[matchList] gameId=${(game.gameId ?? 0)}, champion=${championId}, ` +
+      `inferFields=${JSON.stringify(inferFields)}, result=${effectiveLane}`);
+
     return {
       gameId: (game.gameId ?? 0) as number,
       gameMode: (game.gameMode ?? '') as string,
@@ -88,8 +196,8 @@ export function transformMatchList(raw: unknown): MatchList {
       kills: playerKills,
       deaths: playerDeaths,
       assists: playerAssists,
-      lane: ((player.timeline as Record<string, unknown>)?.lane ?? playerStats.lane ?? '') as string,
-      role: ((player.timeline as Record<string, unknown>)?.role ?? playerStats.role ?? '') as string,
+      lane: effectiveLane,
+      role: rawRole as string,
       isMVP,
       isSVP,
     };
@@ -131,6 +239,15 @@ function transformMatchDetail(raw: unknown): MatchDetail {
         if (!p.tagLine && rawP?.tagLine) {
           p.tagLine = rawP.tagLine as string;
         }
+      }
+      // 修正位置：标准格式数据中 lane 可能不准确
+      // 如辅助被算法标为 MIDDLE/BOTTOM，需结合 role 修正
+      const rawP = (data.participants as Record<string, unknown>[])[idx];
+      const rawRole = (rawP?.role ?? '') as string;
+      const oldLane = p.lane;
+      p.lane = correctLane(p.lane, p.role || rawRole);
+      if (oldLane !== p.lane) {
+        logger.debug(`[matchDetail-std] participant=${p.participantId}, lane corrected: ${oldLane} → ${p.lane} (role=${p.role || rawRole})`);
       }
     });
     // 计算 MVP/SVP
@@ -223,33 +340,22 @@ function transformMatchDetail(raw: unknown): MatchDetail {
     const teamData = teams.find((t) => t.teamId === teamId);
     const win = stats.win !== undefined ? Boolean(stats.win) : (teamData?.win ?? false);
 
-    // lane/position 信息：优先 individualPosition > teamPosition > timeline.lane+role 组合
+    // lane/position 信息：使用统一的位置推断函数
     const timeline = (p.timeline ?? {}) as Record<string, unknown>;
-    const individualPosition = (p.individualPosition ?? stats.individualPosition ?? '') as string;
-    const teamPosition = (p.teamPosition ?? stats.teamPosition ?? '') as string;
-    const timelineLane = (timeline.lane ?? '') as string;
-    const timelineRole = (timeline.role ?? '') as string;
-    const rawLane = (stats.lane ?? p.lane ?? '') as string;
     const rawRole = (stats.role ?? p.role ?? timeline.role ?? '') as string;
 
-    // 选择最有效的分路值（排除 NONE 和空值）
-    let lane = '';
-    if (individualPosition && individualPosition !== 'NONE' && individualPosition !== 'Invalid') {
-      lane = individualPosition;
-    } else if (teamPosition && teamPosition !== 'NONE' && teamPosition !== 'Invalid') {
-      lane = teamPosition;
-    } else {
-      // 通过 lane + role 组合推断
-      const effectiveLane = (timelineLane && timelineLane !== 'NONE') ? timelineLane : rawLane;
-      const effectiveRole = timelineRole || rawRole;
-      if (effectiveLane === 'BOTTOM' && effectiveRole === 'DUO_CARRY') {
-        lane = 'BOTTOM';
-      } else if (effectiveLane === 'BOTTOM' && effectiveRole === 'DUO_SUPPORT') {
-        lane = 'UTILITY';
-      } else if (effectiveLane && effectiveLane !== 'NONE') {
-        lane = effectiveLane;
-      }
-    }
+    const inferFields = {
+      individualPosition: (p.individualPosition ?? stats.individualPosition ?? '') as string,
+      teamPosition: (p.teamPosition ?? stats.teamPosition ?? '') as string,
+      timelineLane: (timeline.lane ?? '') as string,
+      timelineRole: (timeline.role ?? '') as string,
+      rawLane: (stats.lane ?? p.lane ?? '') as string,
+      rawRole,
+    };
+    const lane = inferLane(inferFields);
+
+    logger.debug(`[matchDetail] participant=${participantId}, champion=${championId}, ` +
+      `inferFields=${JSON.stringify(inferFields)}, result=${lane}`);
 
     return {
       participantId,
@@ -326,6 +432,12 @@ async function enrichMatchListMvp(matches: MatchSummary[]): Promise<void> {
       batch.map(async (match) => {
         const cacheKey = String(match.gameId);
         let detail = cacheStore.get('matchDetail', cacheKey) as MatchDetail | null;
+        if (detail) {
+          // 对缓存数据做位置修正
+          for (const p of detail.participants) {
+            p.lane = correctLane(p.lane, p.role);
+          }
+        }
         if (!detail) {
           try {
             const raw = await lcuAPI.getMatchDetail(match.gameId);
@@ -336,11 +448,17 @@ async function enrichMatchListMvp(matches: MatchSummary[]): Promise<void> {
             return;
           }
         }
-        // 通过 championId 找到当前玩家
-        const player = detail.participants.find(p => p.championId === match.championId);
+        // 通过 championId + 胜负匹配当前玩家（避免镜像对局匹配到对手）
+        const player = detail.participants.find(
+          p => p.championId === match.championId && p.win === match.win,
+        ) ?? detail.participants.find(p => p.championId === match.championId);
         if (player) {
           match.isMVP = player.isMVP ?? false;
           match.isSVP = player.isSVP ?? false;
+          // 从详情数据回填位置信息（详情的位置判断更准确）
+          if (player.lane && player.lane !== 'NONE') {
+            match.lane = player.lane;
+          }
         }
       }),
     );
@@ -355,7 +473,13 @@ export async function fetchMatchList(params: MatchListParams): Promise<MatchList
   const puuid = params.puuid;
   const cacheKey = `list_${puuid ?? 'me'}_${params.begIndex ?? 0}_${params.endIndex ?? 20}_q${params.queue ?? 'all'}_c${params.championId ?? 'all'}`;
   const cached = cacheStore.get<MatchList>('matchList', cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    // 对缓存数据做位置修正（旧缓存中 lane 可能是错误值）
+    for (const match of cached.matches) {
+      match.lane = correctLane(match.lane, match.role);
+    }
+    return cached;
+  }
 
   // LCU API 不支持 queue 参数，先拿全部数据再前端过滤
   const apiParams: MatchListParams = {
@@ -399,9 +523,13 @@ export function registerMatchIpcHandlers(): void {
   ipcMain.handle('match:getDetail', async (_event, gameId: number) => {
     try {
       const cacheKey = String(gameId);
-      const cached = cacheStore.get('matchDetail', cacheKey);
+      const cached = cacheStore.get<MatchDetail>('matchDetail', cacheKey);
       if (cached) {
         logger.debug(`match:getDetail 缓存命中: gameId=${gameId}`);
+        // 对缓存数据做位置修正（旧缓存中 lane 可能是错误值）
+        for (const p of cached.participants) {
+          p.lane = correctLane(p.lane, p.role);
+        }
         return cached;
       }
 

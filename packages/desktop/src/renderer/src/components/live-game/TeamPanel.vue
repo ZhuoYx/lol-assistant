@@ -24,6 +24,22 @@
           <span class="ts-value" :class="kdaClass(teamStats.avgKDA)">{{ teamStats.avgKDA.toFixed(2) }}</span>
         </span>
       </div>
+      <!-- Premade groups summary -->
+      <div v-if="premadeGroupsSummary.length > 0" class="premade-summary">
+        <svg class="premade-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+        <span
+          v-for="(group, idx) in premadeGroupsSummary"
+          :key="idx"
+          class="premade-group-tag"
+        >
+          {{ group }}
+        </span>
+      </div>
     </div>
 
     <div class="player-list">
@@ -34,6 +50,7 @@
         :my-tier="myTier"
         :is-me="player.puuid === myPuuid"
         :clickable="true"
+        :premade-groups="team.premadeGroups"
         @click="$emit('player-click', $event)"
       />
     </div>
@@ -108,6 +125,21 @@ function kdaClass(kda: number): string {
   if (kda >= 2) return '';
   return 'low';
 }
+
+/** 预组队摘要文本 */
+const premadeGroupsSummary = computed(() => {
+  const groups = props.team.premadeGroups;
+  if (!groups || groups.length === 0) return [];
+  return groups.map((group) => {
+    const names = group
+      .map((puuid) => {
+        const player = props.team.players.find((p) => p.puuid === puuid);
+        return player?.summonerName ?? '???';
+      })
+      .join(' + ');
+    return `${group.length}人组队: ${names}`;
+  });
+});
 </script>
 
 <style scoped>
@@ -191,5 +223,28 @@ function kdaClass(kda: number): string {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+/* Premade groups summary */
+.premade-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: rgba(230, 126, 34, 0.06);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(230, 126, 34, 0.12);
+  flex-wrap: wrap;
+}
+
+.premade-icon {
+  color: #e67e22;
+  flex-shrink: 0;
+}
+
+.premade-group-tag {
+  font-size: 10px;
+  color: #e67e22;
+  font-weight: var(--font-semibold);
 }
 </style>

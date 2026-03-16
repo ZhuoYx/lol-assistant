@@ -119,7 +119,7 @@
             <span>{{ aramModeName }}小贴士</span>
           </div>
           <p class="tips-text">
-            点击板凳上的英雄可直接交换。Tier 和胜率数据来自 Lolalytics ARAM 统计。
+            点击板凳上的英雄可直接交换。Tier 和胜率数据来自 OP.GG ARAM 统计。
           </p>
         </div>
       </div>
@@ -159,7 +159,6 @@
           <span class="footer-note">
             推荐基于
             <template v-if="dataSource === 'opgg'">OP.GG</template>
-            <template v-else-if="dataSource === 'lolalytics'">Lolalytics</template>
             <template v-else>本地静态</template>
             数据
             <template v-if="dataVersion"> · 版本 {{ dataVersion }}</template>

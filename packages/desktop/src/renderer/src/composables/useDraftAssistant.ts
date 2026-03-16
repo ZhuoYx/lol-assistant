@@ -55,7 +55,7 @@ export function useDraftAssistant() {
   const session = ref<ChampSelectSession | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
-  const dataSource = ref<'opgg' | 'lolalytics' | 'local' | null>(null);
+  const dataSource = ref<'opgg' | 'local' | null>(null);
   const dataVersion = ref<string | null>(null);
 
   // ARAM tier 数据
@@ -145,7 +145,7 @@ export function useDraftAssistant() {
           const alreadyBanned = bannedChampionIds.value.includes(counter.championId);
           const alreadyInRecs = recs.some((r) => r.championId === counter.championId);
           if (!alreadyPicked && !alreadyBanned && !alreadyInRecs) {
-            // 统一 winRate 格式：确保是百分比值（OPGG 返回百分比，Lolalytics 可能返回小数）
+            // 统一 winRate 格式：确保是百分比值（OPGG 返回百分比，其他源可能返回小数）
             const wr = counter.winRate > 1 ? counter.winRate : counter.winRate * 100;
             recs.push({
               championId: counter.championId,
@@ -265,7 +265,7 @@ export function useDraftAssistant() {
       if (counters) {
         counterCache.value.set(championId, counters);
         // Track data source
-        dataSource.value = (counters as ChampionCounters & { dataSource?: string }).dataSource as 'opgg' | 'lolalytics' | 'local' ?? 'local';
+        dataSource.value = (counters as ChampionCounters & { dataSource?: string }).dataSource as 'opgg' | 'local' ?? 'local';
       }
     } catch {
       // Use static fallback data - still add to cache to prevent re-fetching

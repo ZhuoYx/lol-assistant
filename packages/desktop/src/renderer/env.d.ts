@@ -47,12 +47,13 @@ interface ElectronAPI {
   analyzeLiveGame: () => Promise<import('@lol-assistant/shared').LiveGameAnalysis>;
 
   // 第三方数据
-  getChampionBuilds: (championId: number) => Promise<import('@lol-assistant/shared').ChampionBuilds>;
+  getChampionBuilds: (championId: number, role?: string) => Promise<import('@lol-assistant/shared').ChampionBuilds>;
   refreshChampionBuilds: (championId: number) => Promise<void>;
   getChampionCounters: (championId: number) => Promise<import('@lol-assistant/shared').ChampionCounters>;
   updateScraperData: () => Promise<void>;
   getScraperDataVersion: () => Promise<import('@lol-assistant/shared').ScraperDataVersion | null>;
   getAramTierList: () => Promise<import('@lol-assistant/shared').AramChampionTier[]>;
+  getChampionRankings: (position?: string, tier?: string) => Promise<import('@lol-assistant/shared').ChampionRankingList>;
 
   // 符文页管理
   getPerksPages: () => Promise<unknown[]>;

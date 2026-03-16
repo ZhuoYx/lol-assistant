@@ -4,38 +4,34 @@
  * 降级流程：
  * 1. 查询本地缓存 -> 命中且未过期 -> 返回缓存数据
  * 2. 缓存未命中/已过期 -> 请求 OP.GG
- * 3. OP.GG 失败 -> 请求 Lolalytics（备选）
- * 4. Lolalytics 也失败 -> 使用本地内置静态数据（兜底）
- * 5. 更新本地缓存
+ * 3. OP.GG 失败 -> 使用本地内置静态数据（兜底）
+ * 4. 更新本地缓存
  */
 import type {
   IChampionDataScraper,
   ChampionTier,
   ChampionBuilds,
   ChampionCounters,
+  ChampionRankingList,
   ScraperDataVersion,
   AramChampionTier,
 } from '@lol-assistant/shared';
 import { CHAMPION_COUNTERS } from '@lol-assistant/shared';
 import { OPGGScraper } from './opgg';
-import { LolalyticsScraper } from './lolalytics';
 import { ScraperStorage } from './storage';
 import { ScraperScheduler } from './scheduler';
 import { logger } from '../utils/logger';
 
 export class ScraperManager implements IChampionDataScraper {
   private opgg: OPGGScraper;
-  private lolalytics: LolalyticsScraper;
   private storage: ScraperStorage;
   private scheduler: ScraperScheduler;
 
-  /** ARAM Tier 数据内存缓存 (1 小时过期) */
+  /** ARAM Tier 数据内存缓存 */
   private aramTierCache: { data: AramChampionTier[]; expiresAt: number } | null = null;
-  private static ARAM_CACHE_TTL = 60 * 60 * 1000; // 1 小时
 
   constructor() {
     this.opgg = new OPGGScraper();
-    this.lolalytics = new LolalyticsScraper();
     this.storage = new ScraperStorage();
     // 默认使用 OP.GG 作为调度器的主爬取器
     this.scheduler = new ScraperScheduler(this.opgg, this.storage);
@@ -58,8 +54,7 @@ export class ScraperManager implements IChampionDataScraper {
 
   /**
    * 获取 ARAM（大乱斗）英雄 Tier 列表
-   * 数据源：Lolalytics ARAM tier endpoint
-   * 带 1 小时内存缓存
+   * 当前无可用的 ARAM 数据源，返回空列表
    */
   async getAramTierList(): Promise<AramChampionTier[]> {
     // 检查缓存
@@ -68,23 +63,8 @@ export class ScraperManager implements IChampionDataScraper {
       return this.aramTierCache.data;
     }
 
-    try {
-      logger.info('从 Lolalytics 获取 ARAM Tier 列表...');
-      const tierList = await this.lolalytics.getAramTierList();
-      this.aramTierCache = {
-        data: tierList,
-        expiresAt: Date.now() + ScraperManager.ARAM_CACHE_TTL,
-      };
-      return tierList;
-    } catch (err) {
-      logger.warn('获取 ARAM Tier 列表失败:', err);
-      // 返回缓存的过期数据（如果有）
-      if (this.aramTierCache) {
-        logger.info('返回过期的 ARAM Tier 缓存数据');
-        return this.aramTierCache.data;
-      }
-      return [];
-    }
+    logger.info('ARAM Tier 数据暂无可用数据源，返回空列表');
+    return [];
   }
 
   // ─── IChampionDataScraper 实现 ─────────────────────────
@@ -107,32 +87,26 @@ export class ScraperManager implements IChampionDataScraper {
       logger.warn('OP.GG 获取 Tier 列表失败:', err);
     }
 
-    // 3. Lolalytics
-    try {
-      logger.info('从 Lolalytics 获取 Tier 列表...');
-      const tierList = await this.lolalytics.getChampionTierList(queue);
-      await this.storage.saveTierList(queue, tierList);
-      return tierList;
-    } catch (err) {
-      logger.warn('Lolalytics 获取 Tier 列表也失败:', err);
-    }
-
-    // 4. 本地静态数据（从 champion-counters 生成基础 Tier 列表）
-    logger.info('所有在线数据源均失败，使用本地静态数据');
+    // 3. 本地静态数据（从 champion-counters 生成基础 Tier 列表）
+    logger.info('在线数据源获取失败，使用本地静态数据');
     return this.generateLocalTierList();
   }
 
   async getChampionBuilds(championId: number, role?: string): Promise<ChampionBuilds> {
-    const normalizedRole = role ?? 'mid';
-
-    // 1. 查询缓存
-    const cached = await this.storage.getChampionBuilds(championId, normalizedRole);
-    if (cached) {
-      logger.info(`英雄构建缓存命中 (champion=${championId}, role=${normalizedRole})`);
-      return cached;
+    // 如果指定了 role 才查缓存；未指定时由 scraper 自动检测最佳位置
+    if (role) {
+      const cached = await this.storage.getChampionBuilds(championId, role);
+      if (cached) {
+        // 如果缓存数据缺少 availableRoles（旧缓存），视为不完整，需要重新获取
+        if (cached.availableRoles && cached.availableRoles.length > 0) {
+          logger.info(`英雄构建缓存命中 (champion=${championId}, role=${role})`);
+          return cached;
+        }
+        logger.info(`英雄构建缓存数据缺少 availableRoles，重新获取 (champion=${championId})`);
+      }
     }
 
-    // 2. OP.GG
+    // 2. OP.GG（不传 role 时由 scraper 自动检测最佳位置）
     try {
       logger.info(`从 OP.GG 获取英雄 ${championId} 构建...`);
       const builds = await this.opgg.getChampionBuilds(championId, role);
@@ -142,19 +116,9 @@ export class ScraperManager implements IChampionDataScraper {
       logger.warn(`OP.GG 获取英雄 ${championId} 构建失败:`, err);
     }
 
-    // 3. Lolalytics
-    try {
-      logger.info(`从 Lolalytics 获取英雄 ${championId} 构建...`);
-      const builds = await this.lolalytics.getChampionBuilds(championId, role);
-      await this.storage.saveChampionBuilds(builds);
-      return builds;
-    } catch (err) {
-      logger.warn(`Lolalytics 获取英雄 ${championId} 构建也失败:`, err);
-    }
-
-    // 4. 本地空数据兜底
-    logger.info(`所有在线数据源均失败，返回空构建数据 (champion=${championId})`);
-    return this.generateLocalBuilds(championId, normalizedRole);
+    // 3. 本地空数据兜底
+    logger.info(`在线数据源获取失败，返回空构建数据 (champion=${championId})`);
+    return this.generateLocalBuilds(championId, role ?? 'mid');
   }
 
   async getChampionCounters(championId: number, role?: string): Promise<ChampionCounters> {
@@ -177,19 +141,22 @@ export class ScraperManager implements IChampionDataScraper {
       logger.warn(`OP.GG 获取英雄 ${championId} 克制关系失败:`, err);
     }
 
-    // 3. Lolalytics
-    try {
-      logger.info(`从 Lolalytics 获取英雄 ${championId} 克制关系...`);
-      const counters = await this.lolalytics.getChampionCounters(championId, role);
-      await this.storage.saveChampionCounters(counters);
-      return counters;
-    } catch (err) {
-      logger.warn(`Lolalytics 获取英雄 ${championId} 克制关系也失败:`, err);
-    }
-
-    // 4. 本地静态数据
-    logger.info(`所有在线数据源均失败，使用本地静态克制数据 (champion=${championId})`);
+    // 3. 本地静态数据
+    logger.info(`在线数据源获取失败，使用本地静态克制数据 (champion=${championId})`);
     return this.generateLocalCounters(championId, normalizedRole);
+  }
+
+  /**
+   * 获取英雄排名列表（支持段位和分路筛选）
+   * 数据源：仅 OP.GG
+   */
+  async getChampionRankings(position?: string, tier?: string): Promise<ChampionRankingList> {
+    try {
+      return await this.opgg.getChampionRankings(position, tier);
+    } catch (err) {
+      logger.warn('获取英雄排名失败:', err);
+      return { rankings: [], patch: '', tier: tier ?? 'emerald_plus', position: position ?? 'none' };
+    }
   }
 
   // ─── 手动操作 ──────────────────────────────────────────
@@ -283,7 +250,6 @@ export class ScraperManager implements IChampionDataScraper {
 
 // 导出其他模块
 export { OPGGScraper } from './opgg';
-export { LolalyticsScraper } from './lolalytics';
 export { ScraperStorage } from './storage';
 export { ScraperScheduler } from './scheduler';
 export type { SchedulerStatus, UpdateProgress } from './scheduler';

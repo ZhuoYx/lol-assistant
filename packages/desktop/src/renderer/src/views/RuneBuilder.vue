@@ -71,7 +71,7 @@
 
         <!-- Loading -->
         <div v-if="loading" class="loading-section">
-          <LoadingSpinner />
+          <LoadingSpinner size="lg" />
           <span class="loading-text">正在获取 {{ loadingChampName }} 的配置数据...</span>
         </div>
 
@@ -123,68 +123,79 @@
 
         <!-- Build content -->
         <div v-else class="build-layout">
-          <!-- Champion header -->
+          <!-- Champion header with integrated role switcher -->
           <div class="champion-header">
-            <ChampionIcon
-              :champion-id="buildConfig.championId"
-              :name="buildConfig.championName"
-              size="lg"
-            />
-            <div class="champion-info">
-              <h2 class="champion-name">{{ buildConfig.championName }}</h2>
-              <div class="champion-meta">
-                <span v-if="buildConfig.role" class="meta-tag role-tag">{{ roleLabel(buildConfig.role) }}</span>
-                <span class="meta-tag source-tag" :class="buildConfig.dataSource ?? 'local'">{{ sourceLabel }}</span>
+            <div class="header-main">
+              <ChampionIcon
+                :champion-id="buildConfig.championId"
+                :name="buildConfig.championName"
+                size="lg"
+              />
+              <div class="champion-info">
+                <div class="champion-name-row">
+                  <h2 class="champion-name">{{ buildConfig.championName }}</h2>
+                  <div class="champion-badges">
+                    <span class="meta-tag source-tag" :class="buildConfig.dataSource ?? 'local'">{{ sourceLabel }}</span>
+                    <span v-if="buildConfig.patch" class="meta-tag patch-tag">v{{ buildConfig.patch }}</span>
+                  </div>
+                </div>
+                <!-- Role switcher: show all 5 positions -->
+                <div v-if="allRoles.length > 0" class="role-tabs-inline">
+                  <button
+                    v-for="r in allRoles"
+                    :key="r.role"
+                    class="role-tab"
+                    :class="{
+                      active: currentRole === r.role,
+                      switching: switchingRole,
+                      'not-recommended': !r.recommended,
+                    }"
+                    :disabled="switchingRole"
+                    :title="r.recommended ? roleLabel(r.role) : `${roleLabel(r.role)}（非常规位置）`"
+                    @click="switchRole(r.role)"
+                  >
+                    <span class="role-icon">{{ roleIcon(r.role) }}</span>
+                    <span class="role-text">{{ roleLabel(r.role) }}</span>
+                  </button>
+                </div>
               </div>
-            </div>
-            <button class="refresh-btn" :disabled="refreshing" :title="'刷新数据'" @click="refreshBuilds">
-              <svg :class="{ spin: refreshing }" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-              </svg>
-            </button>
-            <button
-              class="favorite-btn"
-              :class="{ 'is-fav': isFavorite(buildConfig.championId) }"
-              :title="isFavorite(buildConfig.championId) ? '取消收藏' : '收藏英雄'"
-              @click="toggleFavorite(buildConfig.championId)"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" :fill="isFavorite(buildConfig.championId) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>
-            </button>
-            <div v-if="buildConfig.skillOrder?.length" class="skill-order">
-              <span class="skill-label">技能加点</span>
-              <div class="skill-keys">
-                <span
-                  v-for="(skill, idx) in buildConfig.skillOrder.slice(0, 4)"
-                  :key="idx"
-                  class="skill-key"
-                  :class="{ primary: idx === 0 }"
-                >{{ skill }}</span>
+              <div class="header-actions">
+                <button class="action-btn" :disabled="refreshing" title="刷新数据" @click="refreshBuilds">
+                  <svg :class="{ spin: refreshing }" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                  </svg>
+                </button>
+                <button
+                  class="action-btn"
+                  :class="{ 'is-fav': isFavorite(buildConfig.championId) }"
+                  :title="isFavorite(buildConfig.championId) ? '取消收藏' : '收藏英雄'"
+                  @click="toggleFavorite(buildConfig.championId)"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" :fill="isFavorite(buildConfig.championId) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
 
-          <!-- 位置切换 -->
-          <div v-if="availableRoles.length > 1" class="role-switcher">
-            <span class="role-switcher-label">切换位置</span>
-            <div class="role-tabs">
-              <button
-                v-for="r in availableRoles"
-                :key="r"
-                class="role-tab"
-                :class="{ active: currentRole === r, loading: switchingRole }"
-                :disabled="switchingRole"
-                @click="switchRole(r)"
-              >
-                {{ roleLabel(r) }}
-              </button>
-            </div>
+          <!-- Role switch hint -->
+          <div v-if="error && buildConfig" class="role-hint">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <span>{{ error }}</span>
           </div>
 
-          <!-- Two-column layout -->
-          <div class="build-columns">
+          <!-- Switching overlay -->
+          <div v-if="switchingRole" class="switching-overlay">
+            <LoadingSpinner size="sm" />
+            <span class="switching-text">切换中...</span>
+          </div>
+
+          <!-- Main build grid: rune + items side-by-side -->
+          <div class="build-columns" :class="{ 'is-switching': switchingRole }">
             <RuneDisplay
               :rune-builds="buildConfig.runeBuilds"
               :selected-index="selectedRuneIndex"
@@ -201,12 +212,14 @@
             />
           </div>
 
+          <!-- Skill order as independent full-width card -->
+          <SkillOrderCard :skill-order="buildConfig.skillOrder" :skill-priority="buildConfig.skillPriority" />
+
           <!-- Footer -->
           <div class="build-footer">
             <span class="footer-note">
               数据来源：
               <template v-if="buildConfig.dataSource === 'opgg'">OP.GG</template>
-              <template v-else-if="buildConfig.dataSource === 'lolalytics'">Lolalytics</template>
               <template v-else>本地默认</template>
               <template v-if="buildConfig.patch"> · 版本 {{ buildConfig.patch }}</template>
             </span>
@@ -224,6 +237,7 @@ import { useAppStore } from '@/stores';
 import { EmptyState, ChampionIcon, LoadingSpinner } from '@/components/common';
 import RuneDisplay from '@/components/rune/RuneDisplay.vue';
 import ItemBuildDisplay from '@/components/rune/ItemBuildDisplay.vue';
+import SkillOrderCard from '@/components/rune/SkillOrderCard.vue';
 import { useRuneBuilder } from '@/composables/useRuneBuilder';
 import { useFavoriteChampions } from '@/composables/useFavoriteChampions';
 import { CHAMPION_ID_MAP, CHAMPION_CN_NAME_MAP, CHAMPION_TITLE_MAP, getChampionDisplayName } from '@lol-assistant/shared';
@@ -251,7 +265,7 @@ const {
   selectedItemIndex,
   sourceLabel,
   currentChampionId,
-  availableRoles,
+  allRoles,
   currentRole,
   switchingRole,
   fetchBuilds,
@@ -321,6 +335,20 @@ function roleLabel(role: string): string {
     utility: '辅助',
   };
   return map[role.toLowerCase()] ?? role;
+}
+
+function roleIcon(role: string): string {
+  const map: Record<string, string> = {
+    top: '上',
+    jungle: '野',
+    mid: '中',
+    middle: '中',
+    adc: '下',
+    bottom: '下',
+    support: '辅',
+    utility: '辅',
+  };
+  return map[role.toLowerCase()] ?? '?';
 }
 
 // Auto-detect champion from champ-select
@@ -414,11 +442,6 @@ onUnmounted(() => {
 .source-badge.opgg {
   background: rgba(59, 130, 246, 0.08);
   color: var(--color-win);
-}
-
-.source-badge.lolalytics {
-  background: rgba(168, 85, 247, 0.08);
-  color: #a855f7;
 }
 
 .source-badge.local {
@@ -575,7 +598,7 @@ onUnmounted(() => {
   z-index: -1;
 }
 
-/* Loading */
+/* Start screen */
 .start-screen {
   display: flex;
   flex-direction: column;
@@ -699,25 +722,40 @@ onUnmounted(() => {
   color: var(--color-error);
 }
 
-/* Champion header */
+/* ─── Build layout ─── */
 .build-layout {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
 }
 
+/* ─── Champion header (integrated role switcher) ─── */
 .champion-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
   background: var(--color-bg-card);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-light);
+  padding: var(--space-4) var(--space-5);
+}
+
+.header-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
 }
 
 .champion-info {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.champion-name-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .champion-name {
@@ -727,10 +765,9 @@ onUnmounted(() => {
   letter-spacing: -0.3px;
 }
 
-.champion-meta {
+.champion-badges {
   display: flex;
-  gap: var(--space-2);
-  margin-top: var(--space-1);
+  gap: var(--space-1);
 }
 
 .meta-tag {
@@ -740,19 +777,9 @@ onUnmounted(() => {
   font-weight: var(--font-medium);
 }
 
-.role-tag {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-secondary);
-}
-
 .source-tag.opgg {
   background: rgba(59, 130, 246, 0.1);
   color: var(--color-win);
-}
-
-.source-tag.lolalytics {
-  background: rgba(168, 85, 247, 0.1);
-  color: #a855f7;
 }
 
 .source-tag.local {
@@ -760,128 +787,31 @@ onUnmounted(() => {
   color: var(--color-text-tertiary);
 }
 
-/* Skill order */
-.refresh-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  flex-shrink: 0;
-}
-
-.refresh-btn:hover:not(:disabled) {
-  background: var(--color-bg-active);
-  color: var(--color-accent);
-  border-color: var(--color-accent);
-}
-
-.refresh-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.favorite-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  flex-shrink: 0;
-}
-
-.favorite-btn:hover {
-  background: var(--color-bg-active);
-  color: var(--color-gold);
-  border-color: var(--color-gold);
-}
-
-.favorite-btn.is-fav {
-  color: var(--color-gold);
-  border-color: var(--color-gold);
-  background: rgba(255, 215, 0, 0.08);
-}
-
-.skill-order {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--space-1);
-}
-
-.skill-label {
-  font-size: 10px;
+.patch-tag {
+  background: var(--color-bg-tertiary);
   color: var(--color-text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-family: var(--font-mono);
 }
 
-.skill-keys {
+/* Inline role tabs */
+.role-tabs-inline {
   display: flex;
   gap: var(--space-1);
 }
 
-.skill-key {
-  width: 28px;
-  height: 28px;
+.role-single {
   display: flex;
   align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-sm);
-  background: var(--color-bg-secondary);
-  font-size: var(--text-xs);
-  font-weight: var(--font-bold);
+  gap: var(--space-1);
   color: var(--color-text-secondary);
-}
-
-.skill-key.primary {
-  background: var(--color-accent);
-  color: #ffffff;
-}
-
-/* Two-column layout */
-.build-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-4);
-}
-
-/* Role switcher */
-.role-switcher {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-4);
-  background: var(--color-bg-card);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border-light);
-}
-
-.role-switcher-label {
   font-size: var(--text-xs);
-  color: var(--color-text-placeholder);
-  flex-shrink: 0;
-}
-
-.role-tabs {
-  display: flex;
-  gap: var(--space-1);
 }
 
 .role-tab {
-  padding: var(--space-1) var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 4px var(--space-3);
   border-radius: var(--radius-md);
   border: 1px solid transparent;
   background: var(--color-bg-secondary);
@@ -896,6 +826,7 @@ onUnmounted(() => {
 .role-tab:hover:not(:disabled) {
   background: var(--color-bg-hover);
   color: var(--color-text-primary);
+  border-color: var(--color-border);
 }
 
 .role-tab.active {
@@ -909,8 +840,138 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
-.role-tab.loading:not(.active) {
+.role-tab.switching:not(.active) {
   opacity: 0.5;
+}
+
+/* 非推荐位置：虚线边框 + 更淡的颜色 */
+.role-tab.not-recommended {
+  opacity: 0.5;
+  border-style: dashed;
+}
+
+.role-tab.not-recommended:hover:not(:disabled) {
+  opacity: 0.8;
+}
+
+.role-tab.not-recommended.active {
+  opacity: 1;
+  border-style: solid;
+}
+
+.role-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+  font-size: 9px;
+  font-weight: var(--font-bold);
+  background: rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+}
+
+.role-tab.active .role-icon {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.role-text {
+  line-height: 1;
+}
+
+/* Header action buttons */
+.header-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.action-btn:hover:not(:disabled) {
+  background: var(--color-bg-active);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-btn.is-fav {
+  color: var(--color-gold);
+  border-color: var(--color-gold);
+  background: rgba(255, 215, 0, 0.08);
+}
+
+.action-btn.is-fav:hover {
+  color: var(--color-gold);
+  border-color: var(--color-gold);
+}
+
+/* ─── Role switch hint ─── */
+.role-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: rgba(255, 179, 0, 0.08);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 179, 0, 0.15);
+  font-size: var(--text-xs);
+  color: var(--color-gold);
+}
+
+.role-hint svg {
+  flex-shrink: 0;
+  color: var(--color-gold);
+}
+
+/* ─── Switching overlay ─── */
+.switching-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.switching-text {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ─── Two-column build grid ─── */
+.build-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  align-items: stretch;
+  min-width: 0; /* 防止 grid 容器本身溢出父级 */
+  transition: opacity var(--transition-normal);
+}
+
+.build-columns.is-switching {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.build-columns > * {
+  min-width: 0; /* 防止 grid 子项溢出列宽 */
 }
 
 @media (max-width: 768px) {

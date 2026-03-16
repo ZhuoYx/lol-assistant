@@ -13,7 +13,7 @@ export const useMatchStore = defineStore('match', () => {
 
   const filters = ref<MatchFilters>({});
 
-  const PAGE_SIZE = 30;
+  const PAGE_SIZE = 50;
   const hasMore = computed(() => matchList.value.length < totalGames.value);
 
   let fetchId = 0;

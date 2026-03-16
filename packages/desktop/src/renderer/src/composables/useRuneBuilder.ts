@@ -15,7 +15,7 @@ const RUNE_TREE_MAP: Record<number, { name: string; color: string }> = {
 const ALL_ROLES = ['top', 'jungle', 'mid', 'adc', 'support'] as const;
 
 /** 数据来源配置标签 */
-export type BuildSource = 'opgg' | 'lolalytics' | 'local' | null;
+export type BuildSource = 'opgg' | 'local' | null;
 
 export interface BuildConfig {
   championId: number;
@@ -26,6 +26,14 @@ export interface BuildConfig {
   runeBuilds: RuneBuild[];
   itemBuilds: ItemBuild[];
   skillOrder: string[];
+  skillPriority: string[];
+}
+
+/** 位置信息 */
+export interface RoleInfo {
+  role: string;
+  /** 是否为 API 推荐的热门位置 */
+  recommended: boolean;
 }
 
 /**
@@ -49,10 +57,33 @@ export function useRuneBuilder() {
 
   // 多位置支持
   const availableRoles = ref<string[]>([]);
+  /** API 返回的推荐位置（英雄有数据的热门位置） */
+  const recommendedRoles = ref<string[]>([]);
   const currentRole = ref<string>('');
   const switchingRole = ref(false);
 
   // ─── Computed ──────────────────────────────────────────
+
+  /**
+   * 全部5个位置，每个位置标记是否为推荐位置
+   * 推荐位置排在前面，非推荐位置排在后面
+   */
+  const allRoles = computed<RoleInfo[]>(() => {
+    const recommended = new Set(recommendedRoles.value.map(r => r.toLowerCase()));
+    // 推荐位置按 API 返回顺序（通常按出场率降序）
+    const result: RoleInfo[] = [];
+    // 先加推荐位置（保持 API 顺序）
+    for (const r of recommendedRoles.value) {
+      result.push({ role: r, recommended: true });
+    }
+    // 再加非推荐位置（按 ALL_ROLES 固定顺序）
+    for (const r of ALL_ROLES) {
+      if (!recommended.has(r)) {
+        result.push({ role: r, recommended: false });
+      }
+    }
+    return result;
+  });
 
   const selectedRune = computed<RuneBuild | null>(() => {
     if (!buildConfig.value?.runeBuilds?.length) return null;
@@ -69,7 +100,6 @@ export function useRuneBuilder() {
   const sourceLabel = computed(() => {
     switch (buildConfig.value?.dataSource) {
       case 'opgg': return 'OP.GG 热门';
-      case 'lolalytics': return 'Lolalytics 热门';
       case 'local': return '默认推荐';
       default: return '未知';
     }
@@ -85,6 +115,16 @@ export function useRuneBuilder() {
 
   /** 从构建数据更新本地状态 */
   function applyBuildConfig(builds: ChampionBuilds) {
+    // 如果有完整的 18 级加点顺序（长度 > 3），直接使用
+    // 否则尝试从 skillPriority 派生（但无法生成完整 18 级顺序）
+    const fullSkillOrder = builds.skillOrder ?? [];
+    // skillPriority: 优先级顺序，如 ["Q","E","W"]
+    let priority = builds.skillPriority ?? [];
+    // 如果没有独立的 skillPriority 但 skillOrder 恰好只有 3 个（旧格式），则把它当做优先级
+    if (priority.length === 0 && fullSkillOrder.length > 0 && fullSkillOrder.length <= 3) {
+      priority = fullSkillOrder;
+    }
+
     buildConfig.value = {
       championId: builds.championId,
       championName: getChampionDisplayName(builds.championId),
@@ -93,7 +133,8 @@ export function useRuneBuilder() {
       dataSource: builds.dataSource,
       runeBuilds: builds.runeBuilds ?? [],
       itemBuilds: builds.itemBuilds ?? [],
-      skillOrder: builds.skillOrder ?? [],
+      skillOrder: fullSkillOrder.length > 3 ? fullSkillOrder : [],
+      skillPriority: priority,
     };
     currentRole.value = builds.role;
   }
@@ -113,7 +154,13 @@ export function useRuneBuilder() {
       if (builds) {
         applyBuildConfig(builds);
 
-        // 设置可用位置列表（所有标准位置都可选）
+        // 保存 API 返回的推荐位置
+        if (builds.availableRoles && builds.availableRoles.length > 0) {
+          recommendedRoles.value = builds.availableRoles;
+        } else {
+          recommendedRoles.value = builds.role ? [builds.role] : [];
+        }
+        // 始终显示全部5个位置供用户切换
         availableRoles.value = [...ALL_ROLES];
       } else {
         buildConfig.value = null;
@@ -134,6 +181,10 @@ export function useRuneBuilder() {
     switchingRole.value = true;
     selectedRuneIndex.value = 0;
     selectedItemIndex.value = 0;
+    error.value = null;
+
+    // 保留当前已知的推荐位置列表
+    const savedRecommended = [...recommendedRoles.value];
 
     try {
       const builds: ChampionBuilds = await window.electronAPI.getChampionBuilds(
@@ -142,14 +193,37 @@ export function useRuneBuilder() {
       );
       if (builds) {
         applyBuildConfig(builds);
+        // 更新推荐位置：优先使用新返回的完整列表，否则保持之前的列表
+        if (builds.availableRoles && builds.availableRoles.length > 1) {
+          recommendedRoles.value = builds.availableRoles;
+        } else {
+          recommendedRoles.value = savedRecommended;
+        }
+        // 始终保持全部位置可见
+        availableRoles.value = [...ALL_ROLES];
+
+        // 如果返回的数据没有符文和出装（非常规位置可能无数据），给出提示但不清空
+        const hasRealData = (builds.runeBuilds?.length ?? 0) > 0 || (builds.itemBuilds?.length ?? 0) > 0;
+        if (!hasRealData) {
+          error.value = `该英雄在「${roleLabel(role)}」位置暂无足够数据`;
+        }
       } else {
-        error.value = `该英雄暂无 ${role} 位置的数据`;
+        error.value = `该英雄暂无「${roleLabel(role)}」位置的数据`;
       }
     } catch {
-      error.value = '切换位置失败';
+      error.value = `切换到「${roleLabel(role)}」位置失败`;
     } finally {
       switchingRole.value = false;
     }
+  }
+
+  /** 位置中文名（内部辅助） */
+  function roleLabel(role: string): string {
+    const map: Record<string, string> = {
+      top: '上单', jungle: '打野', mid: '中单', middle: '中单',
+      adc: 'ADC', bottom: 'ADC', support: '辅助', utility: '辅助',
+    };
+    return map[role.toLowerCase()] ?? role;
   }
 
   /** 强制刷新当前英雄的构建数据（清除缓存） */
@@ -246,6 +320,8 @@ export function useRuneBuilder() {
     hasItems,
     currentChampionId,
     availableRoles,
+    allRoles,
+    recommendedRoles,
     currentRole,
     switchingRole,
     fetchBuilds,

@@ -249,10 +249,9 @@ export class ScraperScheduler {
   }
 
   /** 获取爬取器数据源标记 */
-  private getScraperSource(): 'opgg' | 'lolalytics' | 'local' {
+  private getScraperSource(): 'opgg' | 'local' {
     const name = this.scraper.constructor.name.toLowerCase();
     if (name.includes('opgg')) return 'opgg';
-    if (name.includes('lola')) return 'lolalytics';
     return 'local';
   }
 

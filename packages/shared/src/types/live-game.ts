@@ -10,6 +10,21 @@ export interface LiveGameAnalysis {
 export interface LiveGameTeam {
   teamId: number;
   players: LiveGamePlayer[];
+  /** 预组队分组：同一数组内的 puuid 是预组队的 */
+  premadeGroups?: string[][];
+}
+
+/** 近期战绩摘要 */
+export interface RecentMatchSummary {
+  gameId: number;
+  championId: number;
+  win: boolean;
+  kills: number;
+  deaths: number;
+  assists: number;
+  queueId: number;
+  gameDuration: number;
+  gameCreation: number;
 }
 
 /** 对局玩家 */
@@ -29,6 +44,8 @@ export interface LiveGamePlayer {
   /** 近期表现 */
   recentWinRate: number;
   recentKDA: number;
+  /** 近 10 把战绩摘要 */
+  recentMatches?: RecentMatchSummary[];
   /** 分路位置 (TOP, JUNGLE, MIDDLE, BOTTOM, UTILITY) */
   position?: string;
   /** 召唤师技能 ID */

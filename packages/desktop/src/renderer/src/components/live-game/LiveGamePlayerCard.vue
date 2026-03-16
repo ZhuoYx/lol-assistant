@@ -1,11 +1,16 @@
 <template>
   <div
     class="lg-player-card"
-    :class="[strengthClass, { 'is-me': isMe, clickable }]"
+    :class="[strengthClass, { 'is-me': isMe, clickable, 'has-premade': !!premadeTag }]"
     @click="handleClick"
   >
     <!-- Strength indicator bar -->
     <div class="strength-bar" :class="strengthClass" />
+
+    <!-- Premade group tag -->
+    <span v-if="premadeTag" class="premade-tag" :class="premadeTag.colorClass">
+      {{ premadeTag.label }}
+    </span>
 
     <div class="card-main">
       <div class="card-left">
@@ -72,12 +77,30 @@
         </div>
       </div>
     </div>
+
+    <!-- Recent matches strip -->
+    <div v-if="recentMatchList.length > 0" class="recent-strip">
+      <span class="recent-label">近期</span>
+      <div class="match-dots">
+        <span
+          v-for="(m, idx) in recentMatchList"
+          :key="idx"
+          class="match-dot"
+          :class="m.win ? 'dot-win' : 'dot-lose'"
+          :title="`${m.win ? '胜' : '负'} ${m.kills}/${m.deaths}/${m.assists}`"
+        />
+      </div>
+      <span class="recent-summary">
+        <span class="recent-wins">{{ recentWins }}胜</span>
+        <span class="recent-losses">{{ recentMatchList.length - recentWins }}负</span>
+      </span>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { LiveGamePlayer } from '@lol-assistant/shared';
+import type { LiveGamePlayer, RecentMatchSummary } from '@lol-assistant/shared';
 import TierIcon from '../common/TierIcon.vue';
 import ChampionIcon from '../common/ChampionIcon.vue';
 
@@ -100,15 +123,25 @@ const POSITION_LABEL: Record<string, string> = {
   utility: '辅',
 };
 
+/** 预组队颜色方案 */
+const PREMADE_COLORS = [
+  { label: '组队A', colorClass: 'premade-a' },
+  { label: '组队B', colorClass: 'premade-b' },
+  { label: '组队C', colorClass: 'premade-c' },
+];
+
 const props = withDefaults(defineProps<{
   player: LiveGamePlayer;
   myTier?: string;
   isMe?: boolean;
   clickable?: boolean;
+  /** 该队伍的预组队分组（从 TeamPanel 传入） */
+  premadeGroups?: string[][];
 }>(), {
   myTier: '',
   isMe: false,
   clickable: false,
+  premadeGroups: () => [],
 });
 
 const emit = defineEmits<{
@@ -135,6 +168,28 @@ const positionLabel = computed(() => {
   if (!pos) return '';
   return POSITION_LABEL[pos] ?? POSITION_LABEL[pos.toUpperCase()] ?? '';
 });
+
+/** 预组队标记：查找该玩家所在的预组队分组 */
+const premadeTag = computed(() => {
+  if (!props.premadeGroups || props.premadeGroups.length === 0) return null;
+  for (let i = 0; i < props.premadeGroups.length; i++) {
+    if (props.premadeGroups[i].includes(props.player.puuid)) {
+      const scheme = PREMADE_COLORS[i % PREMADE_COLORS.length];
+      const groupSize = props.premadeGroups[i].length;
+      return {
+        label: `${groupSize}人组队`,
+        colorClass: scheme.colorClass,
+      };
+    }
+  }
+  return null;
+});
+
+/** 近期战绩列表 */
+const recentMatchList = computed<RecentMatchSummary[]>(() => props.player.recentMatches ?? []);
+
+/** 近期胜场数 */
+const recentWins = computed(() => recentMatchList.value.filter((m: RecentMatchSummary) => m.win).length);
 
 function handleClick() {
   if (props.clickable) {
@@ -190,6 +245,11 @@ function kdaClass(kda: number): string {
   background: rgba(0, 113, 227, 0.03);
 }
 
+/* Premade group highlight */
+.lg-player-card.has-premade {
+  border-color: rgba(255, 165, 0, 0.25);
+}
+
 /* Strength indicator bar (left edge) */
 .strength-bar {
   position: absolute;
@@ -206,6 +266,34 @@ function kdaClass(kda: number): string {
 .strength-bar.lower { background: var(--color-success); }
 .strength-bar.much-lower { background: var(--color-success); opacity: 0.6; }
 .strength-bar.neutral { background: transparent; }
+
+/* Premade tag */
+.premade-tag {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 9px;
+  font-weight: var(--font-bold);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  z-index: 1;
+  line-height: 1.4;
+}
+
+.premade-tag.premade-a {
+  color: #e67e22;
+  background: rgba(230, 126, 34, 0.12);
+}
+
+.premade-tag.premade-b {
+  color: #9b59b6;
+  background: rgba(155, 89, 182, 0.12);
+}
+
+.premade-tag.premade-c {
+  color: #1abc9c;
+  background: rgba(26, 188, 156, 0.12);
+}
 
 .card-main {
   display: flex;
@@ -382,5 +470,62 @@ function kdaClass(kda: number): string {
   font-weight: var(--font-bold);
   color: var(--color-gold);
   font-family: var(--font-mono);
+}
+
+/* Recent matches strip */
+.recent-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-2);
+  padding-left: calc(var(--space-4) + 3px);
+}
+
+.recent-label {
+  font-size: 9px;
+  color: var(--color-text-placeholder);
+  flex-shrink: 0;
+}
+
+.match-dots {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.match-dot {
+  width: 14px;
+  height: 6px;
+  border-radius: 2px;
+  transition: opacity var(--transition-fast);
+}
+
+.match-dot:hover {
+  opacity: 0.7;
+}
+
+.dot-win {
+  background: var(--color-win);
+}
+
+.dot-lose {
+  background: var(--color-lose);
+}
+
+.recent-summary {
+  display: flex;
+  gap: 4px;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.recent-wins {
+  color: var(--color-win);
+}
+
+.recent-losses {
+  color: var(--color-lose);
 }
 </style>
