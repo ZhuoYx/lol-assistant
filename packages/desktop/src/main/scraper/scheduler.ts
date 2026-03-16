@@ -165,12 +165,12 @@ export class ScraperScheduler {
 
     if (signal?.aborted) return;
 
-    // 阶段 2: 更新英雄构建数据
+    // 阶段 2: 更新英雄构建 + 克制数据（合并阶段，减少请求数）
     const roles = ['top', 'jungle', 'mid', 'adc', 'support'];
     const totalTasks = championIds.length;
     let completedTasks = 0;
 
-    logger.info(`开始更新英雄构建数据，共 ${totalTasks} 个英雄...`);
+    logger.info(`开始更新英雄构建+克制数据，共 ${totalTasks} 个英雄...`);
 
     for (const champId of championIds) {
       if (signal?.aborted) return;
@@ -178,11 +178,19 @@ export class ScraperScheduler {
       for (const role of roles) {
         if (signal?.aborted) return;
 
+        // 获取构建和克制数据
         try {
           const builds = await this.scraper.getChampionBuilds(champId, role);
           await this.storage.saveChampionBuilds(builds);
         } catch {
           // 单个英雄/角色的构建获取失败不影响整体
+        }
+
+        try {
+          const counters = await this.scraper.getChampionCounters(champId, role);
+          await this.storage.saveChampionCounters(counters);
+        } catch {
+          // 单个英雄/角色的克制获取失败不影响整体
         }
 
         // 请求间隔，避免被封
@@ -195,37 +203,6 @@ export class ScraperScheduler {
         total: totalTasks,
         championId: champId,
         stage: 'builds',
-      });
-    }
-
-    if (signal?.aborted) return;
-
-    // 阶段 3: 更新英雄克制关系
-    completedTasks = 0;
-    logger.info(`开始更新英雄克制数据，共 ${totalTasks} 个英雄...`);
-
-    for (const champId of championIds) {
-      if (signal?.aborted) return;
-
-      for (const role of roles) {
-        if (signal?.aborted) return;
-
-        try {
-          const counters = await this.scraper.getChampionCounters(champId, role);
-          await this.storage.saveChampionCounters(counters);
-        } catch {
-          // 单个英雄/角色的克制获取失败不影响整体
-        }
-
-        await this.delay(500);
-      }
-
-      completedTasks++;
-      this.emitProgress({
-        current: completedTasks,
-        total: totalTasks,
-        championId: champId,
-        stage: 'counters',
       });
     }
 
