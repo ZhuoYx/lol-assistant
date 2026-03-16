@@ -166,6 +166,23 @@
             </div>
           </div>
 
+          <!-- 位置切换 -->
+          <div v-if="availableRoles.length > 1" class="role-switcher">
+            <span class="role-switcher-label">切换位置</span>
+            <div class="role-tabs">
+              <button
+                v-for="r in availableRoles"
+                :key="r"
+                class="role-tab"
+                :class="{ active: currentRole === r, loading: switchingRole }"
+                :disabled="switchingRole"
+                @click="switchRole(r)"
+              >
+                {{ roleLabel(r) }}
+              </button>
+            </div>
+          </div>
+
           <!-- Two-column layout -->
           <div class="build-columns">
             <RuneDisplay
@@ -234,7 +251,11 @@ const {
   selectedItemIndex,
   sourceLabel,
   currentChampionId,
+  availableRoles,
+  currentRole,
+  switchingRole,
   fetchBuilds,
+  switchRole,
   refreshBuilds,
   applyRune,
   selectRune,
@@ -835,6 +856,61 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-4);
+}
+
+/* Role switcher */
+.role-switcher {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-light);
+}
+
+.role-switcher-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-placeholder);
+  flex-shrink: 0;
+}
+
+.role-tabs {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.role-tab {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: var(--color-bg-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.role-tab:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.role-tab.active {
+  background: var(--color-accent);
+  color: #ffffff;
+  border-color: var(--color-accent);
+}
+
+.role-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.role-tab.loading:not(.active) {
+  opacity: 0.5;
 }
 
 @media (max-width: 768px) {

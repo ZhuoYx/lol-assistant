@@ -11,6 +11,9 @@ const RUNE_TREE_MAP: Record<number, { name: string; color: string }> = {
   8400: { name: '坚决', color: '#a1d586' },
 };
 
+/** 所有可选位置 */
+const ALL_ROLES = ['top', 'jungle', 'mid', 'adc', 'support'] as const;
+
 /** 数据来源配置标签 */
 export type BuildSource = 'opgg' | 'lolalytics' | 'local' | null;
 
@@ -44,6 +47,11 @@ export function useRuneBuilder() {
   // Current champion being viewed
   const currentChampionId = ref<number | null>(null);
 
+  // 多位置支持
+  const availableRoles = ref<string[]>([]);
+  const currentRole = ref<string>('');
+  const switchingRole = ref(false);
+
   // ─── Computed ──────────────────────────────────────────
 
   const selectedRune = computed<RuneBuild | null>(() => {
@@ -75,8 +83,23 @@ export function useRuneBuilder() {
 
   // ─── Actions ──────────────────────────────────────────
 
+  /** 从构建数据更新本地状态 */
+  function applyBuildConfig(builds: ChampionBuilds) {
+    buildConfig.value = {
+      championId: builds.championId,
+      championName: getChampionDisplayName(builds.championId),
+      role: builds.role,
+      patch: builds.patch,
+      dataSource: builds.dataSource,
+      runeBuilds: builds.runeBuilds ?? [],
+      itemBuilds: builds.itemBuilds ?? [],
+      skillOrder: builds.skillOrder ?? [],
+    };
+    currentRole.value = builds.role;
+  }
+
   /** 获取指定英雄的构建数据 */
-  async function fetchBuilds(championId: number) {
+  async function fetchBuilds(championId: number, role?: string) {
     if (championId <= 0) return;
 
     currentChampionId.value = championId;
@@ -86,18 +109,12 @@ export function useRuneBuilder() {
     selectedItemIndex.value = 0;
 
     try {
-      const builds: ChampionBuilds = await window.electronAPI.getChampionBuilds(championId);
+      const builds: ChampionBuilds = await window.electronAPI.getChampionBuilds(championId, role);
       if (builds) {
-        buildConfig.value = {
-          championId: builds.championId,
-          championName: getChampionDisplayName(builds.championId),
-          role: builds.role,
-          patch: builds.patch,
-          dataSource: builds.dataSource,
-          runeBuilds: builds.runeBuilds ?? [],
-          itemBuilds: builds.itemBuilds ?? [],
-          skillOrder: builds.skillOrder ?? [],
-        };
+        applyBuildConfig(builds);
+
+        // 设置可用位置列表（所有标准位置都可选）
+        availableRoles.value = [...ALL_ROLES];
       } else {
         buildConfig.value = null;
         error.value = '暂无构建数据';
@@ -107,6 +124,31 @@ export function useRuneBuilder() {
       error.value = '获取构建数据失败';
     } finally {
       loading.value = false;
+    }
+  }
+
+  /** 切换位置 */
+  async function switchRole(role: string) {
+    if (!currentChampionId.value || role === currentRole.value) return;
+
+    switchingRole.value = true;
+    selectedRuneIndex.value = 0;
+    selectedItemIndex.value = 0;
+
+    try {
+      const builds: ChampionBuilds = await window.electronAPI.getChampionBuilds(
+        currentChampionId.value,
+        role,
+      );
+      if (builds) {
+        applyBuildConfig(builds);
+      } else {
+        error.value = `该英雄暂无 ${role} 位置的数据`;
+      }
+    } catch {
+      error.value = '切换位置失败';
+    } finally {
+      switchingRole.value = false;
     }
   }
 
@@ -120,18 +162,9 @@ export function useRuneBuilder() {
 
     try {
       await window.electronAPI.refreshChampionBuilds(champId);
-      const builds: ChampionBuilds = await window.electronAPI.getChampionBuilds(champId);
+      const builds: ChampionBuilds = await window.electronAPI.getChampionBuilds(champId, currentRole.value || undefined);
       if (builds) {
-        buildConfig.value = {
-          championId: builds.championId,
-          championName: getChampionDisplayName(builds.championId),
-          role: builds.role,
-          patch: builds.patch,
-          dataSource: builds.dataSource,
-          runeBuilds: builds.runeBuilds ?? [],
-          itemBuilds: builds.itemBuilds ?? [],
-          skillOrder: builds.skillOrder ?? [],
-        };
+        applyBuildConfig(builds);
         selectedRuneIndex.value = 0;
         selectedItemIndex.value = 0;
       } else {
@@ -212,7 +245,11 @@ export function useRuneBuilder() {
     hasRunes,
     hasItems,
     currentChampionId,
+    availableRoles,
+    currentRole,
+    switchingRole,
     fetchBuilds,
+    switchRole,
     refreshBuilds,
     applyRune,
     getRuneTreeInfo,

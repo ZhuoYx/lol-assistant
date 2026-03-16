@@ -10,11 +10,11 @@ const scraperManager = new ScraperManager();
 
 export function registerScraperIpcHandlers(): void {
   // 获取英雄构建数据
-  ipcMain.handle('scraper:getChampionBuilds', async (_event, championId: number) => {
+  ipcMain.handle('scraper:getChampionBuilds', async (_event, championId: number, role?: string) => {
     try {
-      return await scraperManager.getChampionBuilds(championId);
+      return await scraperManager.getChampionBuilds(championId, role);
     } catch (err) {
-      logger.error(`IPC scraper:getChampionBuilds 失败 (championId=${championId}):`, err);
+      logger.error(`IPC scraper:getChampionBuilds 失败 (championId=${championId}, role=${role}):`, err);
       throw err;
     }
   });

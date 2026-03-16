@@ -99,6 +99,9 @@ function formatRole(role: string): string {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  /* 确保敌我双方卡片高度一致 */
+  min-height: 0;
+  flex: 1;
 }
 
 .team-comp.ally {

@@ -89,7 +89,8 @@
         <SpellCooldowns
           v-if="myChampId"
           :my-champ-id="myChampId"
-          :enemy-champ-id="enemyLaneChampId"
+          :enemy-champ-ids="enemyLaneChampIds"
+          :enemy-labels="enemyLaneLabels"
         />
 
         <!-- Strength legend -->
@@ -205,15 +206,50 @@ const myTeamId = computed(() => {
   return 0;
 });
 
-/** 对位敌方英雄 ID：同位置的敌方英雄 */
-const enemyLaneChampId = computed(() => {
-  if (!myPosition.value || !myTeamId.value) return 0;
+/** 对位敌方英雄 ID 列表：下路/辅助同时显示两者 */
+const BOT_POSITIONS = new Set(['BOTTOM', 'UTILITY']);
+
+const enemyLaneChampIds = computed<number[]>(() => {
+  if (!myPosition.value || !myTeamId.value) return [];
   const enemyTeam = myTeamId.value === 100 ? redTeam.value : blueTeam.value;
-  if (!enemyTeam) return 0;
-  const laneOpponent = enemyTeam.players.find(p =>
-    (p.position ?? '').toUpperCase() === myPosition.value.toUpperCase()
+  if (!enemyTeam) return [];
+
+  const myPos = myPosition.value.toUpperCase();
+
+  // 下路/辅助：同时显示对面下路和辅助
+  if (BOT_POSITIONS.has(myPos)) {
+    return enemyTeam.players
+      .filter(p => BOT_POSITIONS.has((p.position ?? '').toUpperCase()))
+      .map(p => p.championId)
+      .filter(id => id > 0);
+  }
+
+  // 其他位置：只显示对位
+  const opponent = enemyTeam.players.find(p =>
+    (p.position ?? '').toUpperCase() === myPos
   );
-  return laneOpponent?.championId ?? 0;
+  return opponent?.championId ? [opponent.championId] : [];
+});
+
+/** 对位标签（与 enemyLaneChampIds 一一对应） */
+const POSITION_CN: Record<string, string> = {
+  TOP: '上路', JUNGLE: '打野', MIDDLE: '中路', BOTTOM: '下路', UTILITY: '辅助',
+};
+
+const enemyLaneLabels = computed<string[]>(() => {
+  if (!myPosition.value || !myTeamId.value) return [];
+  const enemyTeam = myTeamId.value === 100 ? redTeam.value : blueTeam.value;
+  if (!enemyTeam) return [];
+
+  const myPos = myPosition.value.toUpperCase();
+
+  if (BOT_POSITIONS.has(myPos)) {
+    return enemyTeam.players
+      .filter(p => BOT_POSITIONS.has((p.position ?? '').toUpperCase()))
+      .map(p => POSITION_CN[(p.position ?? '').toUpperCase()] ?? '对位');
+  }
+
+  return ['对位'];
 });
 </script>
 

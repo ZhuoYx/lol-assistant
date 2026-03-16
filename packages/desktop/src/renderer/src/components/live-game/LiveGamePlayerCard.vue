@@ -116,6 +116,8 @@ const emit = defineEmits<{
 }>();
 
 const strengthClass = computed(() => {
+  // 自己不显示实力标记，避免"自己比自己高"的困惑
+  if (props.isMe) return 'neutral';
   if (props.player.dataStatus !== 'loaded' || !props.myTier) return 'neutral';
   const myOrder = TIER_ORDER[props.myTier.toUpperCase()] ?? 0;
   const playerOrder = TIER_ORDER[props.player.tier.toUpperCase()] ?? 0;

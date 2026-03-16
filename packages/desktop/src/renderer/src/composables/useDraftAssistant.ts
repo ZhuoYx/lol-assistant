@@ -145,10 +145,12 @@ export function useDraftAssistant() {
           const alreadyBanned = bannedChampionIds.value.includes(counter.championId);
           const alreadyInRecs = recs.some((r) => r.championId === counter.championId);
           if (!alreadyPicked && !alreadyBanned && !alreadyInRecs) {
+            // 统一 winRate 格式：确保是百分比值（OPGG 返回百分比，Lolalytics 可能返回小数）
+            const wr = counter.winRate > 1 ? counter.winRate : counter.winRate * 100;
             recs.push({
               championId: counter.championId,
               championName: getChampName(counter.championId),
-              winRate: counter.winRate,
+              winRate: wr,
               sampleSize: counter.sampleSize,
               reason: `克制 ${getChampName(enemyId)}`,
             });
@@ -352,14 +354,33 @@ export function useDraftAssistant() {
         session.value = data as ChampSelectSession;
       }
     } catch {
-      // 静默失败
+      // 静默失败，可能 WebSocket 尚未连接，稍后重试
     }
   }
+
+  // 监听 gamePhase 变化：进入 ChampSelect 时主动拉取 session
+  watch(() => appStore.gamePhase, (phase) => {
+    if (phase === 'ChampSelect' && !session.value) {
+      fetchInitialSession();
+    }
+    // 离开选人阶段时清理
+    if (phase !== 'ChampSelect') {
+      session.value = null;
+      counterCache.value.clear();
+    }
+  });
 
   onMounted(() => {
     subscribe();
     fetchDataVersionInfo();
     fetchInitialSession();
+
+    // 延迟再试一次，防止 WebSocket 还未连接成功的情况
+    setTimeout(() => {
+      if (appStore.gamePhase === 'ChampSelect' && !session.value) {
+        fetchInitialSession();
+      }
+    }, 2000);
   });
 
   onUnmounted(() => {

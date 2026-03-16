@@ -102,7 +102,9 @@ function getChampName(id: number): string {
 }
 
 function formatWr(rate: number): string {
-  return `${(rate * 100).toFixed(1)}%`;
+  // 兼容两种格式：如果 rate > 1 说明已经是百分比值（如 52.3），否则是小数（如 0.523）
+  const pct = rate > 1 ? rate : rate * 100;
+  return `${pct.toFixed(1)}%`;
 }
 
 function formatSample(n: number): string {
@@ -112,8 +114,10 @@ function formatSample(n: number): string {
 }
 
 function wrClass(rate: number): string {
-  if (rate >= 0.55) return 'high';
-  if (rate <= 0.45) return 'low';
+  // 兼容两种格式
+  const pct = rate > 1 ? rate : rate * 100;
+  if (pct >= 55) return 'high';
+  if (pct <= 45) return 'low';
   return '';
 }
 </script>

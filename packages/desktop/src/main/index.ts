@@ -262,9 +262,20 @@ function initLCUConnection(): void {
     logger.info('LCU 客户端已连接，初始化 WebSocket...');
     const credentials = lcuClient.getCredentials();
     if (credentials) {
-      lcuWebSocket.connect(credentials).then(() => {
+      lcuWebSocket.connect(credentials).then(async () => {
         // WebSocket 连接成功后注册 Gameflow 监听
         initGameflowMonitor();
+
+        // 主动查询当前 gameflow 状态，解决应用在 BP 中打开时的问题
+        try {
+          const session = await lcuAPI.getGameflowSession() as { phase?: string } | null;
+          if (session?.phase) {
+            logger.info(`WebSocket 连接后获取到当前游戏阶段: ${session.phase}`);
+            handleGamePhaseChange(session.phase as GamePhase);
+          }
+        } catch {
+          // 静默失败，可能不在对局中
+        }
       }).catch((err) => {
         logger.error('WebSocket 连接失败:', err);
       });

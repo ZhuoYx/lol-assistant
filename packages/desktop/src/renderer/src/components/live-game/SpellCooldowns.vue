@@ -18,14 +18,18 @@
         </div>
       </div>
 
-      <!-- 对位敌方英雄 -->
-      <div v-if="enemyChampSpells" class="cd-champ-row enemy">
+      <!-- 对位敌方英雄（可能多个，如下路+辅助） -->
+      <div
+        v-for="(enemy, eIdx) in enemyEntries"
+        :key="eIdx"
+        class="cd-champ-row enemy"
+      >
         <div class="cd-champ-label">
-          <ChampionIcon :champion-id="enemyChampId" size="xs" />
-          <span class="cd-champ-name enemy">对位</span>
+          <ChampionIcon :champion-id="enemy.champId" size="xs" />
+          <span class="cd-champ-name enemy">{{ enemy.label }}</span>
         </div>
         <div class="cd-spells">
-          <div v-for="(spell, idx) in enemyChampSpells" :key="idx" class="cd-spell">
+          <div v-for="(spell, idx) in enemy.spells" :key="idx" class="cd-spell">
             <span class="cd-spell-key">{{ SPELL_KEYS[idx] }}</span>
             <span class="cd-spell-cd">{{ spell.cooldownBurn }}s</span>
           </div>
@@ -47,17 +51,27 @@ interface SpellData {
   cooldown: number[];
 }
 
+interface EnemyEntry {
+  champId: number;
+  label: string;
+  spells: SpellData[];
+}
+
 const SPELL_KEYS = ['Q', 'W', 'E', 'R'];
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   myChampId: number;
-  enemyChampId: number;
-}>();
+  enemyChampIds?: number[];
+  enemyLabels?: string[];
+}>(), {
+  enemyChampIds: () => [],
+  enemyLabels: () => [],
+});
 
 const myChampSpells = ref<SpellData[] | null>(null);
-const enemyChampSpells = ref<SpellData[] | null>(null);
+const enemyEntries = ref<EnemyEntry[]>([]);
 
-const hasData = computed(() => myChampSpells.value !== null || enemyChampSpells.value !== null);
+const hasData = computed(() => myChampSpells.value !== null || enemyEntries.value.length > 0);
 
 async function fetchChampionSpells(championId: number): Promise<SpellData[] | null> {
   if (!championId) return null;
@@ -90,17 +104,36 @@ async function fetchChampionSpells(championId: number): Promise<SpellData[] | nu
 }
 
 async function loadData() {
-  const [my, enemy] = await Promise.allSettled([
-    fetchChampionSpells(props.myChampId),
-    fetchChampionSpells(props.enemyChampId),
-  ]);
-  myChampSpells.value = my.status === 'fulfilled' ? my.value : null;
-  enemyChampSpells.value = enemy.status === 'fulfilled' ? enemy.value : null;
+  // 获取我方英雄技能
+  const myResult = await fetchChampionSpells(props.myChampId);
+  myChampSpells.value = myResult;
+
+  // 获取所有对位敌方英雄技能
+  const entries: EnemyEntry[] = [];
+  const ids = props.enemyChampIds;
+  const labels = props.enemyLabels;
+
+  const results = await Promise.allSettled(
+    ids.map(id => fetchChampionSpells(id))
+  );
+
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    if (result.status === 'fulfilled' && result.value) {
+      entries.push({
+        champId: ids[i],
+        label: labels[i] ?? '对位',
+        spells: result.value,
+      });
+    }
+  }
+
+  enemyEntries.value = entries;
 }
 
 onMounted(loadData);
 
-watch(() => [props.myChampId, props.enemyChampId], loadData);
+watch(() => [props.myChampId, ...props.enemyChampIds], loadData);
 </script>
 
 <style scoped>
