@@ -6,7 +6,7 @@ export default defineConfig({
   main: {
     plugins: [
       externalizeDepsPlugin({
-        exclude: ['electron-store', 'p-limit'],
+        exclude: ['electron-store', 'p-limit', 'axios-retry'],
       }),
     ],
   },
