@@ -1,15 +1,12 @@
 <template>
   <div
     class="lg-player-card"
-    :class="[strengthClass, { 'is-me': isMe, clickable, 'has-premade': !!premadeTag }]"
+    :class="[premadeColorClass, { 'is-me': isMe, clickable }]"
     @click="handleClick"
   >
-    <!-- Strength indicator bar -->
-    <div class="strength-bar" :class="strengthClass" />
-
-    <!-- Premade group tag -->
+    <!-- Premade group tag (small badge, no "N人" text) -->
     <span v-if="premadeTag" class="premade-tag" :class="premadeTag.colorClass">
-      {{ premadeTag.label }}
+      组队
     </span>
 
     <div class="card-main">
@@ -78,22 +75,31 @@
       </div>
     </div>
 
-    <!-- Recent matches strip -->
-    <div v-if="recentMatchList.length > 0" class="recent-strip">
-      <span class="recent-label">近期</span>
-      <div class="match-dots">
-        <span
+    <!-- Recent matches detail strip: show each match's result, champion, and KDA -->
+    <div v-if="recentMatchList.length > 0" class="recent-matches">
+      <div class="recent-header">
+        <span class="recent-label">最近{{ recentMatchList.length }}场</span>
+        <span class="recent-summary">
+          <span class="recent-wins">{{ recentWins }}胜</span>
+          <span class="recent-losses">{{ recentMatchList.length - recentWins }}负</span>
+          <span class="recent-wr">{{ recentWinRateText }}</span>
+        </span>
+      </div>
+      <div class="match-list">
+        <div
           v-for="(m, idx) in recentMatchList"
           :key="idx"
-          class="match-dot"
-          :class="m.win ? 'dot-win' : 'dot-lose'"
-          :title="`${m.win ? '胜' : '负'} ${m.kills}/${m.deaths}/${m.assists}`"
-        />
+          class="match-item"
+          :class="m.win ? 'win' : 'lose'"
+        >
+          <ChampionIcon
+            :champion-id="m.championId"
+            size="xs"
+            class="match-champ-icon"
+          />
+          <span class="match-kda">{{ m.kills }}/{{ m.deaths }}/{{ m.assists }}</span>
+        </div>
       </div>
-      <span class="recent-summary">
-        <span class="recent-wins">{{ recentWins }}胜</span>
-        <span class="recent-losses">{{ recentMatchList.length - recentWins }}负</span>
-      </span>
     </div>
   </div>
 </template>
@@ -103,12 +109,6 @@ import { computed } from 'vue';
 import type { LiveGamePlayer, RecentMatchSummary } from '@lol-assistant/shared';
 import TierIcon from '../common/TierIcon.vue';
 import ChampionIcon from '../common/ChampionIcon.vue';
-
-const TIER_ORDER: Record<string, number> = {
-  IRON: 1, BRONZE: 2, SILVER: 3, GOLD: 4,
-  PLATINUM: 5, EMERALD: 6, DIAMOND: 7,
-  MASTER: 8, GRANDMASTER: 9, CHALLENGER: 10,
-};
 
 const POSITION_LABEL: Record<string, string> = {
   TOP: '上',
@@ -123,7 +123,7 @@ const POSITION_LABEL: Record<string, string> = {
   utility: '辅',
 };
 
-/** 预组队颜色方案 */
+/** 预组队颜色方案 - 用于卡片背景色 */
 const PREMADE_COLORS = [
   { label: '组队A', colorClass: 'premade-a' },
   { label: '组队B', colorClass: 'premade-b' },
@@ -132,13 +132,11 @@ const PREMADE_COLORS = [
 
 const props = withDefaults(defineProps<{
   player: LiveGamePlayer;
-  myTier?: string;
   isMe?: boolean;
   clickable?: boolean;
   /** 该队伍的预组队分组（从 TeamPanel 传入） */
   premadeGroups?: string[][];
 }>(), {
-  myTier: '',
   isMe: false,
   clickable: false,
   premadeGroups: () => [],
@@ -147,21 +145,6 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   click: [puuid: string];
 }>();
-
-const strengthClass = computed(() => {
-  // 自己不显示实力标记，避免"自己比自己高"的困惑
-  if (props.isMe) return 'neutral';
-  if (props.player.dataStatus !== 'loaded' || !props.myTier) return 'neutral';
-  const myOrder = TIER_ORDER[props.myTier.toUpperCase()] ?? 0;
-  const playerOrder = TIER_ORDER[props.player.tier.toUpperCase()] ?? 0;
-  if (myOrder === 0 || playerOrder === 0) return 'neutral';
-  const diff = playerOrder - myOrder;
-  if (diff >= 2) return 'much-higher';
-  if (diff === 1) return 'higher';
-  if (diff <= -2) return 'much-lower';
-  if (diff === -1) return 'lower';
-  return 'even';
-});
 
 const positionLabel = computed(() => {
   const pos = props.player.position;
@@ -175,9 +158,7 @@ const premadeTag = computed(() => {
   for (let i = 0; i < props.premadeGroups.length; i++) {
     if (props.premadeGroups[i].includes(props.player.puuid)) {
       const scheme = PREMADE_COLORS[i % PREMADE_COLORS.length];
-      const groupSize = props.premadeGroups[i].length;
       return {
-        label: `${groupSize}人组队`,
         colorClass: scheme.colorClass,
       };
     }
@@ -185,11 +166,23 @@ const premadeTag = computed(() => {
   return null;
 });
 
+/** 预组队背景色 CSS class */
+const premadeColorClass = computed(() => {
+  if (!premadeTag.value) return '';
+  return `bg-${premadeTag.value.colorClass}`;
+});
+
 /** 近期战绩列表 */
 const recentMatchList = computed<RecentMatchSummary[]>(() => props.player.recentMatches ?? []);
 
 /** 近期胜场数 */
 const recentWins = computed(() => recentMatchList.value.filter((m: RecentMatchSummary) => m.win).length);
+
+/** 近期胜率文本 */
+const recentWinRateText = computed(() => {
+  if (recentMatchList.value.length === 0) return '';
+  return `${((recentWins.value / recentMatchList.value.length) * 100).toFixed(0)}%`;
+});
 
 function handleClick() {
   if (props.clickable) {
@@ -245,27 +238,32 @@ function kdaClass(kda: number): string {
   background: rgba(0, 113, 227, 0.03);
 }
 
-/* Premade group highlight */
-.lg-player-card.has-premade {
-  border-color: rgba(255, 165, 0, 0.25);
+/* Premade group background colors - soft pastels */
+.lg-player-card.bg-premade-a {
+  background: rgba(186, 135, 240, 0.08);
+  border-color: rgba(186, 135, 240, 0.2);
 }
 
-/* Strength indicator bar (left edge) */
-.strength-bar {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  border-radius: 3px 0 0 3px;
+.lg-player-card.bg-premade-b {
+  background: rgba(102, 204, 153, 0.08);
+  border-color: rgba(102, 204, 153, 0.2);
 }
 
-.strength-bar.much-higher { background: var(--color-lose); }
-.strength-bar.higher { background: var(--color-warning); }
-.strength-bar.even { background: var(--color-text-placeholder); }
-.strength-bar.lower { background: var(--color-success); }
-.strength-bar.much-lower { background: var(--color-success); opacity: 0.6; }
-.strength-bar.neutral { background: transparent; }
+.lg-player-card.bg-premade-c {
+  background: rgba(255, 179, 102, 0.08);
+  border-color: rgba(255, 179, 102, 0.2);
+}
+
+/* Override is-me when also has premade */
+.lg-player-card.is-me.bg-premade-a {
+  background: linear-gradient(135deg, rgba(0, 113, 227, 0.03) 0%, rgba(186, 135, 240, 0.08) 100%);
+}
+.lg-player-card.is-me.bg-premade-b {
+  background: linear-gradient(135deg, rgba(0, 113, 227, 0.03) 0%, rgba(102, 204, 153, 0.08) 100%);
+}
+.lg-player-card.is-me.bg-premade-c {
+  background: linear-gradient(135deg, rgba(0, 113, 227, 0.03) 0%, rgba(255, 179, 102, 0.08) 100%);
+}
 
 /* Premade tag */
 .premade-tag {
@@ -281,18 +279,18 @@ function kdaClass(kda: number): string {
 }
 
 .premade-tag.premade-a {
-  color: #e67e22;
-  background: rgba(230, 126, 34, 0.12);
+  color: #9b59b6;
+  background: rgba(186, 135, 240, 0.15);
 }
 
 .premade-tag.premade-b {
-  color: #9b59b6;
-  background: rgba(155, 89, 182, 0.12);
+  color: #27ae60;
+  background: rgba(102, 204, 153, 0.15);
 }
 
 .premade-tag.premade-c {
-  color: #1abc9c;
-  background: rgba(26, 188, 156, 0.12);
+  color: #e67e22;
+  background: rgba(255, 179, 102, 0.15);
 }
 
 .card-main {
@@ -300,7 +298,6 @@ function kdaClass(kda: number): string {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-3) var(--space-4);
-  padding-left: calc(var(--space-4) + 3px);
 }
 
 .card-left {
@@ -472,60 +469,85 @@ function kdaClass(kda: number): string {
   font-family: var(--font-mono);
 }
 
-/* Recent matches strip */
-.recent-strip {
+/* ─── Recent matches detail ─── */
+.recent-matches {
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.recent-header {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-4) var(--space-2);
-  padding-left: calc(var(--space-4) + 3px);
+  justify-content: space-between;
 }
 
 .recent-label {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--color-text-placeholder);
-  flex-shrink: 0;
-}
-
-.match-dots {
-  display: flex;
-  gap: 3px;
-  align-items: center;
-}
-
-.match-dot {
-  width: 14px;
-  height: 6px;
-  border-radius: 2px;
-  transition: opacity var(--transition-fast);
-}
-
-.match-dot:hover {
-  opacity: 0.7;
-}
-
-.dot-win {
-  background: var(--color-win);
-}
-
-.dot-lose {
-  background: var(--color-lose);
 }
 
 .recent-summary {
   display: flex;
-  gap: 4px;
-  font-size: 9px;
+  gap: 6px;
+  font-size: 10px;
   font-family: var(--font-mono);
-  margin-left: auto;
-  flex-shrink: 0;
 }
 
 .recent-wins {
   color: var(--color-win);
+  font-weight: var(--font-semibold);
 }
 
 .recent-losses {
   color: var(--color-lose);
+  font-weight: var(--font-semibold);
+}
+
+.recent-wr {
+  color: var(--color-text-tertiary);
+}
+
+.match-list {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.match-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 5px 2px 2px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  line-height: 1.4;
+}
+
+.match-champ-icon {
+  flex-shrink: 0;
+}
+
+.match-champ-icon :deep(.icon-img),
+.match-champ-icon :deep(.icon-placeholder) {
+  width: 16px !important;
+  height: 16px !important;
+  font-size: 8px !important;
+  border-radius: 3px !important;
+}
+
+.match-item.win {
+  background: rgba(52, 199, 89, 0.1);
+}
+
+.match-item.lose {
+  background: rgba(255, 59, 48, 0.1);
+}
+
+.match-kda {
+  color: var(--color-text-secondary);
+  font-size: 10px;
 }
 </style>

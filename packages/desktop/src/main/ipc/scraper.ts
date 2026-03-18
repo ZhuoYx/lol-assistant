@@ -31,11 +31,11 @@ export function registerScraperIpcHandlers(): void {
   });
 
   // 获取英雄克制关系
-  ipcMain.handle('scraper:getChampionCounters', async (_event, championId: number) => {
+  ipcMain.handle('scraper:getChampionCounters', async (_event, championId: number, role?: string) => {
     try {
-      return await scraperManager.getChampionCounters(championId);
+      return await scraperManager.getChampionCounters(championId, role);
     } catch (err) {
-      logger.error(`IPC scraper:getChampionCounters 失败 (championId=${championId}):`, err);
+      logger.error(`IPC scraper:getChampionCounters 失败 (championId=${championId}, role=${role}):`, err);
       throw err;
     }
   });

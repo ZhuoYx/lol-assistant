@@ -47,7 +47,6 @@
         v-for="player in team.players"
         :key="player.puuid"
         :player="player"
-        :my-tier="myTier"
         :is-me="player.puuid === myPuuid"
         :clickable="true"
         :premade-groups="team.premadeGroups"
@@ -78,7 +77,6 @@ const props = defineProps<{
   team: LiveGameTeam;
   side: 'blue' | 'red';
   myPuuid?: string;
-  myTier?: string;
 }>();
 
 defineEmits<{
@@ -137,7 +135,7 @@ const premadeGroupsSummary = computed(() => {
         return player?.summonerName ?? '???';
       })
       .join(' + ');
-    return `${group.length}人组队: ${names}`;
+    return `组队: ${names}`;
   });
 });
 </script>

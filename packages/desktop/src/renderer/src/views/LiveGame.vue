@@ -72,7 +72,6 @@
             :team="blueTeam"
             side="blue"
             :my-puuid="myPuuid"
-            :my-tier="myTier"
             @player-click="handlePlayerClick"
           />
           <TeamPanel
@@ -80,7 +79,6 @@
             :team="redTeam"
             side="red"
             :my-puuid="myPuuid"
-            :my-tier="myTier"
             @player-click="handlePlayerClick"
           />
         </div>
@@ -93,28 +91,7 @@
           :enemy-labels="enemyLaneLabels"
         />
 
-        <!-- Strength legend -->
-        <div class="legend-bar">
-          <span class="legend-title">实力标记</span>
-          <div class="legend-items">
-            <span class="legend-item">
-              <span class="legend-dot much-higher" />
-              远高于你
-            </span>
-            <span class="legend-item">
-              <span class="legend-dot higher" />
-              略高于你
-            </span>
-            <span class="legend-item">
-              <span class="legend-dot even" />
-              接近
-            </span>
-            <span class="legend-item">
-              <span class="legend-dot lower" />
-              低于你
-            </span>
-          </div>
-        </div>
+
       </div>
     </div>
   </div>
@@ -125,7 +102,6 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore, useSummonerStore } from '@/stores';
 import { useLiveGameStore } from '@/stores/live-game';
-import { useRankStore } from '@/stores/rank';
 import { useLiveGame } from '@/composables/useLiveGame';
 import { EmptyState, LoadingSpinner, ErrorDisplay } from '@/components/common';
 import LiveGamePanel from '@/components/live-game/LiveGamePanel.vue';
@@ -134,7 +110,6 @@ import SpellCooldowns from '@/components/live-game/SpellCooldowns.vue';
 
 const appStore = useAppStore();
 const summonerStore = useSummonerStore();
-const rankStore = useRankStore();
 const liveGameStore = useLiveGameStore();
 const router = useRouter();
 
@@ -159,17 +134,7 @@ const isInGame = computed(() => {
 
 const myPuuid = computed(() => summonerStore.currentSummoner?.puuid ?? '');
 
-const queueId = computed(() => analysis.value?.queueId ?? 0);
-const isFlexQueue = computed(() => queueId.value === 440);
 
-const myTier = computed(() => {
-  const stats = rankStore.rankStats?.queueMap;
-  if (!stats) return '';
-  if (isFlexQueue.value) {
-    return stats.RANKED_FLEX_SR?.tier ?? stats.RANKED_SOLO_5x5?.tier ?? '';
-  }
-  return stats.RANKED_SOLO_5x5?.tier ?? stats.RANKED_FLEX_SR?.tier ?? '';
-});
 
 function handlePlayerClick(puuid: string) {
   router.push({
@@ -345,44 +310,5 @@ const enemyLaneLabels = computed<string[]>(() => {
   gap: var(--space-5);
 }
 
-/* Legend */
-.legend-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-bg-card);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border-light);
-}
 
-.legend-title {
-  font-size: var(--text-xs);
-  color: var(--color-text-placeholder);
-  flex-shrink: 0;
-}
-
-.legend-items {
-  display: flex;
-  gap: var(--space-4);
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--text-xs);
-  color: var(--color-text-tertiary);
-}
-
-.legend-dot {
-  width: 10px;
-  height: 3px;
-  border-radius: 2px;
-}
-
-.legend-dot.much-higher { background: var(--color-lose); }
-.legend-dot.higher { background: var(--color-warning); }
-.legend-dot.even { background: var(--color-text-placeholder); }
-.legend-dot.lower { background: var(--color-success); }
 </style>

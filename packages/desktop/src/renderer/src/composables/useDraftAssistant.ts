@@ -258,12 +258,13 @@ export function useDraftAssistant() {
     }
   }
 
-  async function fetchCountersForEnemy(championId: number) {
-    if (counterCache.value.has(championId)) return;
+  async function fetchCountersForEnemy(championId: number, role?: string) {
+    const cacheKey = championId;
+    if (counterCache.value.has(cacheKey)) return;
     try {
-      const counters = await window.electronAPI.getChampionCounters(championId);
+      const counters = await window.electronAPI.getChampionCounters(championId, role);
       if (counters) {
-        counterCache.value.set(championId, counters);
+        counterCache.value.set(cacheKey, counters);
         // Track data source
         dataSource.value = (counters as ChampionCounters & { dataSource?: string }).dataSource as 'opgg' | 'local' ?? 'local';
       }
@@ -271,9 +272,9 @@ export function useDraftAssistant() {
       // Use static fallback data - still add to cache to prevent re-fetching
       const staticData = CHAMPION_COUNTERS[championId];
       if (staticData) {
-        counterCache.value.set(championId, {
+        counterCache.value.set(cacheKey, {
           championId,
-          role: '',
+          role: role ?? '',
           hardCounters: staticData.counteredBy.map((id) => ({ championId: id, winRate: 0, sampleSize: 0 })),
           easyMatchups: staticData.counters.map((id) => ({ championId: id, winRate: 0, sampleSize: 0 })),
         });
@@ -283,11 +284,21 @@ export function useDraftAssistant() {
   }
 
   async function fetchAllEnemyCounters() {
-    const enemyIds = enemyTeamPicks.value.map((m) => m.championId);
-    if (enemyIds.length === 0) return;
+    const enemyPicks = enemyTeamPicks.value;
+    if (enemyPicks.length === 0) return;
+
+    // 传递每个敌方英雄的位置信息
+    const POSITION_MAP: Record<string, string> = {
+      top: 'top', jungle: 'jungle', middle: 'mid', bottom: 'adc', utility: 'support',
+    };
 
     fetchingCounters.value = true;
-    await Promise.allSettled(enemyIds.map((id) => fetchCountersForEnemy(id)));
+    await Promise.allSettled(
+      enemyPicks.map((m) => {
+        const role = m.assignedPosition ? POSITION_MAP[m.assignedPosition.toLowerCase()] : undefined;
+        return fetchCountersForEnemy(m.championId, role);
+      }),
+    );
     fetchingCounters.value = false;
   }
 

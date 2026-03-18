@@ -68,8 +68,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('scraper:getChampionBuilds', championId, role),
   refreshChampionBuilds: (championId: number) =>
     ipcRenderer.invoke('scraper:refreshChampionBuilds', championId),
-  getChampionCounters: (championId: number) =>
-    ipcRenderer.invoke('scraper:getChampionCounters', championId),
+  getChampionCounters: (championId: number, role?: string) =>
+    ipcRenderer.invoke('scraper:getChampionCounters', championId, role),
   updateScraperData: () => ipcRenderer.invoke('scraper:updateData'),
   getScraperDataVersion: () => ipcRenderer.invoke('scraper:getDataVersion'),
   getAramTierList: () => ipcRenderer.invoke('scraper:getAramTierList'),

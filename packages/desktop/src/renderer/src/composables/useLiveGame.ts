@@ -60,12 +60,11 @@ export function useLiveGame() {
   onMounted(() => {
     unsubPhase = window.electronAPI.onGamePhaseChange(handlePhaseChange);
 
-    // If already in a game, fetch immediately
+    // If already in a game, always fetch fresh data (even if we had old data)
+    // This fixes the issue where switching tabs doesn't refresh data
     const phase = appStore.gamePhase;
     if (phase === 'InProgress' || phase === 'GameStart') {
-      if (!liveGameStore.hasData) {
-        analyze();
-      }
+      analyze();
     }
   });
 

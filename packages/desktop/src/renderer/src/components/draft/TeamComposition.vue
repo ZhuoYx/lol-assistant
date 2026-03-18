@@ -161,6 +161,9 @@ function formatRole(role: string): string {
   gap: 1px;
   min-width: 0;
   flex: 1;
+  /* 固定高度，确保有无位置信息时卡片高度一致 */
+  min-height: 34px;
+  justify-content: center;
 }
 
 .champ-name {

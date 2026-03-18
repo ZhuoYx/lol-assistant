@@ -35,7 +35,7 @@ export function useGameNotification() {
 
     // 对局开始 -> 跳转到对局分析
     if (gamePhase === 'InProgress' || gamePhase === 'GameStart') {
-      if (currentRoute.name === 'DraftAssistant' || currentRoute.name === 'Home') {
+      if (currentRoute.name !== 'LiveGame') {
         router.push({ name: 'LiveGame' });
       }
     }
