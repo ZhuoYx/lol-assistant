@@ -33,6 +33,9 @@ pnpm-debug.log*
 .eslintcache
 *.tsbuildinfo
 
+# Local UI validation screenshots and measurements
+/specs/previews/
+
 # Scraper data (runtime generated)
 scraper-data/
 

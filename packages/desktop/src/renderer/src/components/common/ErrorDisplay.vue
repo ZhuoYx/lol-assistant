@@ -78,7 +78,7 @@ defineEmits<{
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
   color: var(--color-accent);
-  background: transparent;
+  background-color: transparent;
   border: 1px solid var(--color-accent);
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -86,7 +86,7 @@ defineEmits<{
 }
 
 .retry-btn:hover {
-  background: var(--color-accent);
+  background-color: var(--color-accent);
   color: #ffffff;
 }
 </style>

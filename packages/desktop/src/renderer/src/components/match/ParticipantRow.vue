@@ -5,9 +5,17 @@
     @click="$emit('clickPlayer', participant.puuid)"
   >
     <div class="pr-champ">
-      <ChampionIcon :champion-id="participant.championId" :name="participant.championName" size="sm" />
+      <ChampionIcon
+        :champion-id="participant.championId"
+        :name="participant.championName"
+        size="sm"
+      />
       <div class="pr-name-col">
-        <span class="pr-name" :class="{ me: isMe }">
+        <span
+          class="pr-name"
+          :class="{ me: isMe }"
+          :title="participant.summonerName + (participant.tagLine ? '#' + participant.tagLine : '')"
+        >
           {{ participant.summonerName }}
           <span v-if="participant.tagLine" class="pr-id">#{{ participant.tagLine }}</span>
         </span>
@@ -18,7 +26,9 @@
       <div class="kda-row">
         <span v-if="participant.isMVP" class="badge badge-mvp">MVP</span>
         <span v-if="participant.isSVP" class="badge badge-svp">SVP</span>
-        <span class="kda-numbers">{{ participant.kills }}/{{ participant.deaths }}/{{ participant.assists }}</span>
+        <span class="kda-numbers"
+          >{{ participant.kills }}/{{ participant.deaths }}/{{ participant.assists }}</span
+        >
       </div>
       <span class="kda-ratio" :class="kdaColorClass">{{ kdaValue }} KDA</span>
     </div>
@@ -76,7 +86,11 @@ defineEmits<{
 }>();
 
 const kdaValue = computed(() =>
-  calculateKDA(props.participant.kills, props.participant.deaths, props.participant.assists).toFixed(1),
+  calculateKDA(
+    props.participant.kills,
+    props.participant.deaths,
+    props.participant.assists,
+  ).toFixed(1),
 );
 
 const kdaColorClass = computed(() => {
@@ -130,7 +144,8 @@ function onItemImgError(event: Event) {
 <style scoped>
 .participant-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 0.7fr 1.5fr;
+  grid-template-columns: var(--participant-columns);
+  min-width: 820px;
   align-items: center;
   padding: var(--space-2) var(--space-4);
   cursor: pointer;
@@ -138,15 +153,15 @@ function onItemImgError(event: Event) {
 }
 
 .participant-row:hover {
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
 }
 
 .participant-row.is-me {
-  background: rgba(0, 113, 227, 0.05);
+  background-color: rgba(0, 113, 227, 0.05);
 }
 
 .participant-row.is-me:hover {
-  background: rgba(0, 113, 227, 0.08);
+  background-color: rgba(0, 113, 227, 0.08);
 }
 
 .pr-champ {
@@ -240,9 +255,16 @@ function onItemImgError(event: Event) {
   color: var(--color-text-tertiary);
 }
 
-.kda-ratio.gold { color: var(--color-gold); font-weight: var(--font-semibold); }
-.kda-ratio.good { color: var(--color-win); }
-.kda-ratio.poor { color: var(--color-text-placeholder); }
+.kda-ratio.gold {
+  color: var(--color-highlight-text);
+  font-weight: var(--font-semibold);
+}
+.kda-ratio.good {
+  color: var(--color-win-text);
+}
+.kda-ratio.poor {
+  color: var(--color-text-placeholder);
+}
 
 .pr-damage,
 .pr-damage-taken {
@@ -261,7 +283,7 @@ function onItemImgError(event: Event) {
 
 .damage-bar-bg {
   height: 4px;
-  background: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary);
   border-radius: var(--radius-full);
   overflow: hidden;
   width: 80px;
@@ -274,18 +296,18 @@ function onItemImgError(event: Event) {
 }
 
 .damage-bar-fill.damage-dealt {
-  background: var(--color-lose);
+  background-color: var(--color-lose);
 }
 
 .damage-bar-fill.damage-taken {
-  background: #5b8def;
+  background-color: #5b8def;
 }
 
 .pr-gold {
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
   font-family: var(--font-mono);
-  color: var(--color-gold);
+  color: var(--color-highlight-text);
 }
 
 /* 装备栏 */
@@ -304,7 +326,7 @@ function onItemImgError(event: Event) {
 }
 
 .item-slot.empty {
-  background: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary);
   border: 1px solid var(--color-border-light);
 }
 

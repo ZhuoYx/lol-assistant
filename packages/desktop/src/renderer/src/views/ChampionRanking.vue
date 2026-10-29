@@ -1,14 +1,11 @@
 <template>
   <div class="page ranking-page">
-    <header class="page-header">
-      <div class="header-left">
-        <h1 class="page-title">英雄排名</h1>
-        <p class="page-subtitle">OP.GG 实时数据 · 排位热度 & 胜率</p>
-      </div>
-    </header>
+    <PageHeader title="英雄排名" subtitle="所选攻略来源 · 排位热度与胜率"
+      ><template #actions><DataSourceSelect /></template
+    ></PageHeader>
 
     <!-- Filters -->
-    <div class="filter-bar">
+    <div class="filter-bar glass-panel">
       <div class="filter-group">
         <label class="filter-label">分路</label>
         <div class="filter-selector-wrap">
@@ -18,7 +15,17 @@
               {{ pos.label }}
             </option>
           </select>
-          <svg class="selector-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            class="selector-arrow"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </div>
@@ -32,31 +39,50 @@
               {{ t.label }}
             </option>
           </select>
-          <svg class="selector-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            class="selector-arrow"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </div>
       </div>
 
       <div class="filter-meta">
-        <span v-if="rankingData" class="meta-badge">
-          v{{ rankingData.patch }}
-        </span>
+        <span v-if="rankingData" class="meta-badge"> v{{ rankingData.patch }} </span>
         <span class="meta-count">{{ filteredRankings.length }} 英雄</span>
       </div>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="loading-section">
+    <div v-if="loading" class="loading-section glass-surface">
       <LoadingSpinner size="lg" />
       <span class="loading-text">正在获取排名数据...</span>
     </div>
 
     <!-- Error -->
     <div v-else-if="error" class="error-section">
-      <div class="error-card">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+      <div class="error-card glass-surface">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
         <span class="error-text">{{ error }}</span>
         <button class="retry-btn" @click="fetchData">重试</button>
@@ -64,7 +90,13 @@
     </div>
 
     <!-- Ranking Table -->
-    <div v-else-if="filteredRankings.length > 0" class="ranking-table-wrap">
+    <div
+      v-else-if="filteredRankings.length > 0"
+      class="ranking-table-wrap glass-panel"
+      tabindex="0"
+      role="region"
+      aria-label="英雄排名数据，可横向滚动查看完整列"
+    >
       <table class="ranking-table">
         <thead>
           <tr>
@@ -72,19 +104,41 @@
             <th class="col-champ">英雄</th>
             <th v-if="!selectedPosition" class="col-pos">位置</th>
             <th class="col-tier">梯队</th>
-            <th class="col-stat sortable" :class="{ active: sortKey === 'winRate' }" @click="toggleSort('winRate')">
+            <th
+              class="col-stat sortable"
+              :class="{ active: sortKey === 'winRate' }"
+              @click="toggleSort('winRate')"
+            >
               胜率
-              <span class="sort-icon">{{ sortKey === 'winRate' ? (sortAsc ? '↑' : '↓') : '' }}</span>
+              <span class="sort-icon">{{
+                sortKey === 'winRate' ? (sortAsc ? '↑' : '↓') : ''
+              }}</span>
             </th>
-            <th class="col-stat sortable" :class="{ active: sortKey === 'pickRate' }" @click="toggleSort('pickRate')">
+            <th
+              class="col-stat sortable"
+              :class="{ active: sortKey === 'pickRate' }"
+              @click="toggleSort('pickRate')"
+            >
               登场率
-              <span class="sort-icon">{{ sortKey === 'pickRate' ? (sortAsc ? '↑' : '↓') : '' }}</span>
+              <span class="sort-icon">{{
+                sortKey === 'pickRate' ? (sortAsc ? '↑' : '↓') : ''
+              }}</span>
             </th>
-            <th class="col-stat sortable" :class="{ active: sortKey === 'banRate' }" @click="toggleSort('banRate')">
+            <th
+              class="col-stat sortable"
+              :class="{ active: sortKey === 'banRate' }"
+              @click="toggleSort('banRate')"
+            >
               禁用率
-              <span class="sort-icon">{{ sortKey === 'banRate' ? (sortAsc ? '↑' : '↓') : '' }}</span>
+              <span class="sort-icon">{{
+                sortKey === 'banRate' ? (sortAsc ? '↑' : '↓') : ''
+              }}</span>
             </th>
-            <th class="col-stat sortable" :class="{ active: sortKey === 'kda' }" @click="toggleSort('kda')">
+            <th
+              class="col-stat sortable"
+              :class="{ active: sortKey === 'kda' }"
+              @click="toggleSort('kda')"
+            >
               KDA
               <span class="sort-icon">{{ sortKey === 'kda' ? (sortAsc ? '↑' : '↓') : '' }}</span>
             </th>
@@ -103,7 +157,11 @@
             </td>
             <td class="col-champ">
               <div class="champ-cell">
-                <ChampionIcon :champion-id="item.championId" :name="getChampName(item.championId)" size="sm" />
+                <ChampionIcon
+                  :champion-id="item.championId"
+                  :name="getChampName(item.championId)"
+                  size="sm"
+                />
                 <span class="champ-name">{{ getChampName(item.championId) }}</span>
               </div>
             </td>
@@ -111,30 +169,37 @@
               <span class="pos-badge" :class="item.position">{{ posLabel(item.position) }}</span>
             </td>
             <td class="col-tier">
-              <span class="tier-badge" :class="`tier-${item.tier}`">{{ tierLabel(item.tier) }}</span>
+              <span class="tier-badge" :class="`tier-${item.tier}`">{{
+                tierLabel(item.tier)
+              }}</span>
             </td>
             <td class="col-stat">
-              <span class="stat-val" :class="{ 'high-wr': item.winRate > 0.52, 'low-wr': item.winRate < 0.48 }">
+              <span
+                class="stat-val"
+                :class="{ 'high-wr': item.winRate > 0.52, 'low-wr': item.winRate < 0.48 }"
+              >
                 {{ (item.winRate * 100).toFixed(1) }}%
               </span>
             </td>
             <td class="col-stat">{{ (item.pickRate * 100).toFixed(1) }}%</td>
             <td class="col-stat">{{ (item.banRate * 100).toFixed(1) }}%</td>
-            <td class="col-stat">{{ item.kda.toFixed(2) }}</td>
-            <td class="col-games">{{ formatGames(item.games) }}</td>
+            <td class="col-stat">{{ item.kda > 0 ? item.kda.toFixed(2) : '—' }}</td>
+            <td class="col-games">{{ item.games > 0 ? formatGames(item.games) : '—' }}</td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <!-- Empty -->
-    <div v-else class="empty-section">
+    <div v-else class="empty-section glass-surface">
       <span class="empty-text">暂无排名数据</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import DataSourceSelect from '@/components/common/DataSourceSelect.vue';
+import PageHeader from '@/components/common/PageHeader.vue';
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { LoadingSpinner, ChampionIcon } from '@/components/common';
@@ -285,32 +350,12 @@ onMounted(() => {
   margin: 0 auto;
 }
 
-.page-header {
-  margin-bottom: var(--space-5);
-}
-
-.page-title {
-  font-size: var(--text-2xl);
-  font-weight: var(--font-bold);
-  letter-spacing: -0.5px;
-  color: var(--color-text-primary);
-}
-
-.page-subtitle {
-  font-size: var(--text-sm);
-  color: var(--color-text-tertiary);
-  margin-top: var(--space-1);
-}
-
 /* ─── Filter bar ─── */
 .filter-bar {
   display: flex;
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-3) var(--space-4);
-  background: var(--color-bg-card);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--color-border-light);
   margin-bottom: var(--space-4);
   flex-wrap: wrap;
 }
@@ -339,7 +384,7 @@ onMounted(() => {
 .filter-selector {
   appearance: none;
   -webkit-appearance: none;
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 5px 28px 5px 10px;
@@ -378,7 +423,7 @@ onMounted(() => {
 .meta-badge {
   padding: 2px var(--space-2);
   border-radius: var(--radius-sm);
-  background: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary);
   font-size: 10px;
   font-family: var(--font-mono);
   color: var(--color-text-tertiary);
@@ -397,7 +442,9 @@ onMounted(() => {
   justify-content: center;
   gap: var(--space-3);
   padding: var(--space-12) 0;
-  background: var(--color-bg-card);
+  background-color: var(--color-bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-light);
 }
@@ -416,7 +463,8 @@ onMounted(() => {
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  background: rgba(255, 69, 58, 0.06);
+  --glass-tint: linear-gradient(var(--color-lose-bg), var(--color-lose-bg));
+  background-color: var(--color-bg-card);
   border-radius: var(--radius-lg);
   border: 1px solid rgba(255, 69, 58, 0.12);
 }
@@ -436,7 +484,7 @@ onMounted(() => {
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   font-size: var(--text-xs);
   color: var(--color-text-primary);
   cursor: pointer;
@@ -445,7 +493,7 @@ onMounted(() => {
 }
 
 .retry-btn:hover {
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
   border-color: var(--color-accent);
   color: var(--color-accent);
 }
@@ -455,7 +503,9 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   padding: var(--space-12);
-  background: var(--color-bg-card);
+  background-color: var(--color-bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-light);
 }
@@ -467,9 +517,6 @@ onMounted(() => {
 
 /* ─── Ranking Table ─── */
 .ranking-table-wrap {
-  background: var(--color-bg-card);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--color-border-light);
   overflow: hidden;
 }
 
@@ -487,7 +534,7 @@ onMounted(() => {
   text-transform: uppercase;
   letter-spacing: 0.3px;
   text-align: left;
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border-light);
   white-space: nowrap;
   user-select: none;
@@ -525,7 +572,7 @@ onMounted(() => {
 }
 
 .ranking-row:hover {
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
 }
 
 .ranking-row:last-child td {
@@ -533,12 +580,34 @@ onMounted(() => {
 }
 
 /* Column widths */
-.col-rank { width: 44px; text-align: center; }
-.col-champ { width: auto; }
-.col-pos { width: 48px; text-align: center; }
-.col-tier { width: 52px; text-align: center; }
-.col-stat { width: 72px; text-align: right; font-family: var(--font-mono); font-size: 11px; }
-.col-games { width: 64px; text-align: right; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-tertiary); }
+.col-rank {
+  width: 44px;
+  text-align: center;
+}
+.col-champ {
+  width: auto;
+}
+.col-pos {
+  width: 48px;
+  text-align: center;
+}
+.col-tier {
+  width: 52px;
+  text-align: center;
+}
+.col-stat {
+  width: 72px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.col-games {
+  width: 64px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
 
 /* Rank number */
 .rank-num {
@@ -549,7 +618,7 @@ onMounted(() => {
 }
 
 .rank-num.top-3 {
-  color: var(--color-gold);
+  color: var(--color-highlight-text);
   font-weight: var(--font-bold);
 }
 
@@ -581,15 +650,30 @@ onMounted(() => {
   border-radius: var(--radius-sm);
   font-size: 9px;
   font-weight: var(--font-bold);
-  background: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary);
   color: var(--color-text-secondary);
 }
 
-.pos-badge.top { background: rgba(255, 179, 71, 0.12); color: #ffb347; }
-.pos-badge.jungle { background: rgba(34, 197, 94, 0.12); color: #22c55e; }
-.pos-badge.mid { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
-.pos-badge.adc { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
-.pos-badge.support { background: rgba(168, 85, 247, 0.12); color: #a855f7; }
+.pos-badge.top {
+  background-color: rgba(255, 179, 71, 0.12);
+  color: #ffb347;
+}
+.pos-badge.jungle {
+  background-color: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+.pos-badge.mid {
+  background-color: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+}
+.pos-badge.adc {
+  background-color: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+.pos-badge.support {
+  background-color: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+}
 
 /* Tier badge */
 .tier-badge {
@@ -603,13 +687,58 @@ onMounted(() => {
   font-family: var(--font-mono);
 }
 
-.tier-badge.tier-1 { background: rgba(255, 59, 48, 0.12); color: #ff3b30; }
-.tier-badge.tier-2 { background: rgba(255, 149, 0, 0.12); color: #ff9500; }
-.tier-badge.tier-3 { background: rgba(52, 199, 89, 0.12); color: #34c759; }
-.tier-badge.tier-4 { background: rgba(90, 200, 250, 0.12); color: #5ac8fa; }
-.tier-badge.tier-5 { background: var(--color-bg-tertiary); color: var(--color-text-tertiary); }
+.tier-badge.tier-1 {
+  background-color: rgba(255, 59, 48, 0.12);
+  color: #ff3b30;
+}
+.tier-badge.tier-2 {
+  background-color: rgba(255, 149, 0, 0.12);
+  color: #ff9500;
+}
+.tier-badge.tier-3 {
+  background-color: rgba(52, 199, 89, 0.12);
+  color: #34c759;
+}
+.tier-badge.tier-4 {
+  background-color: rgba(90, 200, 250, 0.12);
+  color: #5ac8fa;
+}
+.tier-badge.tier-5 {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-text-tertiary);
+}
 
 /* Win rate colors */
-.stat-val.high-wr { color: var(--color-win); }
-.stat-val.low-wr { color: var(--color-error); }
+.stat-val.high-wr {
+  color: var(--color-win-text);
+}
+.stat-val.low-wr {
+  color: var(--color-error);
+}
+
+.ranking-table-wrap {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.ranking-table {
+  min-width: 760px;
+}
+.champ-cell,
+.champ-name {
+  min-width: 0;
+}
+.champ-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.filter-bar {
+  gap: 12px 20px;
+}
+@container workspace (max-width: 580px) {
+  .filter-meta {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+}
 </style>

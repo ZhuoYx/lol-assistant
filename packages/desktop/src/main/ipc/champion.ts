@@ -4,8 +4,7 @@
  * 通过 PUUID 请求 LCU API 获取最近 30 条战绩，
  * 不走缓存、不请求 detail 接口，仅通过 transformMatchList 转换数据后按英雄聚合统计
  *
- * 注意：MATCH_HISTORY_BY_PUUID 接口不支持分页（begIndex/endIndex 被忽略），
- * 因此只取一次请求返回的最近 30 条数据
+ * 此模块只统计最近样本；战绩列表使用独立的 begIndex/endIndex 分页。
  */
 import { ipcMain } from 'electron';
 import { lcuAPI } from '../lcu/api';

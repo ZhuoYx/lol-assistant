@@ -1,5 +1,5 @@
 <template>
-  <div class="lp-chart">
+  <div class="lp-chart glass-panel">
     <h3 class="chart-title">{{ title }}</h3>
     <div v-if="data.length > 1" class="chart-container">
       <svg :viewBox="`0 0 ${width} ${height}`" class="chart-svg">
@@ -53,12 +53,15 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-const props = withDefaults(defineProps<{
-  title?: string;
-  data: number[];
-}>(), {
-  title: '胜点走势',
-});
+const props = withDefaults(
+  defineProps<{
+    title?: string;
+    data: number[];
+  }>(),
+  {
+    title: '胜点走势',
+  },
+);
 
 const width = 400;
 const height = 160;
@@ -80,9 +83,7 @@ const points = computed(() =>
 
 const linePath = computed(() => {
   if (points.value.length < 2) return '';
-  return points.value
-    .map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`))
-    .join(' ');
+  return points.value.map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`)).join(' ');
 });
 
 const areaPath = computed(() => {
@@ -95,9 +96,7 @@ const areaPath = computed(() => {
 
 const gridLines = computed(() => {
   const count = 4;
-  return Array.from({ length: count }, (_, i) =>
-    padding + (i / (count - 1)) * chartHeight.value,
-  );
+  return Array.from({ length: count }, (_, i) => padding + (i / (count - 1)) * chartHeight.value);
 });
 
 const yLabels = computed(() => {
@@ -110,9 +109,6 @@ const yLabels = computed(() => {
 
 <style scoped>
 .lp-chart {
-  background: var(--color-bg-card);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--color-border-light);
   padding: var(--space-4);
 }
 

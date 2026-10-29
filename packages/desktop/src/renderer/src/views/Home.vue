@@ -1,9 +1,19 @@
 <template>
   <div class="page home-page">
+    <PageHeader title="概览" subtitle="账号状态、排位进度与近期战绩" />
     <!-- 查看他人数据时的返回横幅 -->
     <div v-if="viewingOther" class="other-banner">
       <button class="back-btn" @click="goBackToMine">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
           <polyline points="15 18 9 12 15 6" />
         </svg>
         返回我的账号
@@ -13,10 +23,7 @@
 
     <div class="home-grid">
       <!-- Summoner Card -->
-      <SummonerCard
-        :summoner="displaySummoner"
-        :is-connected="appStore.isConnected"
-      />
+      <SummonerCard :summoner="displaySummoner" :is-connected="appStore.isConnected" />
 
       <!-- Solo/Duo Rank -->
       <RankCard
@@ -51,16 +58,22 @@
               <span class="match-champion-name">{{ match.championName || '未知英雄' }}</span>
               <div class="match-meta-row">
                 <span class="match-result">{{ match.win ? '胜利' : '失败' }}</span>
-                <span class="match-mode-tag" :class="getQueueTagClass(match)">{{ getQueueName(match) }}</span>
+                <span class="match-mode-tag" :class="getQueueTagClass(match)">{{
+                  getQueueName(match)
+                }}</span>
               </div>
             </div>
             <div class="match-kda">
               <div class="kda-row">
                 <span v-if="match.isMVP" class="badge badge-mvp">MVP</span>
                 <span v-if="match.isSVP" class="badge badge-svp">SVP</span>
-                <span class="kda-text">{{ match.kills }}/{{ match.deaths }}/{{ match.assists }}</span>
+                <span class="kda-text"
+                  >{{ match.kills }}/{{ match.deaths }}/{{ match.assists }}</span
+                >
               </div>
-              <span class="kda-value" :class="getKdaClass(match)">{{ calculateKDA(match.kills, match.deaths, match.assists).toFixed(1) }} KDA</span>
+              <span class="kda-value" :class="getKdaClass(match)"
+                >{{ calculateKDA(match.kills, match.deaths, match.assists).toFixed(1) }} KDA</span
+              >
             </div>
             <span class="match-time">{{ formatRelativeTime(match.gameCreation) }}</span>
           </div>
@@ -80,6 +93,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '@/components/common/PageHeader.vue';
 import { computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAppStore, useSummonerStore, useMatchStore, useRankStore } from '@/stores';
@@ -135,7 +149,13 @@ function getQueueTagClass(match: { queueId: number; gameMode: string }): string 
   return 'tag-normal';
 }
 
-function getKdaClass(match: { kills: number; deaths: number; assists: number; isMVP?: boolean; isSVP?: boolean }): string {
+function getKdaClass(match: {
+  kills: number;
+  deaths: number;
+  assists: number;
+  isMVP?: boolean;
+  isSVP?: boolean;
+}): string {
   if (match.isMVP || match.isSVP) return 'kda-gold';
   const kda = calculateKDA(match.kills, match.deaths, match.assists);
   if (kda >= 1) return 'kda-good';
@@ -187,15 +207,23 @@ function loadHomeData() {
 }
 
 // 搜索后路由带 puuid query，触发切换
-watch(() => route.query.puuid, async (puuid) => {
-  if (puuid && typeof puuid === 'string') {
-    await switchToPlayer(puuid);
-  }
-}, { immediate: false });
+watch(
+  () => route.query.puuid,
+  async (puuid) => {
+    if (puuid && typeof puuid === 'string') {
+      await switchToPlayer(puuid);
+    }
+  },
+  { immediate: false },
+);
 
-watch(() => summonerStore.currentSummoner, (val) => {
-  if (val) loadHomeData();
-}, { immediate: true });
+watch(
+  () => summonerStore.currentSummoner,
+  (val) => {
+    if (val) loadHomeData();
+  },
+  { immediate: true },
+);
 
 onMounted(async () => {
   const queryPUUID = route.query.puuid as string | undefined;
@@ -221,7 +249,7 @@ onMounted(async () => {
   gap: var(--space-3);
   margin-bottom: var(--space-4);
   padding: var(--space-3) var(--space-4);
-  background: rgba(0, 113, 227, 0.06);
+  background-color: rgba(0, 113, 227, 0.06);
   border: 1px solid rgba(0, 113, 227, 0.15);
   border-radius: var(--radius-lg);
 }
@@ -234,7 +262,7 @@ onMounted(async () => {
   font-size: var(--text-xs);
   font-weight: var(--font-medium);
   color: var(--color-accent);
-  background: rgba(0, 113, 227, 0.06);
+  background-color: rgba(0, 113, 227, 0.06);
   border: 1px solid rgba(0, 113, 227, 0.2);
   border-radius: var(--radius-full);
   cursor: pointer;
@@ -242,7 +270,7 @@ onMounted(async () => {
 }
 
 .back-btn:hover {
-  background: rgba(0, 113, 227, 0.12);
+  background-color: rgba(0, 113, 227, 0.12);
   border-color: rgba(0, 113, 227, 0.4);
 }
 
@@ -259,10 +287,7 @@ onMounted(async () => {
 }
 
 .card {
-  background: var(--color-bg-card);
-  border-radius: var(--radius-xl);
   padding: var(--space-5);
-  border: 1px solid var(--color-border-light);
   transition: box-shadow var(--transition-normal);
 }
 
@@ -303,19 +328,19 @@ onMounted(async () => {
 
 /* 胜负淡色背景区分 */
 .recent-match-item.win {
-  background: rgba(52, 199, 89, 0.06);
+  background-color: rgba(52, 199, 89, 0.06);
 }
 
 .recent-match-item.lose {
-  background: rgba(255, 59, 48, 0.06);
+  background-color: rgba(255, 59, 48, 0.06);
 }
 
 .recent-match-item.win:hover {
-  background: rgba(52, 199, 89, 0.12);
+  background-color: rgba(52, 199, 89, 0.12);
 }
 
 .recent-match-item.lose:hover {
-  background: rgba(255, 59, 48, 0.12);
+  background-color: rgba(255, 59, 48, 0.12);
 }
 
 .match-result-bar {
@@ -325,8 +350,12 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.win .match-result-bar { background: var(--color-win); }
-.lose .match-result-bar { background: var(--color-lose); }
+.win .match-result-bar {
+  background-color: var(--color-win);
+}
+.lose .match-result-bar {
+  background-color: var(--color-lose);
+}
 
 .match-info {
   display: flex;
@@ -356,8 +385,12 @@ onMounted(async () => {
   font-weight: var(--font-semibold);
 }
 
-.win .match-result { color: var(--color-win); }
-.lose .match-result { color: var(--color-lose); }
+.win .match-result {
+  color: var(--color-win-text);
+}
+.lose .match-result {
+  color: var(--color-lose-text);
+}
 
 .match-mode-tag {
   font-size: 10px;
@@ -368,27 +401,27 @@ onMounted(async () => {
 }
 
 .tag-ranked {
-  background: rgba(99, 132, 255, 0.12);
+  background-color: rgba(99, 132, 255, 0.12);
   color: #6384ff;
 }
 
 .tag-aram {
-  background: rgba(46, 216, 176, 0.12);
+  background-color: rgba(46, 216, 176, 0.12);
   color: #2ed8b0;
 }
 
 .tag-fun {
-  background: rgba(255, 168, 38, 0.12);
+  background-color: rgba(255, 168, 38, 0.12);
   color: #ffa826;
 }
 
 .tag-normal {
-  background: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary);
   color: var(--color-text-tertiary);
 }
 
 .tag-bot {
-  background: rgba(162, 132, 94, 0.12);
+  background-color: rgba(162, 132, 94, 0.12);
   color: #a2845e;
 }
 
@@ -444,12 +477,12 @@ onMounted(async () => {
 }
 
 .kda-value.kda-gold {
-  color: var(--color-gold);
+  color: var(--color-highlight-text);
   font-weight: var(--font-semibold);
 }
 
 .kda-value.kda-good {
-  color: var(--color-win);
+  color: var(--color-win-text);
 }
 
 .kda-value.kda-poor {
@@ -474,10 +507,77 @@ onMounted(async () => {
   color: var(--color-text-placeholder);
 }
 
-@media (max-width: 800px) {
+.home-grid {
+  grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.home-grid > * {
+  min-width: 0;
+}
+.home-grid > .summoner-card {
+  grid-column: auto;
+}
+.match-info {
+  min-width: 0;
+  flex: 1;
+}
+.match-champion-name {
+  max-width: none;
+}
+.other-banner {
+  flex-wrap: wrap;
+}
+.other-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@container workspace (max-width: 1000px) {
   .home-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .home-grid > .summoner-card {
+    grid-column: 1 / -1;
   }
 }
-
+@container workspace (max-width: 580px) {
+  .home-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .home-grid > .summoner-card {
+    grid-column: auto;
+  }
+  .recent-match-item {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .match-time {
+    flex-basis: 100%;
+    text-align: left;
+    padding-left: 56px;
+  }
+  .match-info {
+    min-width: 100px;
+  }
+}
+.recent-card {
+  background-color: var(--color-bg-readable);
+}
+.match-time,
+.kda-value {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.match-mode-tag {
+  font-size: 12px;
+}
+.tag-aram {
+  color: var(--color-success-text);
+}
+.tag-ranked,
+.kda-good {
+  color: var(--color-win-text);
+}
+.tag-fun {
+  color: var(--color-warning);
+}
 </style>

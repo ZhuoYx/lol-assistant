@@ -29,8 +29,18 @@
     </div>
     <div v-else-if="!isConnected" class="state-empty">
       <div class="state-icon">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18.36 6.64a9 9 0 1 1-12.73 0" /><line x1="12" y1="2" x2="12" y2="12" />
+        <svg
+          width="36"
+          height="36"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+          <line x1="12" y1="2" x2="12" y2="12" />
         </svg>
       </div>
       <p class="state-title">未连接客户端</p>
@@ -57,7 +67,9 @@ const avatarError = ref(false);
 
 const summonerName = computed(() => {
   if (!props.summoner) return '';
-  return props.summoner.gameName || props.summoner.displayName || props.summoner.internalName || '召唤师';
+  return (
+    props.summoner.gameName || props.summoner.displayName || props.summoner.internalName || '召唤师'
+  );
 });
 
 const avatarUrl = computed(() => {
@@ -120,7 +132,9 @@ const totalXp = computed(() => {
   right: -4px;
   font-size: 10px;
   font-weight: var(--font-bold);
-  background: var(--color-bg-card);
+  background-color: var(--color-bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   color: var(--color-text-primary);
   padding: 1px 6px;
   border-radius: var(--radius-full);
@@ -156,7 +170,7 @@ const totalXp = computed(() => {
 
 .xp-bar {
   height: 4px;
-  background: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary);
   border-radius: var(--radius-full);
   overflow: hidden;
 }

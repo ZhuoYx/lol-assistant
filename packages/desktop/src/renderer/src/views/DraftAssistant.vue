@@ -1,46 +1,69 @@
 <template>
   <div class="page draft-page">
-    <header class="page-header">
-      <div class="header-left">
-        <h1 class="page-title">选人助手</h1>
-        <p class="page-subtitle">
-          <template v-if="isInChampSelect && session && isAram">{{ aramModeName }} · 英雄交换与推荐</template>
-          <template v-else>BP 阶段克制推荐与队伍分析</template>
-        </p>
-      </div>
-      <div v-if="isInChampSelect && session" class="header-right">
-        <span v-if="isAram && isHextechAram" class="mode-badge hextech">海克斯大乱斗</span>
-        <span v-else-if="isAram" class="mode-badge aram">大乱斗</span>
-        <span v-else class="mode-badge ranked">排位/匹配</span>
-        <div class="timer-pill" :class="timerPhase.toLowerCase()">
-          <span class="timer-phase">{{ phaseLabel }}</span>
-          <span v-if="timeLeft > 0" class="timer-count">{{ timeLeft }}s</span>
-        </div>
-      </div>
-    </header>
+    <PageHeader
+      title="选人助手"
+      :subtitle="
+        isInChampSelect && session && isAram
+          ? aramModeName + ' · 英雄交换与推荐'
+          : 'BP 阶段克制推荐与队伍分析'
+      "
+      ><template #actions
+        ><DataSourceSelect />
+        <div v-if="isInChampSelect && session" class="draft-status">
+          <span v-if="isAram && isHextechAram" class="mode-badge hextech">海克斯大乱斗</span
+          ><span v-else-if="isAram" class="mode-badge aram">大乱斗</span
+          ><span v-else class="mode-badge ranked">排位/匹配</span>
+          <div class="timer-pill" :class="timerPhase.toLowerCase()">
+            <span class="timer-phase">{{ phaseLabel }}</span
+            ><span v-if="timeLeft > 0" class="timer-count">{{ timeLeft }}s</span>
+          </div>
+        </div></template
+      ></PageHeader
+    >
 
     <div class="draft-content">
       <!-- Not connected -->
       <EmptyState
+        class="glass-panel"
         v-if="!appStore.isConnected"
         title="未连接客户端"
         description="请启动英雄联盟客户端以使用选人助手"
       >
         <template #icon>
-          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18.36 6.64a9 9 0 1 1-12.73 0" /><line x1="12" y1="2" x2="12" y2="12" />
+          <svg
+            width="44"
+            height="44"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+            <line x1="12" y1="2" x2="12" y2="12" />
           </svg>
         </template>
       </EmptyState>
 
       <!-- Not in champ select -->
       <EmptyState
+        class="glass-panel"
         v-else-if="!isInChampSelect || !session"
         title="未在选人阶段"
         description="进入排位/匹配/大乱斗选人阶段后将自动显示推荐"
       >
         <template #icon>
-          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+          <svg
+            width="44"
+            height="44"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
         </template>
@@ -55,7 +78,7 @@
             <div
               v-for="member in myTeamPicks"
               :key="member.cellId"
-              class="aram-champion-card"
+              class="aram-champion-card glass-surface"
               :class="{ 'is-me': member.cellId === localPlayerCellId }"
             >
               <div class="aram-champ-icon">
@@ -70,10 +93,15 @@
               </div>
               <span class="aram-champ-name">{{ getChampName(member.championId) }}</span>
               <div v-if="getAramTier(member.championId)" class="aram-tier-info">
-                <span class="tier-badge" :class="`tier-${getAramTier(member.championId)!.tier.replace('+', 'plus').toLowerCase()}`">
+                <span
+                  class="tier-badge"
+                  :class="`tier-${getAramTier(member.championId)!.tier.replace('+', 'plus').toLowerCase()}`"
+                >
                   {{ getAramTier(member.championId)!.tier }}
                 </span>
-                <span class="tier-winrate">{{ getAramTier(member.championId)!.winRate.toFixed(1) }}%</span>
+                <span class="tier-winrate"
+                  >{{ getAramTier(member.championId)!.winRate.toFixed(1) }}%</span
+                >
               </div>
               <span v-if="member.cellId === localPlayerCellId" class="me-tag">我</span>
             </div>
@@ -87,7 +115,7 @@
             <div
               v-for="champId in benchChampions"
               :key="champId"
-              class="bench-champion-card"
+              class="bench-champion-card glass-surface"
               :class="{ 'is-swapping': swappingChampionId === champId }"
               @click="benchSwapChampion(champId)"
             >
@@ -101,7 +129,10 @@
               </div>
               <span class="bench-champ-name">{{ getChampName(champId) }}</span>
               <div v-if="getAramTier(champId)" class="bench-tier-info">
-                <span class="tier-badge small" :class="`tier-${getAramTier(champId)!.tier.replace('+', 'plus').toLowerCase()}`">
+                <span
+                  class="tier-badge small"
+                  :class="`tier-${getAramTier(champId)!.tier.replace('+', 'plus').toLowerCase()}`"
+                >
                   {{ getAramTier(champId)!.tier }}
                 </span>
                 <span class="bench-winrate">{{ getAramTier(champId)!.winRate.toFixed(1) }}%</span>
@@ -113,13 +144,24 @@
         <!-- ARAM 提示 -->
         <div class="aram-tips card">
           <div class="tips-header">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
             <span>{{ aramModeName }}小贴士</span>
           </div>
           <p class="tips-text">
-            点击板凳上的英雄可直接交换。Tier 和胜率数据来自 OP.GG ARAM 统计。
+            点击板凳上的英雄可直接交换。所选来源暂未提供此模式的强度数据时，将不显示 Tier 与胜率。
           </p>
         </div>
       </div>
@@ -146,6 +188,10 @@
         </div>
 
         <!-- Bottom: counter suggestions -->
+        <div v-if="error" class="source-error glass-surface" role="status">
+          <span>{{ error }}</span
+          ><button :disabled="fetchingCounters" @click="retryCounters">重试</button>
+        </div>
         <CounterSuggestion
           :recommendations="counterRecommendations"
           :weaknesses="enemyWeaknesses"
@@ -159,7 +205,7 @@
           <span class="footer-note">
             推荐基于
             <template v-if="dataSource === 'opgg'">OP.GG</template>
-            <template v-else>本地静态</template>
+            <template v-else-if="dataSource === 'qq101'">101.qq.com</template>
             数据
             <template v-if="dataVersion"> · 版本 {{ dataVersion }}</template>
           </span>
@@ -170,6 +216,8 @@
 </template>
 
 <script setup lang="ts">
+import DataSourceSelect from '@/components/common/DataSourceSelect.vue';
+import PageHeader from '@/components/common/PageHeader.vue';
 import { computed } from 'vue';
 import { useAppStore } from '@/stores';
 import { EmptyState } from '@/components/common';
@@ -181,6 +229,8 @@ const appStore = useAppStore();
 
 const {
   session,
+  error,
+  retryCounters,
   isInChampSelect,
   isAram,
   isHextechAram,
@@ -206,10 +256,14 @@ const {
 
 const phaseLabel = computed(() => {
   switch (timerPhase.value) {
-    case 'BAN_PICK': return '禁选中';
-    case 'PLANNING': return '准备阶段';
-    case 'FINALIZATION': return '确认选择';
-    default: return '选人中';
+    case 'BAN_PICK':
+      return '禁选中';
+    case 'PLANNING':
+      return '准备阶段';
+    case 'FINALIZATION':
+      return '确认选择';
+    default:
+      return '选人中';
   }
 });
 
@@ -226,41 +280,32 @@ const enemyBans = computed(() => {
 </script>
 
 <style scoped>
+.draft-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.source-error {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 18px;
+  border-radius: var(--radius-lg);
+  background-color: var(--color-bg-card);
+  color: var(--color-error);
+  backdrop-filter: var(--glass-blur);
+}
+.source-error button {
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent);
+  border: 1px solid var(--color-border);
+  padding: 4px 12px;
+  border-radius: 8px;
+}
 .draft-page {
   max-width: var(--content-max-width);
   margin: 0 auto;
-}
-
-.page-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: var(--space-6);
-}
-
-.header-left {
-  display: flex;
-  flex-direction: column;
-}
-
-.page-title {
-  font-size: var(--text-2xl);
-  font-weight: var(--font-bold);
-  letter-spacing: -0.5px;
-  color: var(--color-text-primary);
-}
-
-.page-subtitle {
-  font-size: var(--text-sm);
-  color: var(--color-text-tertiary);
-  margin-top: var(--space-1);
-}
-
-.header-right {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
 }
 
 /* Mode badge */
@@ -274,19 +319,19 @@ const enemyBans = computed(() => {
 }
 
 .mode-badge.aram {
-  background: rgba(168, 85, 247, 0.1);
+  background-color: rgba(168, 85, 247, 0.1);
   color: #a855f7;
   border: 1px solid rgba(168, 85, 247, 0.25);
 }
 
 .mode-badge.hextech {
-  background: rgba(236, 72, 153, 0.1);
+  background-color: rgba(236, 72, 153, 0.1);
   color: #ec4899;
   border: 1px solid rgba(236, 72, 153, 0.25);
 }
 
 .mode-badge.ranked {
-  background: rgba(0, 113, 227, 0.06);
+  background-color: rgba(0, 113, 227, 0.06);
   color: var(--color-accent);
   border: 1px solid rgba(0, 113, 227, 0.2);
 }
@@ -298,7 +343,7 @@ const enemyBans = computed(() => {
   gap: var(--space-2);
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-full);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   font-size: var(--text-xs);
 }
 
@@ -315,8 +360,12 @@ const enemyBans = computed(() => {
   text-align: right;
 }
 
-.timer-pill.ban_pick .timer-count { color: var(--color-warning); }
-.timer-pill.finalization .timer-count { color: var(--color-success); }
+.timer-pill.ban_pick .timer-count {
+  color: var(--color-warning);
+}
+.timer-pill.finalization .timer-count {
+  color: var(--color-success);
+}
 
 /* Content */
 .draft-content {
@@ -324,7 +373,9 @@ const enemyBans = computed(() => {
 }
 
 .draft-content > .empty-state {
-  background: var(--color-bg-card);
+  background-color: var(--color-bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-light);
   min-height: 300px;
@@ -383,7 +434,9 @@ const enemyBans = computed(() => {
 }
 
 .aram-section {
-  background: var(--color-bg-card);
+  background-color: var(--color-bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-light);
   padding: var(--space-4);
@@ -404,19 +457,20 @@ const enemyBans = computed(() => {
 }
 
 .aram-champion-card {
+  --glass-tint: linear-gradient(transparent, transparent);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-3);
   border-radius: var(--radius-lg);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-card);
   position: relative;
   transition: all var(--transition-fast);
 }
 
 .aram-champion-card.is-me {
-  background: rgba(0, 113, 227, 0.06);
+  background-color: rgba(0, 113, 227, 0.06);
   border: 1px solid rgba(0, 113, 227, 0.2);
 }
 
@@ -425,7 +479,7 @@ const enemyBans = computed(() => {
   height: 56px;
   border-radius: var(--radius-full);
   overflow: hidden;
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
 }
 
 .champ-img {
@@ -462,7 +516,7 @@ const enemyBans = computed(() => {
   font-size: 10px;
   font-weight: var(--font-bold);
   color: var(--color-accent);
-  background: rgba(0, 113, 227, 0.1);
+  background-color: rgba(0, 113, 227, 0.1);
   padding: 0 4px;
   border-radius: var(--radius-sm);
 }
@@ -475,20 +529,21 @@ const enemyBans = computed(() => {
 }
 
 .bench-champion-card {
+  --glass-tint: linear-gradient(transparent, transparent);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-1);
   padding: var(--space-2);
   border-radius: var(--radius-md);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-card);
   border: 1px solid transparent;
   transition: all var(--transition-fast);
 }
 
 .bench-champion-card:hover {
   border-color: rgba(168, 85, 247, 0.3);
-  background: rgba(168, 85, 247, 0.04);
+  background-color: rgba(168, 85, 247, 0.04);
   cursor: pointer;
 }
 
@@ -502,7 +557,7 @@ const enemyBans = computed(() => {
   height: 44px;
   border-radius: var(--radius-full);
   overflow: hidden;
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
 }
 
 .bench-champ-name {
@@ -565,12 +620,30 @@ const enemyBans = computed(() => {
   padding: 0 4px;
 }
 
-.tier-splus { background: rgba(255, 0, 85, 0.12); color: #ff0055; }
-.tier-s { background: rgba(255, 136, 0, 0.12); color: #ff8800; }
-.tier-a { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
-.tier-b { background: rgba(34, 197, 94, 0.12); color: #22c55e; }
-.tier-c { background: rgba(156, 163, 175, 0.12); color: #9ca3af; }
-.tier-d { background: rgba(107, 114, 128, 0.1); color: #6b7280; }
+.tier-splus {
+  background-color: rgba(255, 0, 85, 0.12);
+  color: #ff0055;
+}
+.tier-s {
+  background-color: rgba(255, 136, 0, 0.12);
+  color: #ff8800;
+}
+.tier-a {
+  background-color: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+}
+.tier-b {
+  background-color: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+.tier-c {
+  background-color: rgba(156, 163, 175, 0.12);
+  color: #9ca3af;
+}
+.tier-d {
+  background-color: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+}
 
 .tier-winrate {
   font-size: 10px;
@@ -589,5 +662,33 @@ const enemyBans = computed(() => {
   font-weight: var(--font-normal);
   color: var(--color-text-placeholder);
   margin-left: var(--space-2);
+}
+
+.teams-row {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+.teams-row > * {
+  min-width: 0;
+}
+.aram-team-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.source-error {
+  flex-wrap: wrap;
+}
+@container workspace (max-width: 760px) {
+  .teams-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .vs-divider {
+    padding: 0;
+    height: 20px;
+  }
+}
+@container workspace (max-width: 580px) {
+  .aram-team-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 </style>

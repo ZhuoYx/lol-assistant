@@ -68,15 +68,15 @@ const tierLabel = computed(() => {
   opacity: 0.8;
 }
 
-.tier-iron { color: var(--color-tier-iron); background: rgba(107, 107, 107, 0.1); }
-.tier-bronze { color: var(--color-tier-bronze); background: rgba(139, 105, 20, 0.1); }
-.tier-silver { color: var(--color-tier-silver); background: rgba(123, 138, 142, 0.1); }
-.tier-gold { color: var(--color-tier-gold); background: rgba(200, 155, 60, 0.1); }
-.tier-platinum { color: var(--color-tier-platinum); background: rgba(34, 163, 139, 0.1); }
-.tier-emerald { color: var(--color-tier-emerald); background: rgba(27, 168, 143, 0.1); }
-.tier-diamond { color: var(--color-tier-diamond); background: rgba(87, 108, 206, 0.1); }
-.tier-master { color: var(--color-tier-master); background: rgba(155, 89, 182, 0.1); }
-.tier-grandmaster { color: var(--color-tier-grandmaster); background: rgba(231, 76, 60, 0.1); }
-.tier-challenger { color: var(--color-tier-challenger); background: rgba(241, 196, 15, 0.1); }
-.tier-unranked { color: var(--color-text-tertiary); background: var(--color-bg-hover); }
+.tier-iron { color: var(--color-tier-iron); background-color: rgba(107, 107, 107, 0.1); }
+.tier-bronze { color: var(--color-tier-bronze); background-color: rgba(139, 105, 20, 0.1); }
+.tier-silver { color: var(--color-tier-silver); background-color: rgba(123, 138, 142, 0.1); }
+.tier-gold { color: var(--color-tier-gold); background-color: rgba(200, 155, 60, 0.1); }
+.tier-platinum { color: var(--color-tier-platinum); background-color: rgba(34, 163, 139, 0.1); }
+.tier-emerald { color: var(--color-tier-emerald); background-color: rgba(27, 168, 143, 0.1); }
+.tier-diamond { color: var(--color-tier-diamond); background-color: rgba(87, 108, 206, 0.1); }
+.tier-master { color: var(--color-tier-master); background-color: rgba(155, 89, 182, 0.1); }
+.tier-grandmaster { color: var(--color-tier-grandmaster); background-color: rgba(231, 76, 60, 0.1); }
+.tier-challenger { color: var(--color-tier-challenger); background-color: rgba(241, 196, 15, 0.1); }
+.tier-unranked { color: var(--color-text-tertiary); background-color: var(--color-bg-hover); }
 </style>

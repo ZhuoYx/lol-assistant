@@ -1,5 +1,5 @@
 <template>
-  <div class="team-comp" :class="side">
+  <div class="team-comp glass-panel" :class="side">
     <div class="comp-header">
       <span class="comp-title">{{ side === 'ally' ? '我方阵容' : '敌方阵容' }}</span>
       <span class="comp-count">{{ picks.length }}/5</span>
@@ -20,14 +20,24 @@
           />
           <div class="pick-info">
             <span class="champ-name">{{ getChampName(member.championId) }}</span>
-            <span v-if="member.assignedPosition" class="pick-role">{{ formatRole(member.assignedPosition) }}</span>
+            <span v-if="member.assignedPosition" class="pick-role">{{
+              formatRole(member.assignedPosition)
+            }}</span>
           </div>
           <span v-if="member.cellId === localCellId" class="me-tag">我</span>
         </template>
         <template v-else>
           <div class="empty-slot">
             <div class="empty-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              >
                 <circle cx="12" cy="12" r="10" opacity="0.3" />
                 <line x1="12" y1="8" x2="12" y2="16" opacity="0.3" />
                 <line x1="8" y1="12" x2="16" y2="12" opacity="0.3" />
@@ -92,9 +102,6 @@ function formatRole(role: string): string {
 
 <style scoped>
 .team-comp {
-  background: var(--color-bg-card);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--color-border-light);
   padding: var(--space-4) var(--space-5);
   display: flex;
   flex-direction: column;
@@ -147,11 +154,11 @@ function formatRole(role: string): string {
 }
 
 .pick-slot.filled {
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
 }
 
 .pick-slot.is-local {
-  background: rgba(0, 113, 227, 0.06);
+  background-color: rgba(0, 113, 227, 0.06);
   border: 1px solid rgba(0, 113, 227, 0.12);
 }
 
@@ -184,7 +191,7 @@ function formatRole(role: string): string {
   font-size: 10px;
   font-weight: var(--font-bold);
   color: var(--color-accent);
-  background: rgba(0, 113, 227, 0.1);
+  background-color: rgba(0, 113, 227, 0.1);
   padding: 1px 6px;
   border-radius: var(--radius-sm);
   flex-shrink: 0;
@@ -244,7 +251,13 @@ function formatRole(role: string): string {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, transparent 40%, var(--color-lose) 40%, var(--color-lose) 44%, transparent 44%);
+  background: linear-gradient(
+    135deg,
+    transparent 40%,
+    var(--color-lose) 40%,
+    var(--color-lose) 44%,
+    transparent 44%
+  );
   border-radius: var(--radius-sm);
   pointer-events: none;
 }

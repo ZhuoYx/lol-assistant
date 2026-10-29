@@ -55,6 +55,7 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     title: '英雄联盟助手',
+    icon: join(__dirname, '../../resources/icons/poro-companion.ico'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -96,7 +97,7 @@ function createWindow(): void {
  * 创建系统托盘
  */
 function createTray(): void {
-  const iconPath = join(__dirname, '../../resources/icons/icon.ico');
+  const iconPath = join(__dirname, '../../resources/icons/poro-companion.ico');
   const icon = nativeImage.createFromPath(iconPath);
   tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
   tray.setToolTip('英雄联盟助手');

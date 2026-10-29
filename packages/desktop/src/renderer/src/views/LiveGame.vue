@@ -1,41 +1,63 @@
 <template>
   <div class="page live-game-page">
-    <header class="page-header">
-      <div class="header-left">
-        <h1 class="page-title">对局分析</h1>
-        <p class="page-subtitle">实时查看双方玩家数据</p>
-      </div>
-      <div v-if="analysis" class="header-right">
-        <span class="load-status">
-          <span class="load-dot" :class="{ active: !hasLoadingPlayers }" />
-          {{ loadedPlayerCount }}/{{ totalPlayerCount }} 已加载
-        </span>
-      </div>
-    </header>
+    <PageHeader title="对局分析" subtitle="双方阵容一览，掌握每位玩家的近期表现"
+      ><template #actions
+        ><DataSourceSelect /><span v-if="analysis" class="load-status" role="status"
+          ><span
+            class="load-dot"
+            :class="{ active: loadedPlayerCount === totalPlayerCount, pending: hasLoadingPlayers }"
+          />{{ hasLoadingPlayers ? '数据加载中' : '玩家数据' }} · {{ loadedPlayerCount }}/{{
+            totalPlayerCount
+          }}</span
+        ></template
+      ></PageHeader
+    >
 
     <div class="live-game-content">
       <!-- Not connected -->
       <EmptyState
+        class="glass-panel"
         v-if="!appStore.isConnected"
         title="未连接客户端"
         description="请启动英雄联盟客户端以使用对局分析功能"
       >
         <template #icon>
-          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18.36 6.64a9 9 0 1 1-12.73 0" /><line x1="12" y1="2" x2="12" y2="12" />
+          <svg
+            width="44"
+            height="44"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+            <line x1="12" y1="2" x2="12" y2="12" />
           </svg>
         </template>
       </EmptyState>
 
       <!-- Not in game -->
       <EmptyState
+        class="glass-panel"
         v-else-if="!isInGame && !analysis"
         title="当前不在对局中"
         description="进入对局后将自动开始分析双方玩家数据"
       >
         <template #icon>
-          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+          <svg
+            width="44"
+            height="44"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
           </svg>
         </template>
       </EmptyState>
@@ -50,20 +72,21 @@
 
       <!-- Error state -->
       <ErrorDisplay
+        class="glass-panel"
         v-else-if="error && !analysis"
         :message="error"
         :retryable="true"
-        @retry="analyze"
+        @retry="analyze()"
       />
 
       <!-- Analysis view -->
       <div v-else-if="analysis" class="analysis-view">
         <!-- Game info panel -->
-        <LiveGamePanel
-          :analysis="analysis"
-          :refreshing="refreshing"
-          @refresh="analyze"
-        />
+        <LiveGamePanel :analysis="analysis" :refreshing="refreshing" @refresh="analyze()" />
+
+        <div v-if="error" class="refresh-error" role="alert">
+          {{ error }}，当前保留上次成功加载的数据。
+        </div>
 
         <!-- Two-team layout -->
         <div class="teams-grid">
@@ -83,6 +106,19 @@
           />
         </div>
 
+        <p class="analysis-note">
+          点击玩家卡片查看战绩 · 悬停或聚焦近期对局查看英雄与 KDA · 组队标记由共同对局推测
+        </p>
+
+        <ChampionInsights
+          v-if="analysis.gameMode === 'CLASSIC'"
+          :champion-ids="
+            [...(blueTeam?.players ?? []), ...(redTeam?.players ?? [])]
+              .map((p) => p.championId)
+              .filter((id) => id > 0)
+          "
+        />
+
         <!-- Spell Cooldowns -->
         <SpellCooldowns
           v-if="myChampId"
@@ -90,14 +126,13 @@
           :enemy-champ-ids="enemyLaneChampIds"
           :enemy-labels="enemyLaneLabels"
         />
-
-
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import PageHeader from '@/components/common/PageHeader.vue';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAppStore, useSummonerStore } from '@/stores';
@@ -107,19 +142,15 @@ import { EmptyState, LoadingSpinner, ErrorDisplay } from '@/components/common';
 import LiveGamePanel from '@/components/live-game/LiveGamePanel.vue';
 import TeamPanel from '@/components/live-game/TeamPanel.vue';
 import SpellCooldowns from '@/components/live-game/SpellCooldowns.vue';
+import ChampionInsights from '@/components/live-game/ChampionInsights.vue';
+import DataSourceSelect from '@/components/common/DataSourceSelect.vue';
 
 const appStore = useAppStore();
 const summonerStore = useSummonerStore();
 const liveGameStore = useLiveGameStore();
 const router = useRouter();
 
-const {
-  analysis,
-  loading,
-  error,
-  refreshing,
-  analyze,
-} = useLiveGame();
+const { analysis, loading, error, refreshing, analyze } = useLiveGame();
 
 const blueTeam = computed(() => liveGameStore.blueTeam);
 const redTeam = computed(() => liveGameStore.redTeam);
@@ -134,8 +165,6 @@ const isInGame = computed(() => {
 
 const myPuuid = computed(() => summonerStore.currentSummoner?.puuid ?? '');
 
-
-
 function handlePlayerClick(puuid: string) {
   router.push({
     path: '/',
@@ -147,9 +176,9 @@ function handlePlayerClick(puuid: string) {
 const myChampId = computed(() => {
   if (!blueTeam.value || !myPuuid.value) return 0;
   // 先在蓝队找
-  let me = blueTeam.value.players.find(p => p.puuid === myPuuid.value);
+  let me = blueTeam.value.players.find((p) => p.puuid === myPuuid.value);
   if (!me && redTeam.value) {
-    me = redTeam.value.players.find(p => p.puuid === myPuuid.value);
+    me = redTeam.value.players.find((p) => p.puuid === myPuuid.value);
   }
   return me?.championId ?? 0;
 });
@@ -157,17 +186,17 @@ const myChampId = computed(() => {
 /** 我的位置 */
 const myPosition = computed(() => {
   if (!blueTeam.value || !myPuuid.value) return '';
-  let me = blueTeam.value.players.find(p => p.puuid === myPuuid.value);
+  let me = blueTeam.value.players.find((p) => p.puuid === myPuuid.value);
   if (!me && redTeam.value) {
-    me = redTeam.value.players.find(p => p.puuid === myPuuid.value);
+    me = redTeam.value.players.find((p) => p.puuid === myPuuid.value);
   }
   return me?.position ?? '';
 });
 
 /** 我在哪个队伍 */
 const myTeamId = computed(() => {
-  if (blueTeam.value?.players.some(p => p.puuid === myPuuid.value)) return 100;
-  if (redTeam.value?.players.some(p => p.puuid === myPuuid.value)) return 200;
+  if (blueTeam.value?.players.some((p) => p.puuid === myPuuid.value)) return 100;
+  if (redTeam.value?.players.some((p) => p.puuid === myPuuid.value)) return 200;
   return 0;
 });
 
@@ -184,21 +213,23 @@ const enemyLaneChampIds = computed<number[]>(() => {
   // 下路/辅助：同时显示对面下路和辅助
   if (BOT_POSITIONS.has(myPos)) {
     return enemyTeam.players
-      .filter(p => BOT_POSITIONS.has((p.position ?? '').toUpperCase()))
-      .map(p => p.championId)
-      .filter(id => id > 0);
+      .filter((p) => BOT_POSITIONS.has((p.position ?? '').toUpperCase()))
+      .map((p) => p.championId)
+      .filter((id) => id > 0);
   }
 
   // 其他位置：只显示对位
-  const opponent = enemyTeam.players.find(p =>
-    (p.position ?? '').toUpperCase() === myPos
-  );
+  const opponent = enemyTeam.players.find((p) => (p.position ?? '').toUpperCase() === myPos);
   return opponent?.championId ? [opponent.championId] : [];
 });
 
 /** 对位标签（与 enemyLaneChampIds 一一对应） */
 const POSITION_CN: Record<string, string> = {
-  TOP: '上路', JUNGLE: '打野', MIDDLE: '中路', BOTTOM: '下路', UTILITY: '辅助',
+  TOP: '上路',
+  JUNGLE: '打野',
+  MIDDLE: '中路',
+  BOTTOM: '下路',
+  UTILITY: '辅助',
 };
 
 const enemyLaneLabels = computed<string[]>(() => {
@@ -210,8 +241,8 @@ const enemyLaneLabels = computed<string[]>(() => {
 
   if (BOT_POSITIONS.has(myPos)) {
     return enemyTeam.players
-      .filter(p => BOT_POSITIONS.has((p.position ?? '').toUpperCase()))
-      .map(p => POSITION_CN[(p.position ?? '').toUpperCase()] ?? '对位');
+      .filter((p) => BOT_POSITIONS.has((p.position ?? '').toUpperCase()))
+      .map((p) => POSITION_CN[(p.position ?? '').toUpperCase()] ?? '对位');
   }
 
   return ['对位'];
@@ -224,43 +255,13 @@ const enemyLaneLabels = computed<string[]>(() => {
   margin: 0 auto;
 }
 
-.page-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: var(--space-6);
-}
-
-.header-left {
-  display: flex;
-  flex-direction: column;
-}
-
-.page-title {
-  font-size: var(--text-2xl);
-  font-weight: var(--font-bold);
-  letter-spacing: -0.5px;
-  color: var(--color-text-primary);
-}
-
-.page-subtitle {
-  font-size: var(--text-sm);
-  color: var(--color-text-tertiary);
-  margin-top: var(--space-1);
-}
-
-.header-right {
-  flex-shrink: 0;
-}
-
 .load-status {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   font-size: var(--text-xs);
   color: var(--color-text-tertiary);
-  background: var(--color-bg-secondary);
-  padding: var(--space-1) var(--space-3);
+  padding: 0 2px;
   border-radius: var(--radius-full);
 }
 
@@ -268,18 +269,26 @@ const enemyLaneLabels = computed<string[]>(() => {
   width: 6px;
   height: 6px;
   border-radius: var(--radius-full);
-  background: var(--color-warning);
+  background-color: var(--color-warning);
+}
+
+.load-dot.pending {
   animation: pulse-dot 1.2s ease infinite;
 }
 
 .load-dot.active {
-  background: var(--color-success);
+  background-color: var(--color-success);
   animation: none;
 }
 
 @keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
 }
 
 .live-game-content {
@@ -289,7 +298,9 @@ const enemyLaneLabels = computed<string[]>(() => {
 .live-game-content > .empty-state,
 .live-game-content > .loading-spinner,
 .live-game-content > .error-display {
-  background: var(--color-bg-card);
+  background-color: var(--color-bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-light);
   min-height: 300px;
@@ -301,14 +312,33 @@ const enemyLaneLabels = computed<string[]>(() => {
 .analysis-view {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: 16px;
 }
 
 .teams-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-5);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.analysis-note {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  text-align: center;
+  line-height: 1.7;
+}
+.refresh-error {
+  border: 1px solid color-mix(in srgb, var(--color-error) 25%, transparent);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: var(--color-error);
+  background-color: var(--color-lose-bg);
+  font-size: 12px;
 }
 
-
+@container workspace (max-width: 780px) {
+  .teams-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+}
 </style>

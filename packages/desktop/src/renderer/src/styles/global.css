@@ -24,6 +24,80 @@ body {
   background-color: var(--color-bg-primary);
   overflow: hidden;
   user-select: none;
+  transition:
+    color var(--transition-normal),
+    background-color var(--transition-normal);
+}
+
+.content-wrapper > :where(.page) {
+  width: 100%;
+  min-width: 0;
+  max-width: var(--page-max-width, var(--content-max-width));
+  margin-inline: auto;
+}
+.card,
+.glass-panel,
+.glass-surface,
+.n-card {
+  background-color: var(--color-bg-card);
+  background-image:
+    var(--glass-tint, linear-gradient(transparent, transparent)), var(--glass-sheen),
+    var(--glass-noise);
+  background-size:
+    100% 100%,
+    100% 100%,
+    160px 160px;
+  background-repeat: no-repeat, no-repeat, repeat;
+  background-clip: padding-box;
+  border: 1px solid var(--color-border-light);
+  border-bottom-color: var(--glass-edge-bottom);
+  border-radius: var(--panel-radius);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--panel-shadow);
+}
+.glass-panel,
+.glass-surface {
+  min-width: 0;
+}
+/* Nested cards tint the existing frost instead of hiding it under a second dense sheet. */
+:is(.card, .glass-panel) :is(.glass-surface, .glass-panel, .n-card) {
+  background-color: var(--color-bg-nested);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+}
+.page :where(.empty-state, .error-display) {
+  min-width: 0;
+}
+.page :where(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+}
+.page-title {
+  text-wrap: balance;
+}
+.page-subtitle {
+  line-height: 1.65;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+input,
+textarea {
+  user-select: text;
+}
+[data-theme='dark'] .primary-btn {
+  color: #101a2b;
+}
+@supports not (backdrop-filter: blur(1px)) {
+  :root {
+    --color-bg-card: #f8faff;
+    --color-bg-sidebar: #f0f3fa;
+  }
+  [data-theme='dark'] {
+    --color-bg-card: #182236;
+    --color-bg-sidebar: #10192c;
+  }
 }
 
 a {
@@ -46,10 +120,22 @@ button {
   cursor: pointer;
 }
 
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 input,
 textarea,
 select {
   font-family: inherit;
+}
+
+/* Native popup menus need an opaque themed surface on Windows Chromium. */
+select option,
+select optgroup {
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-option);
 }
 
 /* Scrollbar (Apple-style thin scrollbar) */
@@ -78,6 +164,17 @@ select {
 
 [data-theme='dark'] ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Custom drag region for frameless window */
@@ -128,7 +225,40 @@ select {
   color: var(--color-lose);
 }
 
-/* Fade transition */
+/* Cross-fade rendered snapshots; keep opacity off live glass and its ancestors. */
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-group(root) {
+  animation-duration: 220ms;
+}
+
+::view-transition-old(root) {
+  animation: route-fade-out 220ms ease-in-out both;
+}
+
+::view-transition-new(root) {
+  animation: route-fade-in 220ms ease-in-out both;
+}
+
+@keyframes route-fade-out {
+  to { opacity: 0; }
+}
+
+@keyframes route-fade-in {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(root),
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}
+
+/* Local text fade transition */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity var(--transition-normal);
@@ -137,22 +267,6 @@ select {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-}
-
-/* Slide transition */
-.slide-enter-active,
-.slide-leave-active {
-  transition: all var(--transition-spring);
-}
-
-.slide-enter-from {
-  opacity: 0;
-  transform: translateX(-8px);
-}
-
-.slide-leave-to {
-  opacity: 0;
-  transform: translateX(8px);
 }
 
 /* Scale fade transition */

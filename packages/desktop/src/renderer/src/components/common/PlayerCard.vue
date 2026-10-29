@@ -1,5 +1,5 @@
 <template>
-  <div class="player-card" :class="{ clickable }" @click="handleClick">
+  <div class="player-card glass-surface" :class="{ clickable }" @click="handleClick">
     <div class="player-left">
       <ChampionIcon
         :champion-id="player.championId"
@@ -45,14 +45,17 @@ import type { LiveGamePlayer } from '@lol-assistant/shared';
 import TierIcon from './TierIcon.vue';
 import ChampionIcon from './ChampionIcon.vue';
 
-const props = withDefaults(defineProps<{
-  player: LiveGamePlayer;
-  compact?: boolean;
-  clickable?: boolean;
-}>(), {
-  compact: false,
-  clickable: false,
-});
+const props = withDefaults(
+  defineProps<{
+    player: LiveGamePlayer;
+    compact?: boolean;
+    clickable?: boolean;
+  }>(),
+  {
+    compact: false,
+    clickable: false,
+  },
+);
 
 const emit = defineEmits<{
   click: [puuid: string];
@@ -88,7 +91,9 @@ function kdaClass(kda: number): string {
   justify-content: space-between;
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-lg);
-  background: var(--color-bg-card);
+  background-color: var(--color-bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--color-border-light);
   transition: all var(--transition-fast);
 }
@@ -176,8 +181,12 @@ function kdaClass(kda: number): string {
   font-family: var(--font-mono);
 }
 
-.stat-value.high { color: var(--color-win); }
-.stat-value.low { color: var(--color-lose); }
+.stat-value.high {
+  color: var(--color-win-text);
+}
+.stat-value.low {
+  color: var(--color-lose-text);
+}
 
 .stat-games {
   font-size: 10px;

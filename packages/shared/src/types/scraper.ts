@@ -1,3 +1,5 @@
+export type ChampionDataSource = 'opgg' | 'qq101';
+
 /** 英雄 Tier 信息 */
 export interface ChampionTier {
   championId: number;
@@ -23,7 +25,7 @@ export interface ChampionBuilds {
   championId: number;
   role: string;
   patch: string;
-  dataSource: 'opgg' | 'local';
+  dataSource: ChampionDataSource;
   runeBuilds: RuneBuild[];
   itemBuilds: ItemBuild[];
   skillOrder: string[];
@@ -59,6 +61,7 @@ export interface ItemBuild {
 
 /** 英雄克制关系 */
 export interface ChampionCounters {
+  dataSource?: ChampionDataSource;
   championId: number;
   role: string;
   hardCounters: CounterInfo[];
@@ -76,7 +79,7 @@ export interface CounterInfo {
 export interface ScraperDataVersion {
   patch: string;
   lastUpdated: number;
-  source: 'opgg' | 'local';
+  source: ChampionDataSource;
 }
 
 /** 英雄排名信息（来自 OP.GG） */

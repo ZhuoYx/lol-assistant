@@ -41,32 +41,32 @@ const label = computed(() => {
 }
 
 .connected {
-  background: rgba(48, 209, 88, 0.1);
+  background-color: rgba(48, 209, 88, 0.1);
   color: var(--color-success);
 }
 
 .connected .status-dot {
-  background: var(--color-success);
+  background-color: var(--color-success);
   box-shadow: 0 0 6px rgba(48, 209, 88, 0.4);
 }
 
 .connecting {
-  background: rgba(255, 159, 10, 0.1);
+  background-color: rgba(255, 159, 10, 0.1);
   color: var(--color-warning);
 }
 
 .connecting .status-dot {
-  background: var(--color-warning);
+  background-color: var(--color-warning);
   animation: pulse 1.5s ease infinite;
 }
 
 .disconnected {
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
   color: var(--color-text-tertiary);
 }
 
 .disconnected .status-dot {
-  background: var(--color-text-placeholder);
+  background-color: var(--color-text-placeholder);
 }
 
 @keyframes pulse {

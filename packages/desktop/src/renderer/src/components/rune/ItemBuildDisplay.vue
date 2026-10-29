@@ -1,24 +1,31 @@
 <template>
-  <div class="item-build">
+  <div class="item-build glass-panel">
     <!-- Header: selector for multiple item builds -->
     <div class="item-header">
       <h3 class="section-title">出装推荐</h3>
       <div v-if="itemBuilds.length > 1" class="item-selector-wrap">
         <select
           class="item-selector"
+          aria-label="出装方案"
           :value="selectedIndex"
           @change="$emit('select', Number(($event.target as HTMLSelectElement).value))"
         >
-          <option
-            v-for="(build, idx) in itemBuilds"
-            :key="idx"
-            :value="idx"
-          >
+          <option v-for="(build, idx) in itemBuilds" :key="idx" :value="idx">
             {{ build.name || `配置 ${idx + 1}` }}
             {{ build.winRate ? `(${formatPercent(build.winRate)})` : '' }}
           </option>
         </select>
-        <svg class="selector-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg
+          class="selector-arrow"
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </div>
@@ -68,7 +75,7 @@
                 class="item-img"
                 :src="getItemImgUrl(itemId)"
                 :alt="getItemName(itemId)"
-                @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+                @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
               />
               <span v-else class="item-id">{{ itemId }}</span>
             </div>
@@ -92,7 +99,7 @@
                   class="item-img"
                   :src="getItemImgUrl(itemId)"
                   :alt="getItemName(itemId)"
-                  @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+                  @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
                 />
                 <span v-else class="item-id">{{ itemId }}</span>
               </div>
@@ -130,7 +137,7 @@
                 class="item-img"
                 :src="getItemImgUrl(currentBuild.boots)"
                 :alt="getItemName(currentBuild.boots)"
-                @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+                @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
               />
               <span v-else class="item-id">{{ currentBuild.boots }}</span>
             </div>
@@ -148,12 +155,15 @@ import { ITEM_ID_MAP, getItemIconUrl } from '@lol-assistant/shared';
 
 const DDRAGON_VERSION = '16.5.1';
 
-const props = withDefaults(defineProps<{
-  itemBuilds: ItemBuild[];
-  selectedIndex?: number;
-}>(), {
-  selectedIndex: 0,
-});
+const props = withDefaults(
+  defineProps<{
+    itemBuilds: ItemBuild[];
+    selectedIndex?: number;
+  }>(),
+  {
+    selectedIndex: 0,
+  },
+);
 
 defineEmits<{
   (e: 'select', index: number): void;
@@ -190,9 +200,6 @@ function formatSample(v: number): string {
 
 <style scoped>
 .item-build {
-  background: var(--color-bg-card);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--color-border-light);
   overflow: hidden;
   min-width: 0; /* 防止 grid 子项溢出 */
   display: flex;
@@ -227,7 +234,7 @@ function formatSample(v: number): string {
 .item-selector {
   appearance: none;
   -webkit-appearance: none;
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 4px 28px 4px 10px;
@@ -277,7 +284,7 @@ function formatSample(v: number): string {
   justify-content: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
 }
 
 .stat-item {
@@ -302,13 +309,13 @@ function formatSample(v: number): string {
 }
 
 .stat-value.win-rate {
-  color: var(--color-win);
+  color: var(--color-win-text);
 }
 
 .stat-divider {
   width: 1px;
   height: 20px;
-  background: var(--color-border);
+  background-color: var(--color-border);
   flex-shrink: 0;
 }
 
@@ -345,7 +352,7 @@ function formatSample(v: number): string {
 .label-line {
   flex: 1;
   height: 1px;
-  background: var(--color-border-light);
+  background-color: var(--color-border-light);
 }
 
 .items-row {

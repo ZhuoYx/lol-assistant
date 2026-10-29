@@ -1,10 +1,19 @@
 <template>
   <div class="page champion-stats-page">
+    <PageHeader title="英雄统计" subtitle="查看英雄使用情况与近期表现" />
     <!-- 查看他人数据时的返回横幅 -->
     <div v-if="viewingOther" class="other-banner">
       <button class="back-btn" @click="goBackToMine">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
           <polyline points="15 18 9 12 15 6" />
         </svg>
         返回我的账号
@@ -15,15 +24,21 @@
     <!-- Search & Sort -->
     <div class="toolbar">
       <div class="search-box">
-        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+        <svg
+          class="search-icon"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
         </svg>
-        <input
-          v-model="searchQuery"
-          type="text"
-          class="search-input"
-          placeholder="搜索英雄..."
-        />
+        <input v-model="searchQuery" type="text" class="search-input" placeholder="搜索英雄..." />
       </div>
       <div class="sort-group">
         <button
@@ -44,13 +59,14 @@
         <LoadingSpinner v-if="loading" size="lg" text="加载英雄数据..." centered />
 
         <ErrorDisplay
+          class="glass-panel"
           v-else-if="error"
           :message="error"
           retryable
           @retry="fetchData"
         />
 
-        <div v-else-if="sortedStats.length > 0" class="champion-list">
+        <div v-else-if="sortedStats.length > 0" class="champion-list glass-panel">
           <ChampionStatsItem
             v-for="(stat, index) in sortedStats"
             :key="stat.championId"
@@ -62,13 +78,23 @@
         </div>
 
         <EmptyState
+          class="glass-panel"
           v-else
           :title="searchQuery ? '未找到匹配的英雄' : '暂无英雄数据'"
           :description="searchQuery ? '尝试其他搜索关键词' : '连接客户端后显示英雄统计'"
         >
           <template #icon>
-            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <svg
+              width="44"
+              height="44"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
           </template>
         </EmptyState>
@@ -83,6 +109,7 @@
 </template>
 
 <script setup lang="ts">
+import PageHeader from '@/components/common/PageHeader.vue';
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import type { ChampionStats } from '@lol-assistant/shared';
@@ -116,9 +143,7 @@ const sortOptions = [
 const filteredStats = computed(() => {
   if (!searchQuery.value) return championStats.value;
   const q = searchQuery.value.toLowerCase();
-  return championStats.value.filter((s) =>
-    s.championName.toLowerCase().includes(q),
-  );
+  return championStats.value.filter((s) => s.championName.toLowerCase().includes(q));
 });
 
 const sortedStats = computed(() => {
@@ -133,8 +158,8 @@ const sortedStats = computed(() => {
   }
 });
 
-const selectedStat = computed(() =>
-  championStats.value.find((s) => s.championId === selectedChampionId.value) ?? null,
+const selectedStat = computed(
+  () => championStats.value.find((s) => s.championId === selectedChampionId.value) ?? null,
 );
 
 function onSelectChampion(id: number) {
@@ -180,13 +205,16 @@ onMounted(() => {
 });
 
 // 用户切换时（activePUUID 变化），重新拉取英雄数据
-watch(() => summonerStore.activePUUID, (newPUUID, oldPUUID) => {
-  if (newPUUID && newPUUID !== oldPUUID) {
-    championStats.value = [];
-    selectedChampionId.value = null;
-    fetchData();
-  }
-});
+watch(
+  () => summonerStore.activePUUID,
+  (newPUUID, oldPUUID) => {
+    if (newPUUID && newPUUID !== oldPUUID) {
+      championStats.value = [];
+      selectedChampionId.value = null;
+      fetchData();
+    }
+  },
+);
 </script>
 
 <style scoped>
@@ -213,7 +241,7 @@ watch(() => summonerStore.activePUUID, (newPUUID, oldPUUID) => {
   font-size: var(--text-xs);
   font-weight: var(--font-medium);
   color: var(--color-accent);
-  background: rgba(0, 113, 227, 0.06);
+  background-color: rgba(0, 113, 227, 0.06);
   border: 1px solid rgba(0, 113, 227, 0.2);
   border-radius: var(--radius-full);
   cursor: pointer;
@@ -221,7 +249,7 @@ watch(() => summonerStore.activePUUID, (newPUUID, oldPUUID) => {
 }
 
 .back-btn:hover {
-  background: rgba(0, 113, 227, 0.12);
+  background-color: rgba(0, 113, 227, 0.12);
   border-color: rgba(0, 113, 227, 0.4);
 }
 
@@ -243,10 +271,12 @@ watch(() => summonerStore.activePUUID, (newPUUID, oldPUUID) => {
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  background: var(--color-bg-card);
+  background-color: var(--color-bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-md);
-  flex: 1;
+  flex: 1 1 220px;
   max-width: 260px;
   transition: border-color var(--transition-fast);
 }
@@ -262,7 +292,7 @@ watch(() => summonerStore.activePUUID, (newPUUID, oldPUUID) => {
 
 .search-input {
   border: none;
-  background: transparent;
+  background-color: transparent;
   outline: none;
   font-size: var(--text-sm);
   color: var(--color-text-primary);
@@ -284,7 +314,9 @@ watch(() => summonerStore.activePUUID, (newPUUID, oldPUUID) => {
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
   color: var(--color-text-secondary);
-  background: var(--color-bg-card);
+  background-color: var(--color-bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-full);
   cursor: pointer;
@@ -292,12 +324,12 @@ watch(() => summonerStore.activePUUID, (newPUUID, oldPUUID) => {
 }
 
 .sort-chip:hover {
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
 }
 
 .sort-chip.active {
-  background: var(--color-accent);
-  color: #ffffff;
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
   border-color: var(--color-accent);
 }
 
@@ -316,9 +348,6 @@ watch(() => summonerStore.activePUUID, (newPUUID, oldPUUID) => {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: var(--color-bg-card);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--color-border-light);
   padding: var(--space-2);
   max-height: calc(100vh - 180px);
   overflow-y: auto;
@@ -329,9 +358,33 @@ watch(() => summonerStore.activePUUID, (newPUUID, oldPUUID) => {
   top: 0;
 }
 
-@media (max-width: 900px) {
-  .champion-layout { grid-template-columns: 1fr; }
-  .toolbar { flex-direction: column; align-items: stretch; }
-  .search-box { max-width: none; }
+.champion-layout {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 20px;
+}
+.champion-layout > * {
+  min-width: 0;
+}
+.champion-detail-panel {
+  align-self: start;
+}
+.toolbar,
+.sort-group,
+.other-banner {
+  flex-wrap: wrap;
+}
+@container workspace (max-width: 960px) {
+  .champion-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .champion-detail-panel {
+    position: static;
+  }
+  .champion-list {
+    max-height: min(60vh, 600px);
+  }
+  .search-box {
+    max-width: none;
+  }
 }
 </style>

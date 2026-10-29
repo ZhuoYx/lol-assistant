@@ -249,10 +249,10 @@ export class ScraperScheduler {
   }
 
   /** 获取爬取器数据源标记 */
-  private getScraperSource(): 'opgg' | 'local' {
+  private getScraperSource(): 'opgg' | 'qq101' {
     const name = this.scraper.constructor.name.toLowerCase();
     if (name.includes('opgg')) return 'opgg';
-    return 'local';
+    return 'qq101';
   }
 
   /** 延迟 */

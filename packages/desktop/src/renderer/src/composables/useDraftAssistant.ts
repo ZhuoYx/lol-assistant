@@ -2,7 +2,7 @@ import { onMounted, onUnmounted, ref, computed, watch, type Ref } from 'vue';
 import { useAppStore } from '@/stores/app';
 import { useChampionStore } from '@/stores/champion';
 import type { ChampionCounters, CounterInfo, AramChampionTier } from '@lol-assistant/shared';
-import { CHAMPION_ID_MAP, CHAMPION_CN_NAME_MAP, CHAMPION_COUNTERS } from '@lol-assistant/shared';
+import { CHAMPION_ID_MAP, CHAMPION_CN_NAME_MAP } from '@lol-assistant/shared';
 
 /** 选人阶段玩家 pick / ban 信息 */
 export interface ChampSelectAction {
@@ -55,7 +55,7 @@ export function useDraftAssistant() {
   const session = ref<ChampSelectSession | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
-  const dataSource = ref<'opgg' | 'local' | null>(null);
+  const dataSource = ref<'opgg' | 'qq101' | null>(appStore.championDataSource);
   const dataVersion = ref<string | null>(null);
 
   // ARAM tier 数据
@@ -156,25 +156,6 @@ export function useDraftAssistant() {
             });
           }
         }
-      } else {
-        // Fallback: use static counter data
-        const staticData = CHAMPION_COUNTERS[enemyId];
-        if (staticData) {
-          for (const counterId of staticData.counteredBy.slice(0, 2)) {
-            const alreadyPicked = myTeamPicks.value.some((m) => m.championId === counterId);
-            const alreadyBanned = bannedChampionIds.value.includes(counterId);
-            const alreadyInRecs = recs.some((r) => r.championId === counterId);
-            if (!alreadyPicked && !alreadyBanned && !alreadyInRecs) {
-              recs.push({
-                championId: counterId,
-                championName: getChampName(counterId),
-                winRate: 0,
-                sampleSize: 0,
-                reason: `克制 ${getChampName(enemyId)}`,
-              });
-            }
-          }
-        }
       }
     }
 
@@ -266,20 +247,10 @@ export function useDraftAssistant() {
       if (counters) {
         counterCache.value.set(cacheKey, counters);
         // Track data source
-        dataSource.value = (counters as ChampionCounters & { dataSource?: string }).dataSource as 'opgg' | 'local' ?? 'local';
+        dataSource.value = (counters as ChampionCounters & { dataSource?: string }).dataSource as 'opgg' | 'qq101' ?? appStore.championDataSource;
       }
     } catch {
-      // Use static fallback data - still add to cache to prevent re-fetching
-      const staticData = CHAMPION_COUNTERS[championId];
-      if (staticData) {
-        counterCache.value.set(cacheKey, {
-          championId,
-          role: role ?? '',
-          hardCounters: staticData.counteredBy.map((id) => ({ championId: id, winRate: 0, sampleSize: 0 })),
-          easyMatchups: staticData.counters.map((id) => ({ championId: id, winRate: 0, sampleSize: 0 })),
-        });
-        dataSource.value = 'local';
-      }
+      error.value = '获取克制数据失败，请检查所选攻略来源后重试';
     }
   }
 
@@ -293,6 +264,7 @@ export function useDraftAssistant() {
     };
 
     fetchingCounters.value = true;
+    error.value = null;
     await Promise.allSettled(
       enemyPicks.map((m) => {
         const role = m.assignedPosition ? POSITION_MAP[m.assignedPosition.toLowerCase()] : undefined;
@@ -352,7 +324,7 @@ export function useDraftAssistant() {
         dataSource.value = ver.source;
       }
     } catch {
-      dataSource.value = 'local';
+      dataSource.value = null;
     }
   }
 
@@ -425,5 +397,6 @@ export function useDraftAssistant() {
     aramTierLoading,
     benchSwapChampion,
     swappingChampionId,
+    retryCounters: fetchAllEnemyCounters,
   };
 }

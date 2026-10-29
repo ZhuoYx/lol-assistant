@@ -1,5 +1,5 @@
 <template>
-  <div class="skill-order-card">
+  <div class="skill-order-card glass-panel">
     <div class="skill-header">
       <h3 class="section-title">技能加点</h3>
       <span class="skill-hint">推荐顺序</span>
@@ -13,10 +13,7 @@
       <!-- Priority order: big visual display -->
       <div v-if="skillPriority.length > 0" class="skill-priority">
         <template v-for="(skill, idx) in skillPriority.slice(0, 3)" :key="idx">
-          <div
-            class="skill-badge"
-            :class="[`priority-${idx}`, skillColorClass(skill)]"
-          >
+          <div class="skill-badge" :class="skillColorClass(skill)">
             <span class="skill-letter">{{ skill }}</span>
             <span class="skill-rank">{{ idx === 0 ? '主' : idx === 1 ? '副' : '三' }}</span>
           </div>
@@ -43,11 +40,7 @@
           <!-- Level header row -->
           <div class="table-row level-row">
             <div class="table-cell label-cell">Lv</div>
-            <div
-              v-for="lv in 18"
-              :key="lv"
-              class="table-cell level-cell"
-            >
+            <div v-for="lv in 18" :key="lv" class="table-cell level-cell">
               {{ lv }}
             </div>
           </div>
@@ -80,21 +73,29 @@
 </template>
 
 <script setup lang="ts">
-const props = withDefaults(defineProps<{
-  skillOrder: string[];
-  skillPriority: string[];
-}>(), {
-  skillOrder: () => [],
-  skillPriority: () => [],
-});
+const props = withDefaults(
+  defineProps<{
+    skillOrder: string[];
+    skillPriority: string[];
+  }>(),
+  {
+    skillOrder: () => [],
+    skillPriority: () => [],
+  },
+);
 
 function skillColorClass(skill: string): string {
   switch (skill.toUpperCase()) {
-    case 'Q': return 'skill-q';
-    case 'W': return 'skill-w';
-    case 'E': return 'skill-e';
-    case 'R': return 'skill-r';
-    default: return '';
+    case 'Q':
+      return 'skill-q';
+    case 'W':
+      return 'skill-w';
+    case 'E':
+      return 'skill-e';
+    case 'R':
+      return 'skill-r';
+    default:
+      return '';
   }
 }
 
@@ -106,9 +107,6 @@ function getSkillAtLevel(level: number): string {
 
 <style scoped>
 .skill-order-card {
-  background: var(--color-bg-card);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--color-border-light);
   overflow: hidden;
 }
 
@@ -160,27 +158,20 @@ function getSkillAtLevel(level: number): string {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 2px;
-  padding: var(--space-2) var(--space-3);
+  width: 56px;
+  height: 60px;
+  flex: 0 0 56px;
+  padding: var(--space-2);
   border-radius: var(--radius-lg);
-  min-width: 48px;
-  transition: all var(--transition-fast);
-}
-
-.skill-badge.priority-0 {
-  padding: var(--space-3) var(--space-4);
-  min-width: 56px;
 }
 
 .skill-letter {
-  font-size: var(--text-lg);
+  font-size: var(--text-xl);
   font-weight: var(--font-bold);
   font-family: var(--font-mono);
   line-height: 1;
-}
-
-.priority-0 .skill-letter {
-  font-size: var(--text-xl);
 }
 
 .skill-rank {
@@ -196,19 +187,19 @@ function getSkillAtLevel(level: number): string {
 
 /* Skill colors for badges */
 .skill-badge.skill-q {
-  background: rgba(59, 130, 246, 0.1);
+  background-color: rgba(59, 130, 246, 0.1);
   color: #3b82f6;
 }
 .skill-badge.skill-w {
-  background: rgba(34, 197, 94, 0.1);
+  background-color: rgba(34, 197, 94, 0.1);
   color: #22c55e;
 }
 .skill-badge.skill-e {
-  background: rgba(168, 85, 247, 0.1);
+  background-color: rgba(168, 85, 247, 0.1);
   color: #a855f7;
 }
 .skill-badge.skill-r {
-  background: rgba(245, 158, 11, 0.1);
+  background-color: rgba(245, 158, 11, 0.1);
   color: #f59e0b;
 }
 
@@ -220,10 +211,10 @@ function getSkillAtLevel(level: number): string {
 
 .skill-table {
   display: grid;
-  grid-template-columns: 32px repeat(18, 1fr);
+  grid-template-columns: 32px repeat(18, minmax(26px, 1fr));
   gap: 1px;
   min-width: 0;
-  background: var(--color-border-light);
+  background-color: var(--color-border-light);
   border-radius: var(--radius-md);
   overflow: hidden;
 }
@@ -239,7 +230,7 @@ function getSkillAtLevel(level: number): string {
   height: 28px;
   font-size: 10px;
   font-family: var(--font-mono);
-  background: var(--color-bg-card);
+  background-color: var(--color-bg-card);
   color: var(--color-text-tertiary);
   min-width: 0;
 }
@@ -247,11 +238,11 @@ function getSkillAtLevel(level: number): string {
 .label-cell {
   font-weight: var(--font-bold);
   font-size: 11px;
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
 }
 
 .level-cell {
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   font-weight: var(--font-medium);
 }
 
@@ -259,20 +250,36 @@ function getSkillAtLevel(level: number): string {
   font-weight: var(--font-bold);
 }
 
-.skill-label.skill-q { color: #3b82f6; }
-.skill-label.skill-w { color: #22c55e; }
-.skill-label.skill-e { color: #a855f7; }
-.skill-label.skill-r { color: #f59e0b; }
+.skill-label.skill-q {
+  color: #3b82f6;
+}
+.skill-label.skill-w {
+  color: #22c55e;
+}
+.skill-label.skill-e {
+  color: #a855f7;
+}
+.skill-label.skill-r {
+  color: #f59e0b;
+}
 
 /* Active cell (skill point allocated at this level) */
 .active-cell {
   position: relative;
 }
 
-.active-cell.skill-q { background: rgba(59, 130, 246, 0.12); }
-.active-cell.skill-w { background: rgba(34, 197, 94, 0.12); }
-.active-cell.skill-e { background: rgba(168, 85, 247, 0.12); }
-.active-cell.skill-r { background: rgba(245, 158, 11, 0.12); }
+.active-cell.skill-q {
+  background-color: rgba(59, 130, 246, 0.12);
+}
+.active-cell.skill-w {
+  background-color: rgba(34, 197, 94, 0.12);
+}
+.active-cell.skill-e {
+  background-color: rgba(168, 85, 247, 0.12);
+}
+.active-cell.skill-r {
+  background-color: rgba(245, 158, 11, 0.12);
+}
 
 .cell-dot {
   width: 8px;
@@ -281,8 +288,16 @@ function getSkillAtLevel(level: number): string {
   flex-shrink: 0;
 }
 
-.active-cell.skill-q .cell-dot { background: #3b82f6; }
-.active-cell.skill-w .cell-dot { background: #22c55e; }
-.active-cell.skill-e .cell-dot { background: #a855f7; }
-.active-cell.skill-r .cell-dot { background: #f59e0b; }
+.active-cell.skill-q .cell-dot {
+  background-color: #3b82f6;
+}
+.active-cell.skill-w .cell-dot {
+  background-color: #22c55e;
+}
+.active-cell.skill-e .cell-dot {
+  background-color: #a855f7;
+}
+.active-cell.skill-r .cell-dot {
+  background-color: #f59e0b;
+}
 </style>

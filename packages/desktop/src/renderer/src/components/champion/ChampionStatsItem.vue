@@ -1,9 +1,5 @@
 <template>
-  <div
-    class="champion-stats-item"
-    :class="{ selected }"
-    @click="$emit('select', stat.championId)"
-  >
+  <div class="champion-stats-item" :class="{ selected }" @click="$emit('select', stat.championId)">
     <span class="item-rank">{{ rank }}</span>
     <ChampionIcon :champion-id="stat.championId" :name="stat.championName" size="sm" />
     <div class="item-info">
@@ -16,16 +12,14 @@
           <div
             class="stat-bar-fill"
             :class="winRateClass"
-            :style="{ width: (stat.winRate * 100) + '%' }"
+            :style="{ width: stat.winRate * 100 + '%' }"
           />
         </div>
         <span class="stat-bar-label" :class="winRateClass">
           {{ (stat.winRate * 100).toFixed(1) }}%
         </span>
       </div>
-      <span class="item-kda" :class="kdaClass">
-        {{ stat.avgKDA.toFixed(2) }} KDA
-      </span>
+      <span class="item-kda" :class="kdaClass"> {{ stat.avgKDA.toFixed(2) }} KDA </span>
     </div>
   </div>
 </template>
@@ -70,11 +64,11 @@ const kdaClass = computed(() => {
 }
 
 .champion-stats-item:hover {
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
 }
 
 .champion-stats-item.selected {
-  background: rgba(0, 113, 227, 0.06);
+  background-color: rgba(0, 113, 227, 0.06);
   border-left: 3px solid var(--color-accent);
 }
 
@@ -121,7 +115,7 @@ const kdaClass = computed(() => {
 .stat-bar-bg {
   width: 60px;
   height: 4px;
-  background: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary);
   border-radius: var(--radius-full);
   overflow: hidden;
 }
@@ -132,9 +126,15 @@ const kdaClass = computed(() => {
   transition: width var(--transition-normal);
 }
 
-.stat-bar-fill.high { background: var(--color-win); }
-.stat-bar-fill.mid { background: var(--color-text-tertiary); }
-.stat-bar-fill.low { background: var(--color-lose); }
+.stat-bar-fill.high {
+  background-color: var(--color-win);
+}
+.stat-bar-fill.mid {
+  background-color: var(--color-text-tertiary);
+}
+.stat-bar-fill.low {
+  background-color: var(--color-lose);
+}
 
 .stat-bar-label {
   font-size: var(--text-xs);
@@ -144,9 +144,15 @@ const kdaClass = computed(() => {
   text-align: right;
 }
 
-.stat-bar-label.high { color: var(--color-win); }
-.stat-bar-label.mid { color: var(--color-text-secondary); }
-.stat-bar-label.low { color: var(--color-lose); }
+.stat-bar-label.high {
+  color: var(--color-win-text);
+}
+.stat-bar-label.mid {
+  color: var(--color-text-secondary);
+}
+.stat-bar-label.low {
+  color: var(--color-lose-text);
+}
 
 .item-kda {
   font-size: var(--text-xs);
@@ -155,7 +161,39 @@ const kdaClass = computed(() => {
   text-align: right;
 }
 
-.kda-excellent { color: var(--color-gold); font-weight: var(--font-semibold); }
-.kda-good { color: var(--color-win); }
-.kda-poor { color: var(--color-text-placeholder); }
+.kda-excellent {
+  color: var(--color-highlight-text);
+  font-weight: var(--font-semibold);
+}
+.kda-good {
+  color: var(--color-win-text);
+}
+.kda-poor {
+  color: var(--color-text-placeholder);
+}
+
+.item-info {
+  flex: 1;
+  min-width: 0;
+}
+.item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-stats {
+  flex-shrink: 0;
+}
+@container workspace (max-width: 580px) {
+  .stat-bar-bg {
+    display: none;
+  }
+  .item-stats {
+    gap: 10px;
+  }
+  .champion-stats-item {
+    gap: 8px;
+    padding-inline: 8px;
+  }
+}
 </style>
