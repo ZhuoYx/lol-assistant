@@ -24,6 +24,11 @@ export interface MatchSummary {
 export interface MatchList {
   matches: MatchSummary[];
   totalGames: number;
+  /** Raw LCU page cursor, before local queue/champion filtering. */
+  nextIndex?: number;
+  hasMore?: boolean;
+  /** Used to detect servers that ignore pagination and repeat the first page. */
+  pageGameIds?: number[];
 }
 
 /** 战绩列表查询参数 */

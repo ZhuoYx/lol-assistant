@@ -1,59 +1,72 @@
 <template>
-  <div class="team-panel" :class="side">
-    <div class="team-header">
+  <section
+    class="team-panel card"
+    :class="side"
+    :aria-label="side === 'blue' ? '蓝色方玩家' : '红色方玩家'"
+  >
+    <header class="team-header">
       <div class="team-title-row">
-        <span class="team-dot" />
-        <span class="team-name">{{ side === 'blue' ? '蓝色方' : '红色方' }}</span>
-        <span v-if="loadedCount < team.players.length" class="loading-hint">
-          ({{ loadedCount }}/{{ team.players.length }} 已加载)
-        </span>
-      </div>
-      <div v-if="teamStats" class="team-stats">
-        <span class="ts-item">
-          <span class="ts-label">平均段位</span>
-          <span class="ts-value">{{ teamStats.avgTierLabel }}</span>
-        </span>
-        <span class="ts-divider" />
-        <span class="ts-item">
-          <span class="ts-label">平均胜率</span>
-          <span class="ts-value" :class="winRateClass(teamStats.avgWinRate)">{{ formatPct(teamStats.avgWinRate) }}</span>
-        </span>
-        <span class="ts-divider" />
-        <span class="ts-item">
-          <span class="ts-label">平均KDA</span>
-          <span class="ts-value" :class="kdaClass(teamStats.avgKDA)">{{ teamStats.avgKDA.toFixed(2) }}</span>
-        </span>
-      </div>
-      <!-- Premade groups summary -->
-      <div v-if="premadeGroupsSummary.length > 0" class="premade-summary">
-        <svg class="premade-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
+        <div class="team-heading">
+          <span class="team-mark" aria-hidden="true">{{ side === 'blue' ? '蓝' : '红' }}</span>
+          <div>
+            <h2>
+              {{ side === 'blue' ? '蓝色方' : '红色方'
+              }}<span v-if="isMyTeam" class="my-team-badge">我方</span>
+            </h2>
+            <p>{{ team.players.length }} 位召唤师</p>
+          </div>
+        </div>
         <span
-          v-for="(group, idx) in premadeGroupsSummary"
-          :key="idx"
-          class="premade-group-tag"
+          class="team-load"
+          :title="failedCount ? `${failedCount} 位玩家数据未获取` : '玩家数据加载进度'"
+          >{{ loadedCount }}/{{ team.players.length }} 已就绪</span
         >
-          {{ group }}
-        </span>
       </div>
-    </div>
 
+      <dl class="team-stats">
+        <div>
+          <dt>平均段位</dt>
+          <dd>{{ teamStats.avgTierLabel }}</dd>
+        </div>
+        <div>
+          <dt>近期平均胜率</dt>
+          <dd :class="teamStats.avgWinRate === null ? '' : winRateClass(teamStats.avgWinRate)">
+            {{ teamStats.avgWinRate === null ? '—' : formatPct(teamStats.avgWinRate) }}
+          </dd>
+        </div>
+        <div>
+          <dt>近期平均 KDA</dt>
+          <dd>{{ teamStats.avgKDA === null ? '—' : teamStats.avgKDA.toFixed(2) }}</dd>
+        </div>
+      </dl>
+
+      <div class="team-footnote">
+        <template v-if="premadeGroupsSummary.length">
+          <span class="group-caption">疑似组队</span>
+          <span
+            v-for="(group, index) in premadeGroupsSummary"
+            :key="index"
+            class="group-chip"
+            :class="`group-${index % 3}`"
+            :title="group.names"
+            >组队 {{ index + 1 }} · {{ group.count }} 人</span
+          >
+        </template>
+        <span v-else>按已获取的段位及近期战绩统计</span>
+      </div>
+    </header>
     <div class="player-list">
       <LiveGamePlayerCard
         v-for="player in team.players"
         :key="player.puuid"
         :player="player"
         :is-me="player.puuid === myPuuid"
-        :clickable="true"
+        clickable
         :premade-groups="team.premadeGroups"
         @click="$emit('player-click', $event)"
       />
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -61,188 +74,214 @@ import { computed } from 'vue';
 import type { LiveGameTeam } from '@lol-assistant/shared';
 import LiveGamePlayerCard from './LiveGamePlayerCard.vue';
 
+const props = defineProps<{ team: LiveGameTeam; side: 'blue' | 'red'; myPuuid?: string }>();
+defineEmits<{ 'player-click': [puuid: string] }>();
 const TIER_ORDER: Record<string, number> = {
-  IRON: 1, BRONZE: 2, SILVER: 3, GOLD: 4,
-  PLATINUM: 5, EMERALD: 6, DIAMOND: 7,
-  MASTER: 8, GRANDMASTER: 9, CHALLENGER: 10,
+  IRON: 1,
+  BRONZE: 2,
+  SILVER: 3,
+  GOLD: 4,
+  PLATINUM: 5,
+  EMERALD: 6,
+  DIAMOND: 7,
+  MASTER: 8,
+  GRANDMASTER: 9,
+  CHALLENGER: 10,
 };
-
-const TIER_NAMES: Record<string, string> = {
-  IRON: '黑铁', BRONZE: '黄铜', SILVER: '白银', GOLD: '黄金',
-  PLATINUM: '铂金', EMERALD: '翡翠', DIAMOND: '钻石',
-  MASTER: '大师', GRANDMASTER: '宗师', CHALLENGER: '王者',
-};
-
-const props = defineProps<{
-  team: LiveGameTeam;
-  side: 'blue' | 'red';
-  myPuuid?: string;
-}>();
-
-defineEmits<{
-  'player-click': [puuid: string];
-}>();
-
-const loadedCount = computed(() =>
-  props.team.players.filter((p) => p.dataStatus === 'loaded').length
+const TIER_NAMES = [
+  '—',
+  '黑铁',
+  '黄铜',
+  '白银',
+  '黄金',
+  '铂金',
+  '翡翠',
+  '钻石',
+  '大师',
+  '宗师',
+  '王者',
+];
+const loadedPlayers = computed(() => props.team.players.filter((p) => p.dataStatus === 'loaded'));
+const loadedCount = computed(() => loadedPlayers.value.length);
+const failedCount = computed(
+  () => props.team.players.filter((p) => p.dataStatus === 'failed').length,
 );
-
+const isMyTeam = computed(
+  () => !!props.myPuuid && props.team.players.some((p) => p.puuid === props.myPuuid),
+);
 const teamStats = computed(() => {
-  const loaded = props.team.players.filter((p) => p.dataStatus === 'loaded');
-  if (loaded.length === 0) return null;
-
-  const avgWinRate = loaded.reduce((s, p) => s + p.recentWinRate, 0) / loaded.length;
-  const avgKDA = loaded.reduce((s, p) => s + p.recentKDA, 0) / loaded.length;
-
-  const tierValues = loaded
+  const recent = loadedPlayers.value.filter((p) => p.recentMatches?.length);
+  const tiers = loadedPlayers.value
     .map((p) => TIER_ORDER[p.tier.toUpperCase()] ?? 0)
-    .filter((v) => v > 0);
-  let avgTierLabel = '-';
-  if (tierValues.length > 0) {
-    const avg = tierValues.reduce((s, v) => s + v, 0) / tierValues.length;
-    const rounded = Math.round(avg);
-    const entry = Object.entries(TIER_ORDER).find(([, v]) => v === rounded);
-    if (entry) avgTierLabel = TIER_NAMES[entry[0]] ?? entry[0];
-  }
-
-  return { avgWinRate, avgKDA, avgTierLabel };
+    .filter(Boolean);
+  return {
+    avgTierLabel: tiers.length
+      ? TIER_NAMES[Math.round(tiers.reduce((sum, tier) => sum + tier, 0) / tiers.length)]
+      : '—',
+    avgWinRate: recent.length
+      ? recent.reduce((sum, p) => sum + p.recentWinRate, 0) / recent.length
+      : null,
+    avgKDA: recent.length ? recent.reduce((sum, p) => sum + p.recentKDA, 0) / recent.length : null,
+  };
 });
-
-function formatPct(v: number): string {
-  return `${(v * 100).toFixed(1)}%`;
+const premadeGroupsSummary = computed(() =>
+  (props.team.premadeGroups ?? []).map((group) => ({
+    count: group.length,
+    names: group
+      .map(
+        (puuid) => props.team.players.find((p) => p.puuid === puuid)?.summonerName ?? '未知召唤师',
+      )
+      .join(' + '),
+  })),
+);
+function formatPct(rate: number) {
+  return `${(rate * 100).toFixed(1)}%`;
 }
-
-function winRateClass(rate: number): string {
-  if (rate >= 0.55) return 'high';
-  if (rate <= 0.45) return 'low';
-  return '';
+function winRateClass(rate: number) {
+  return rate >= 0.55 ? 'high' : rate <= 0.45 ? 'low' : '';
 }
-
-function kdaClass(kda: number): string {
-  if (kda >= 3.5) return 'high';
-  if (kda >= 2) return '';
-  return 'low';
-}
-
-/** 预组队摘要文本 */
-const premadeGroupsSummary = computed(() => {
-  const groups = props.team.premadeGroups;
-  if (!groups || groups.length === 0) return [];
-  return groups.map((group) => {
-    const names = group
-      .map((puuid) => {
-        const player = props.team.players.find((p) => p.puuid === puuid);
-        return player?.summonerName ?? '???';
-      })
-      .join(' + ');
-    return `组队: ${names}`;
-  });
-});
 </script>
 
 <style scoped>
 .team-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  --team-color: var(--color-win);
+  --team-tint: var(--color-win-bg);
+  min-width: 0;
+  padding: 16px;
+  container: team / inline-size;
+  align-self: start;
+  --glass-tint: linear-gradient(180deg, var(--team-tint), transparent 240px);
 }
-
+.team-panel.red {
+  --team-color: var(--color-lose);
+  --team-tint: var(--color-lose-bg);
+}
 .team-header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: 0 var(--space-1);
+  margin-bottom: 12px;
 }
-
+.team-title-row,
+.team-heading {
+  display: flex;
+  align-items: center;
+}
 .team-title-row {
+  justify-content: space-between;
+  gap: 12px;
+}
+.team-heading {
+  gap: 10px;
+  min-width: 0;
+}
+.team-mark {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 40px;
+  clip-path: polygon(0 0, 100% 0, 100% 73%, 50% 100%, 0 73%);
+  background: var(--team-color);
+  color: white;
+  font-size: 13px;
+  font-weight: 650;
+  padding-bottom: 4px;
+}
+h2 {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 7px;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.3px;
 }
-
-.team-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
+.team-heading p {
+  margin-top: 2px;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
 }
-
-.blue .team-dot { background: var(--color-win); }
-.red .team-dot { background: var(--color-lose); }
-
-.team-name {
-  font-size: var(--text-sm);
-  font-weight: var(--font-bold);
-  color: var(--color-text-primary);
-}
-
-.loading-hint {
-  font-size: var(--text-xs);
-  color: var(--color-text-placeholder);
-}
-
-.team-stats {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-bg-secondary);
-  border-radius: var(--radius-md);
-}
-
-.ts-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.ts-label {
+.my-team-badge {
+  color: var(--color-accent);
+  background-color: var(--color-accent-soft);
+  padding: 1px 5px;
+  border-radius: 4px;
   font-size: 10px;
-  color: var(--color-text-placeholder);
+  font-weight: 500;
 }
-
-.ts-value {
-  font-size: var(--text-xs);
-  font-weight: var(--font-bold);
-  color: var(--color-text-primary);
-  font-family: var(--font-mono);
+.team-load {
+  font: 11px var(--font-mono);
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
 }
-
-.ts-value.high { color: var(--color-win); }
-.ts-value.low { color: var(--color-lose); }
-
-.ts-divider {
-  width: 1px;
-  height: 12px;
-  background: var(--color-divider);
+.team-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding-block: 16px 12px;
 }
-
+.team-stats > div + div {
+  border-left: 1px solid var(--color-divider);
+  padding-left: 16px;
+}
+dt {
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+}
+dd {
+  margin-top: 4px;
+  font-size: 18px;
+  line-height: 1.3;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.3px;
+}
+.high {
+  color: var(--color-win-text);
+}
+.low {
+  color: var(--color-lose-text);
+}
+.team-footnote {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 24px;
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+}
+.group-chip {
+  border-radius: 5px;
+  padding: 2px 6px;
+}
+.group-0 {
+  color: var(--color-tier-master);
+  background-color: rgba(155, 89, 182, 0.1);
+}
+.group-1 {
+  color: var(--color-success);
+  background-color: rgba(20, 133, 93, 0.1);
+}
+.group-2 {
+  color: var(--color-warning);
+  background-color: rgba(170, 103, 8, 0.1);
+}
 .player-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 10px;
 }
-
-/* Premade groups summary */
-.premade-summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-3);
-  background: rgba(230, 126, 34, 0.06);
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(230, 126, 34, 0.12);
-  flex-wrap: wrap;
+@container team (max-width: 420px) {
+  .team-stats {
+    gap: 8px;
+  }
+  .team-stats > div + div {
+    padding-left: 10px;
+  }
+  dd {
+    font-size: 16px;
+  }
 }
-
-.premade-icon {
-  color: #e67e22;
-  flex-shrink: 0;
-}
-
-.premade-group-tag {
-  font-size: 10px;
-  color: #e67e22;
-  font-weight: var(--font-semibold);
+@media (max-width: 620px) {
+  .team-panel {
+    padding: 12px;
+  }
 }
 </style>

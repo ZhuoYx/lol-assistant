@@ -185,7 +185,7 @@ const winRateColorClass = computed(() => {
 .tier-master .rank-accent-stripe { background: linear-gradient(90deg, #9b59b6, #d4a0e8, #9b59b6); }
 .tier-grandmaster .rank-accent-stripe { background: linear-gradient(90deg, #e74c3c, #ff8a7a, #e74c3c); }
 .tier-challenger .rank-accent-stripe { background: linear-gradient(90deg, #f1c40f, #fff4a3, #f1c40f); }
-.tier-unranked .rank-accent-stripe { background: var(--color-border-light); }
+.tier-unranked .rank-accent-stripe { background-color: var(--color-border-light); }
 
 /* ── Decorative glow overlay ── */
 .rank-glow-overlay {
@@ -263,7 +263,7 @@ const winRateColorClass = computed(() => {
   width: 6px;
   height: 6px;
   border-radius: var(--radius-full);
-  background: var(--color-accent);
+  background-color: var(--color-accent);
   animation: pulse 1.5s ease infinite;
 }
 
@@ -329,7 +329,7 @@ const winRateColorClass = computed(() => {
   width: 64px;
   height: 64px;
   border-radius: var(--radius-lg);
-  background: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -401,7 +401,7 @@ const winRateColorClass = computed(() => {
 /* ── LP Progress Bar ── */
 .lp-progress-bar {
   height: 3px;
-  background: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary);
   border-radius: var(--radius-full);
   overflow: hidden;
   margin: 2px 0;
@@ -432,12 +432,12 @@ const winRateColorClass = computed(() => {
   font-size: var(--text-xs);
 }
 
-.wins { color: var(--color-win); font-weight: var(--font-medium); }
-.losses { color: var(--color-lose); font-weight: var(--font-medium); }
+.wins { color: var(--color-win-text); font-weight: var(--font-medium); }
+.losses { color: var(--color-lose-text); font-weight: var(--font-medium); }
 .winrate-divider { color: var(--color-text-placeholder); }
 .winrate { color: var(--color-text-tertiary); }
-.winrate.high { color: var(--color-win); font-weight: var(--font-semibold); }
-.winrate.low { color: var(--color-lose); font-weight: var(--font-semibold); }
+.winrate.high { color: var(--color-win-text); font-weight: var(--font-semibold); }
+.winrate.low { color: var(--color-lose-text); font-weight: var(--font-semibold); }
 .winrate-na { color: var(--color-text-placeholder); font-style: italic; font-size: var(--text-xs); }
 
 /* ── Mini Series ── */
@@ -476,9 +476,9 @@ const winRateColorClass = computed(() => {
   transform: scale(1.15);
 }
 
-.series-dot.win { background: var(--color-win); box-shadow: 0 0 6px rgba(52,199,89,0.3); }
-.series-dot.loss { background: var(--color-lose); box-shadow: 0 0 6px rgba(255,59,48,0.3); }
-.series-dot.pending { background: var(--color-bg-tertiary); border: 1.5px solid var(--color-border); }
+.series-dot.win { background-color: var(--color-win); box-shadow: 0 0 6px rgba(52,199,89,0.3); }
+.series-dot.loss { background-color: var(--color-lose); box-shadow: 0 0 6px rgba(255,59,48,0.3); }
+.series-dot.pending { background-color: var(--color-bg-tertiary); border: 1.5px solid var(--color-border); }
 
 /* ── Empty State ── */
 .rank-empty {

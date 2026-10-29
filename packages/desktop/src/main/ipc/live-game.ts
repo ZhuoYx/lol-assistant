@@ -274,7 +274,7 @@ async function fetchPlayerData(player: GameflowPlayer, queueId: number = 0): Pro
   const recentMatches: RecentMatchSummary[] = [];
 
   if (recentResult.status === 'fulfilled') {
-    const matchList = recentResult.value as Record<string, unknown>;
+    const matchList = recentResult.value as unknown as Record<string, unknown>;
     // LCU 原始格式: { games: { games: [...], gameCount } } 或标准格式 { matches: [...] }
     let matches: Record<string, unknown>[] = [];
     if (Array.isArray(matchList.matches)) {

@@ -209,9 +209,8 @@ function buildMatchListQuery(params: MatchListParams): string {
     queryParams.push(`endIndex=${params.endIndex}`);
   }
   // 注意：LCU API 不支持 queue 参数，队列筛选在前端完成
-  if (params.championId !== undefined) {
-    queryParams.push(`championId=${params.championId}`);
-  }
+  // championId is not a documented match-history query parameter either.
+  // Apply both champion and queue filters after retrieving the raw LCU page.
 
   if (queryParams.length === 0) return '';
   return `?${queryParams.join('&')}`;

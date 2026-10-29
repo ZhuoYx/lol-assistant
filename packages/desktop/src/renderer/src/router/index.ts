@@ -1,4 +1,5 @@
 import { createRouter, createMemoryHistory, type RouteRecordRaw } from 'vue-router';
+import { installRouteTransitions } from './transitions';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -61,6 +62,8 @@ const router = createRouter({
   history: createMemoryHistory(),
   routes,
 });
+
+installRouteTransitions(router);
 
 export default router;
 export { routes };

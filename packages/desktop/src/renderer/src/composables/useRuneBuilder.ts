@@ -15,7 +15,7 @@ const RUNE_TREE_MAP: Record<number, { name: string; color: string }> = {
 const ALL_ROLES = ['top', 'jungle', 'mid', 'adc', 'support'] as const;
 
 /** 数据来源配置标签 */
-export type BuildSource = 'opgg' | 'local' | null;
+export type BuildSource = 'opgg' | 'qq101' | null;
 
 export interface BuildConfig {
   championId: number;
@@ -100,7 +100,7 @@ export function useRuneBuilder() {
   const sourceLabel = computed(() => {
     switch (buildConfig.value?.dataSource) {
       case 'opgg': return 'OP.GG 热门';
-      case 'local': return '默认推荐';
+      case 'qq101': return '101.qq.com 国服';
       default: return '未知';
     }
   });

@@ -72,7 +72,8 @@ const queueTagClass = computed(() => {
   const bot = [830, 840, 850, 870, 880, 890];
   if (ranked.includes(queueId) || [700, 720].includes(queueId)) return 'tag-ranked';
   if (aram.includes(queueId) || props.match.gameMode === 'ARAM') return 'tag-aram';
-  if (fun.includes(queueId) || props.match.gameMode === 'URF' || props.match.gameMode === 'CHERRY') return 'tag-fun';
+  if (fun.includes(queueId) || props.match.gameMode === 'URF' || props.match.gameMode === 'CHERRY')
+    return 'tag-fun';
   if (bot.includes(queueId)) return 'tag-bot';
   return 'tag-normal';
 });
@@ -112,21 +113,21 @@ const laneName = computed(() => {
 }
 
 .match-item.win {
-  background: rgba(52, 199, 89, 0.06);
+  background-color: rgba(52, 199, 89, 0.06);
 }
 
 .match-item.lose {
-  background: rgba(255, 59, 48, 0.06);
+  background-color: rgba(255, 59, 48, 0.06);
 }
 
 .match-item.win:hover,
 .match-item.win.expanded {
-  background: rgba(52, 199, 89, 0.12);
+  background-color: rgba(52, 199, 89, 0.12);
 }
 
 .match-item.lose:hover,
 .match-item.lose.expanded {
-  background: rgba(255, 59, 48, 0.12);
+  background-color: rgba(255, 59, 48, 0.12);
 }
 
 .result-bar {
@@ -136,8 +137,12 @@ const laneName = computed(() => {
   flex-shrink: 0;
 }
 
-.win .result-bar { background: var(--color-win); }
-.lose .result-bar { background: var(--color-lose); }
+.win .result-bar {
+  background-color: var(--color-win);
+}
+.lose .result-bar {
+  background-color: var(--color-lose);
+}
 
 .match-info {
   display: flex;
@@ -148,19 +153,20 @@ const laneName = computed(() => {
 }
 
 .champion-name {
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   font-weight: var(--font-semibold);
   color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+  max-width: 100%;
 }
 
 .meta-row {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-wrap: wrap;
 }
 
 .result-text {
@@ -168,11 +174,15 @@ const laneName = computed(() => {
   font-weight: var(--font-semibold);
 }
 
-.win .result-text { color: var(--color-win); }
-.lose .result-text { color: var(--color-lose); }
+.win .result-text {
+  color: var(--color-win-text);
+}
+.lose .result-text {
+  color: var(--color-lose-text);
+}
 
 .mode-tag {
-  font-size: 10px;
+  font-size: 12px;
   padding: 1px 6px;
   border-radius: var(--radius-sm);
   font-weight: var(--font-medium);
@@ -180,37 +190,37 @@ const laneName = computed(() => {
 }
 
 .tag-ranked {
-  background: rgba(99, 132, 255, 0.12);
-  color: #6384ff;
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent);
 }
 
 .tag-aram {
-  background: rgba(46, 216, 176, 0.12);
-  color: #2ed8b0;
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  color: var(--color-success-text);
 }
 
 .tag-fun {
-  background: rgba(255, 168, 38, 0.12);
-  color: #ffa826;
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  color: var(--color-warning);
 }
 
 .tag-normal {
-  background: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary);
   color: var(--color-text-tertiary);
 }
 
 .tag-bot {
-  background: rgba(162, 132, 94, 0.12);
-  color: #a2845e;
+  background-color: rgba(162, 132, 94, 0.12);
+  color: var(--color-text-secondary);
 }
 
 .lane-tag {
-  font-size: 10px;
+  font-size: 12px;
   padding: 1px 6px;
   border-radius: var(--radius-sm);
   font-weight: var(--font-medium);
   white-space: nowrap;
-  background: rgba(120, 120, 140, 0.12);
+  background-color: rgba(120, 120, 140, 0.12);
   color: var(--color-text-secondary);
 }
 
@@ -233,7 +243,7 @@ const laneName = computed(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.5px;
   padding: 1px 5px;
@@ -244,36 +254,43 @@ const laneName = computed(() => {
 
 .badge-mvp {
   background: linear-gradient(135deg, rgba(255, 215, 0, 0.18), rgba(255, 180, 0, 0.12));
-  color: #d4a017;
+  color: var(--color-highlight-text);
   border: 1px solid rgba(255, 215, 0, 0.3);
 }
 
 .badge-svp {
   background: linear-gradient(135deg, rgba(192, 192, 192, 0.18), rgba(160, 160, 180, 0.12));
-  color: #8e8ea0;
+  color: var(--color-text-secondary);
   border: 1px solid rgba(192, 192, 192, 0.3);
 }
 
 .kda-numbers {
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   font-weight: var(--font-semibold);
   color: var(--color-text-primary);
   font-family: var(--font-mono);
 }
 
 .kda-ratio {
-  font-size: 10px;
-  color: var(--color-text-tertiary);
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 
-.kda-ratio.gold { color: var(--color-gold); font-weight: var(--font-semibold); }
-.kda-ratio.good { color: var(--color-win); }
-.kda-ratio.poor { color: var(--color-text-placeholder); }
+.kda-ratio.gold {
+  color: var(--color-highlight-text);
+  font-weight: var(--font-semibold);
+}
+.kda-ratio.good {
+  color: var(--color-win-text);
+}
+.kda-ratio.poor {
+  color: var(--color-text-secondary);
+}
 
 .match-time {
-  font-size: 10px;
-  color: var(--color-text-placeholder);
-  min-width: 54px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  min-width: 70px;
   text-align: right;
   flex-shrink: 0;
 }

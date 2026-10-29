@@ -1,5 +1,5 @@
 <template>
-  <div class="match-detail">
+  <div class="match-detail glass-panel">
     <div v-if="loading" class="detail-loading">
       <LoadingSpinner size="md" text="加载详情..." centered />
     </div>
@@ -21,10 +21,18 @@
             <span class="team-indicator" />
             <span class="team-label">{{ team.teamId === 100 ? '蓝色方' : '红色方' }}</span>
           </div>
-          <span class="team-result" :class="{ win: team.win }">{{ team.win ? '胜利' : '失败' }}</span>
+          <span class="team-result" :class="{ win: team.win }">{{
+            team.win ? '胜利' : '失败'
+          }}</span>
         </div>
 
-        <div class="participants-list">
+        <p class="table-scroll-hint">可横向滚动查看完整装备和数据</p>
+        <div
+          class="participants-list"
+          tabindex="0"
+          role="region"
+          :aria-label="`${team.teamId === 100 ? '蓝色方' : '红色方'}对局数据，可横向滚动`"
+        >
           <div class="participant-header-row">
             <span class="ph-champ">英雄</span>
             <span class="ph-kda">KDA</span>
@@ -48,7 +56,16 @@
     </div>
     <div v-else-if="!loading" class="detail-empty">
       <div class="empty-icon">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+        <svg
+          width="40"
+          height="40"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
           <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
           <path d="M9 9h6v6H9z" />
         </svg>
@@ -96,9 +113,9 @@ const displayTeams = computed(() => {
     return props.detail.teams;
   }
   // 从 participants 推断
-  const teamIds = [...new Set(props.detail.participants.map(p => p.teamId))];
-  return teamIds.map(teamId => {
-    const teamParticipants = props.detail!.participants.filter(p => p.teamId === teamId);
+  const teamIds = [...new Set(props.detail.participants.map((p) => p.teamId))];
+  return teamIds.map((teamId) => {
+    const teamParticipants = props.detail!.participants.filter((p) => p.teamId === teamId);
     const win = teamParticipants.length > 0 ? teamParticipants[0].win : false;
     return { teamId, win, bans: [], objectives: {} };
   });
@@ -107,19 +124,13 @@ const displayTeams = computed(() => {
 // 全场最高伤害（用于伤害条百分比计算）
 const allMaxDamage = computed(() => {
   if (!props.detail) return 1;
-  return Math.max(
-    ...props.detail.participants.map((p) => p.totalDamageDealt),
-    1,
-  );
+  return Math.max(...props.detail.participants.map((p) => p.totalDamageDealt), 1);
 });
 
 // 全场最高承受伤害
 const allMaxDamageTaken = computed(() => {
   if (!props.detail) return 1;
-  return Math.max(
-    ...props.detail.participants.map((p) => p.totalDamageTaken),
-    1,
-  );
+  return Math.max(...props.detail.participants.map((p) => p.totalDamageTaken), 1);
 });
 
 const POSITION_ORDER: Record<string, number> = {
@@ -155,9 +166,6 @@ function getTeamParticipants(teamId: number) {
 
 <style scoped>
 .match-detail {
-  background: var(--color-bg-card);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--color-border-light);
   overflow: hidden;
 }
 
@@ -212,11 +220,11 @@ function getTeamParticipants(teamId: number) {
 }
 
 .team-header.team-blue {
-  background: rgba(68, 133, 244, 0.06);
+  background-color: rgba(68, 133, 244, 0.06);
 }
 
 .team-header.team-red {
-  background: rgba(234, 67, 53, 0.06);
+  background-color: rgba(234, 67, 53, 0.06);
 }
 
 .team-left {
@@ -232,11 +240,11 @@ function getTeamParticipants(teamId: number) {
 }
 
 .team-blue .team-indicator {
-  background: #4485f4;
+  background-color: #4485f4;
 }
 
 .team-red .team-indicator {
-  background: #ea4335;
+  background-color: #ea4335;
 }
 
 .team-label {
@@ -255,16 +263,17 @@ function getTeamParticipants(teamId: number) {
 .team-result {
   font-weight: var(--font-semibold);
   font-size: var(--text-xs);
-  color: var(--color-lose);
+  color: var(--color-lose-text);
 }
 
 .team-result.win {
-  color: var(--color-win);
+  color: var(--color-win-text);
 }
 
 .participant-header-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 0.7fr 1.5fr;
+  grid-template-columns: var(--participant-columns);
+  min-width: 820px;
   padding: var(--space-1) var(--space-4);
   font-size: 10px;
   color: var(--color-text-placeholder);
@@ -298,5 +307,29 @@ function getTeamParticipants(teamId: number) {
 .empty-desc {
   font-size: var(--text-xs);
   color: var(--color-text-tertiary);
+}
+
+.participants-list {
+  --participant-columns: minmax(180px, 1fr) 120px 100px 100px 80px 180px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.detail-header {
+  flex-wrap: wrap;
+}
+.table-scroll-hint {
+  display: none;
+  padding: 6px 16px;
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  background-color: var(--color-bg-inset);
+}
+@container workspace (max-width: 840px) {
+  .table-scroll-hint {
+    display: block;
+  }
+  .detail-time {
+    margin-left: 0;
+  }
 }
 </style>

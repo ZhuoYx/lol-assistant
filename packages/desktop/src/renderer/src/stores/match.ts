@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
-import type { MatchSummary, MatchDetail, MatchFilters, MatchListParams } from '@lol-assistant/shared';
+import { ref } from 'vue';
+import type {
+  MatchSummary,
+  MatchDetail,
+  MatchFilters,
+  MatchListParams,
+} from '@lol-assistant/shared';
 import { useSummonerStore } from './summoner';
 
 export const useMatchStore = defineStore('match', () => {
@@ -13,13 +18,16 @@ export const useMatchStore = defineStore('match', () => {
 
   const filters = ref<MatchFilters>({});
 
-  const PAGE_SIZE = 50;
-  const hasMore = computed(() => matchList.value.length < totalGames.value);
+  const PAGE_SIZE = 20;
+  const hasMore = ref(false);
+  const paginationNotice = ref('');
+  let nextIndex = 0;
+  let seenPageIds = new Set<number>();
 
   let fetchId = 0;
 
-  async function fetchMatchList(reset = false) {
-    if (!reset && loading.value) return;
+  async function fetchMatchList(reset = false): Promise<boolean> {
+    if (!reset && loading.value) return false;
     loading.value = true;
     error.value = null;
     const currentFetchId = ++fetchId;
@@ -28,11 +36,15 @@ export const useMatchStore = defineStore('match', () => {
     if (reset) {
       matchList.value = [];
       totalGames.value = 0;
+      nextIndex = 0;
+      seenPageIds = new Set();
+      hasMore.value = false;
+      paginationNotice.value = '';
     }
 
     try {
       const summonerStore = useSummonerStore();
-      const begIndex = reset ? 0 : matchList.value.length;
+      const begIndex = reset ? 0 : nextIndex;
       const params: MatchListParams = {
         puuid: summonerStore.activePUUID,
         begIndex,
@@ -43,17 +55,36 @@ export const useMatchStore = defineStore('match', () => {
 
       const result = await window.electronAPI.getMatchList(params);
 
-      if (currentFetchId !== fetchId) return;
+      if (currentFetchId !== fetchId) return false;
+
+      const pageIds = result.pageGameIds ?? (result.matches ?? []).map((m) => m.gameId);
+      const repeatsPage =
+        begIndex > 0 && pageIds.length > 0 && pageIds.every((id) => seenPageIds.has(id));
+      for (const id of pageIds) seenPageIds.add(id);
+      nextIndex = result.nextIndex ?? begIndex + pageIds.length;
+      hasMore.value =
+        !repeatsPage && nextIndex > begIndex && (result.hasMore ?? pageIds.length >= PAGE_SIZE);
+      if (repeatsPage)
+        paginationNotice.value = '客户端重复返回已加载战绩，已停止翻页；当前大区可能限制更早记录。';
 
       if (reset) {
         matchList.value = result.matches ?? [];
       } else {
-        matchList.value.push(...(result.matches ?? []));
+        const loadedIds = new Set(matchList.value.map((m) => m.gameId));
+        matchList.value.push(
+          ...(result.matches ?? []).filter((m) => {
+            if (loadedIds.has(m.gameId)) return false;
+            loadedIds.add(m.gameId);
+            return true;
+          }),
+        );
       }
       totalGames.value = result.totalGames ?? 0;
+      return true;
     } catch (e) {
-      if (currentFetchId !== fetchId) return;
+      if (currentFetchId !== fetchId) return false;
       error.value = e instanceof Error ? e.message : '获取战绩失败';
+      return false;
     } finally {
       if (currentFetchId === fetchId) {
         loading.value = false;
@@ -84,6 +115,12 @@ export const useMatchStore = defineStore('match', () => {
   }
 
   function clear() {
+    ++fetchId;
+    loading.value = false;
+    nextIndex = 0;
+    seenPageIds = new Set();
+    hasMore.value = false;
+    paginationNotice.value = '';
     matchList.value = [];
     currentMatch.value = null;
     totalGames.value = 0;
@@ -100,6 +137,8 @@ export const useMatchStore = defineStore('match', () => {
     error,
     filters,
     hasMore,
+    paginationNotice,
+    pageSize: PAGE_SIZE,
     fetchMatchList,
     fetchMatchDetail,
     setFilters,

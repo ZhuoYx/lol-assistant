@@ -33,6 +33,9 @@ pnpm-debug.log*
 .eslintcache
 *.tsbuildinfo
 
+# Local specifications and UI validation artifacts
+/specs/
+
 # Scraper data (runtime generated)
 scraper-data/
 

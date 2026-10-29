@@ -9,6 +9,11 @@ import { logger } from '../utils/logger';
 const scraperManager = new ScraperManager();
 
 export function registerScraperIpcHandlers(): void {
+  ipcMain.handle('scraper:getSource', () => scraperManager.getSource());
+  ipcMain.handle('scraper:setSource', (_event, source: 'opgg' | 'qq101') => {
+    scraperManager.setSource(source);
+    return scraperManager.getSource();
+  });
   // 获取英雄构建数据
   ipcMain.handle('scraper:getChampionBuilds', async (_event, championId: number, role?: string) => {
     try {

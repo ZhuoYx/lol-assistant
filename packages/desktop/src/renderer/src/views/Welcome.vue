@@ -1,6 +1,6 @@
 <template>
   <div class="welcome-page">
-    <div class="welcome-container">
+    <div class="welcome-container glass-panel">
       <!-- Step indicator -->
       <div class="steps">
         <div
@@ -16,8 +16,17 @@
         <!-- Step 0: Welcome -->
         <div v-if="currentStep === 0" key="welcome" class="step-content">
           <div class="welcome-icon">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            <svg
+              width="64"
+              height="64"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
             </svg>
           </div>
           <h1 class="welcome-title">欢迎使用 LOL 助手</h1>
@@ -34,7 +43,18 @@
           <div class="feature-grid">
             <div class="feature-item">
               <div class="feature-icon accent">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                >
+                  <path d="M12 20V10" />
+                  <path d="M18 20V4" />
+                  <path d="M6 20v-4" />
+                </svg>
               </div>
               <div class="feature-text">
                 <strong>战绩查询</strong>
@@ -43,7 +63,17 @@
             </div>
             <div class="feature-item">
               <div class="feature-icon success">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <polygon points="10 8 16 12 10 16 10 8" />
+                </svg>
               </div>
               <div class="feature-text">
                 <strong>对局分析</strong>
@@ -52,7 +82,19 @@
             </div>
             <div class="feature-item">
               <div class="feature-icon warning">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
               </div>
               <div class="feature-text">
                 <strong>选人助手</strong>
@@ -61,7 +103,16 @@
             </div>
             <div class="feature-item">
               <div class="feature-icon info">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                >
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
               </div>
               <div class="feature-text">
                 <strong>符文出装</strong>
@@ -81,19 +132,66 @@
           <p class="step-desc">请确认英雄联盟客户端的安装位置，以便自动连接</p>
 
           <div class="path-section">
-            <div class="path-card" :class="{ valid: pathStatus === 'valid', invalid: pathStatus === 'invalid' }">
+            <div
+              class="path-card glass-surface"
+              :class="{ valid: pathStatus === 'valid', invalid: pathStatus === 'invalid' }"
+            >
               <div class="path-status-icon">
-                <svg v-if="pathStatus === 'detecting'" class="spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                  <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                <svg
+                  v-if="pathStatus === 'detecting'"
+                  class="spin"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                >
+                  <path d="M21 12a9 9 0 11-6.219-8.56" />
                 </svg>
-                <svg v-else-if="pathStatus === 'valid'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="20 6 9 17 4 12"/>
+                <svg
+                  v-else-if="pathStatus === 'valid'"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--color-success)"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="20 6 9 17 4 12" />
                 </svg>
-                <svg v-else-if="pathStatus === 'invalid'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-error)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                <svg
+                  v-else-if="pathStatus === 'invalid'"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--color-error)"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="15" y1="9" x2="9" y2="15" />
+                  <line x1="9" y1="9" x2="15" y2="15" />
                 </svg>
-                <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                <svg
+                  v-else
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="var(--color-text-tertiary)"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+                  />
                 </svg>
               </div>
               <div class="path-info">
@@ -104,14 +202,33 @@
 
             <div class="path-actions">
               <button class="path-btn" :disabled="pathStatus === 'detecting'" @click="autoDetect">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                  <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                >
+                  <path d="M21 12a9 9 0 11-6.219-8.56" />
                 </svg>
                 自动检测
               </button>
               <button class="path-btn" @click="manualSelect">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+                  />
                 </svg>
                 手动选择
               </button>
@@ -119,12 +236,34 @@
           </div>
 
           <div v-if="pathStatus === 'invalid'" class="path-error-tip">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
             <span>未检测到有效的英雄联盟安装，路径下未找到 LeagueClient.exe</span>
           </div>
 
           <div class="path-tip">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
             <span>如果客户端正在运行，可自动检测；否则请手动指定安装目录</span>
           </div>
 
@@ -156,7 +295,18 @@
             </div>
           </div>
           <div class="pref-tip">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
             <span>建议将英雄联盟设置为「无边框窗口」模式以获得最佳体验</span>
           </div>
           <div class="step-actions">
@@ -271,11 +421,12 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-bg-primary);
+  background-color: transparent;
   padding: var(--space-6);
 }
 
 .welcome-container {
+  padding: clamp(20px, 4vw, 32px);
   width: 100%;
   max-width: 520px;
   display: flex;
@@ -294,17 +445,17 @@ onMounted(() => {
   width: 8px;
   height: 8px;
   border-radius: var(--radius-full);
-  background: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary);
   transition: all var(--transition-normal);
 }
 
 .step-dot.active {
   width: 24px;
-  background: var(--color-accent);
+  background-color: var(--color-accent);
 }
 
 .step-dot.completed {
-  background: var(--color-accent);
+  background-color: var(--color-accent);
 }
 
 /* Step content */
@@ -361,7 +512,7 @@ onMounted(() => {
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-4);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border-light);
 }
@@ -377,22 +528,22 @@ onMounted(() => {
 }
 
 .feature-icon.accent {
-  background: rgba(0, 113, 227, 0.1);
+  background-color: rgba(0, 113, 227, 0.1);
   color: var(--color-accent);
 }
 
 .feature-icon.success {
-  background: rgba(48, 209, 88, 0.1);
+  background-color: rgba(48, 209, 88, 0.1);
   color: var(--color-success);
 }
 
 .feature-icon.warning {
-  background: rgba(255, 159, 10, 0.1);
+  background-color: rgba(255, 159, 10, 0.1);
   color: var(--color-warning);
 }
 
 .feature-icon.info {
-  background: rgba(100, 210, 255, 0.1);
+  background-color: rgba(100, 210, 255, 0.1);
   color: var(--color-info);
 }
 
@@ -424,7 +575,7 @@ onMounted(() => {
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-4);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border-light);
   transition: border-color var(--transition-normal);
@@ -433,12 +584,12 @@ onMounted(() => {
 
 .path-card.valid {
   border-color: rgba(48, 209, 88, 0.3);
-  background: rgba(48, 209, 88, 0.04);
+  background-color: rgba(48, 209, 88, 0.04);
 }
 
 .path-card.invalid {
   border-color: rgba(255, 69, 58, 0.3);
-  background: rgba(255, 69, 58, 0.04);
+  background-color: rgba(255, 69, 58, 0.04);
 }
 
 .path-status-icon {
@@ -447,17 +598,17 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary);
   border-radius: var(--radius-md);
   flex-shrink: 0;
 }
 
 .path-card.valid .path-status-icon {
-  background: rgba(48, 209, 88, 0.1);
+  background-color: rgba(48, 209, 88, 0.1);
 }
 
 .path-card.invalid .path-status-icon {
-  background: rgba(255, 69, 58, 0.1);
+  background-color: rgba(255, 69, 58, 0.1);
 }
 
 .path-info {
@@ -496,14 +647,14 @@ onMounted(() => {
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
   color: var(--color-text-secondary);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
 }
 
 .path-btn:hover:not(:disabled) {
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
   color: var(--color-text-primary);
   border-color: var(--color-border);
 }
@@ -520,7 +671,7 @@ onMounted(() => {
   font-size: var(--text-xs);
   color: var(--color-error);
   padding: var(--space-2) var(--space-3);
-  background: rgba(255, 69, 58, 0.06);
+  background-color: rgba(255, 69, 58, 0.06);
   border-radius: var(--radius-md);
   margin-bottom: var(--space-3);
   text-align: left;
@@ -538,7 +689,7 @@ onMounted(() => {
   font-size: var(--text-xs);
   color: var(--color-text-tertiary);
   padding: var(--space-2) var(--space-3);
-  background: rgba(0, 113, 227, 0.04);
+  background-color: rgba(0, 113, 227, 0.04);
   border-radius: var(--radius-md);
   margin-bottom: var(--space-8);
   text-align: left;
@@ -553,7 +704,7 @@ onMounted(() => {
 .pref-list {
   display: flex;
   flex-direction: column;
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border-light);
   overflow: hidden;
@@ -596,7 +747,7 @@ onMounted(() => {
   font-size: var(--text-xs);
   color: var(--color-text-tertiary);
   padding: var(--space-3);
-  background: rgba(255, 159, 10, 0.06);
+  background-color: rgba(255, 159, 10, 0.06);
   border-radius: var(--radius-md);
   margin-bottom: var(--space-8);
   text-align: left;
@@ -618,8 +769,8 @@ onMounted(() => {
   padding: 10px 28px;
   font-size: var(--text-base);
   font-weight: var(--font-semibold);
-  color: #ffffff;
-  background: var(--color-accent);
+  color: var(--color-on-accent);
+  background-color: var(--color-accent);
   border: none;
   border-radius: var(--radius-full);
   transition: all var(--transition-fast);
@@ -627,12 +778,12 @@ onMounted(() => {
 }
 
 .primary-btn:hover {
-  background: var(--color-accent-hover);
+  background-color: var(--color-accent-hover);
   transform: scale(1.02);
 }
 
 .primary-btn:active {
-  background: var(--color-accent-active);
+  background-color: var(--color-accent-active);
   transform: scale(0.98);
 }
 
@@ -641,21 +792,25 @@ onMounted(() => {
   font-size: var(--text-base);
   font-weight: var(--font-medium);
   color: var(--color-text-secondary);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
   transition: all var(--transition-fast);
 }
 
 .secondary-btn:hover {
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
   color: var(--color-text-primary);
 }
 
 /* Spin animation */
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .spin {

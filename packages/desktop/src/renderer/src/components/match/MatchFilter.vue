@@ -58,7 +58,7 @@ const queueOptions: { label: string; value: number | undefined }[] = [
   font-size: var(--text-xs);
   font-weight: var(--font-medium);
   color: var(--color-text-tertiary);
-  background: transparent;
+  background-color: transparent;
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-full);
   cursor: pointer;
@@ -70,13 +70,26 @@ const queueOptions: { label: string; value: number | undefined }[] = [
 .filter-chip:hover {
   color: var(--color-text-secondary);
   border-color: var(--color-border);
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
 }
 
 .filter-chip.active {
   color: var(--color-accent);
-  background: rgba(0, 113, 227, 0.08);
+  background-color: rgba(0, 113, 227, 0.08);
   border-color: rgba(0, 113, 227, 0.3);
   font-weight: var(--font-semibold);
+}
+
+.match-filter {
+  min-width: 0;
+}
+.filter-scroll {
+  flex-wrap: wrap;
+  overflow-x: visible;
+  gap: 7px;
+  padding: 2px;
+}
+.filter-chip {
+  background-color: var(--color-bg-card);
 }
 </style>

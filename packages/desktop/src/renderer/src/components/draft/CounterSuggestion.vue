@@ -1,5 +1,5 @@
 <template>
-  <div class="counter-suggestion">
+  <div class="counter-suggestion glass-panel">
     <div class="section-header">
       <div class="header-left">
         <span class="section-title">克制推荐</span>
@@ -20,7 +20,16 @@
 
     <!-- No enemy picks yet -->
     <div v-else-if="recommendations.length === 0 && !fetching" class="counter-empty">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
       </svg>
       <span class="empty-note">等待敌方选择英雄后显示克制推荐</span>
@@ -28,11 +37,7 @@
 
     <!-- Recommendations -->
     <div v-else class="recs-list">
-      <div
-        v-for="rec in recommendations"
-        :key="rec.championId"
-        class="rec-card"
-      >
+      <div v-for="rec in recommendations" :key="rec.championId" class="rec-card glass-surface">
         <ChampionIcon :champion-id="rec.championId" :name="rec.championName" size="sm" />
         <div class="rec-info">
           <span class="rec-name">{{ rec.championName }}</span>
@@ -40,7 +45,9 @@
         </div>
         <div v-if="rec.winRate > 0" class="rec-stats">
           <span class="rec-wr" :class="wrClass(rec.winRate)">{{ formatWr(rec.winRate) }}</span>
-          <span v-if="rec.sampleSize > 0" class="rec-sample">{{ formatSample(rec.sampleSize) }}局</span>
+          <span v-if="rec.sampleSize > 0" class="rec-sample"
+            >{{ formatSample(rec.sampleSize) }}局</span
+          >
         </div>
         <div v-else class="rec-stats">
           <span class="rec-static">经验推荐</span>
@@ -58,13 +65,11 @@
             <span class="weakness-champ">{{ w.championName }} 不擅长对抗</span>
           </div>
           <div class="weakness-matchups">
-            <span
-              v-for="matchup in w.easyMatchups"
-              :key="matchup.championId"
-              class="matchup-tag"
-            >
+            <span v-for="matchup in w.easyMatchups" :key="matchup.championId" class="matchup-tag">
               {{ getChampName(matchup.championId) }}
-              <span v-if="matchup.winRate > 0" class="matchup-wr">{{ formatWr(matchup.winRate) }}</span>
+              <span v-if="matchup.winRate > 0" class="matchup-wr">{{
+                formatWr(matchup.winRate)
+              }}</span>
             </span>
           </div>
         </div>
@@ -84,15 +89,18 @@ const props = defineProps<{
   recommendations: CounterRecommendation[];
   weaknesses: { championId: number; championName: string; easyMatchups: CounterInfo[] }[];
   fetching: boolean;
-  dataSource: 'opgg' | 'local' | null;
+  dataSource: 'opgg' | 'qq101' | null;
   dataVersion: string | null;
 }>();
 
 const sourceLabel = computed(() => {
   switch (props.dataSource) {
-    case 'opgg': return 'OP.GG';
-    case 'local': return '本地数据';
-    default: return '';
+    case 'opgg':
+      return 'OP.GG';
+    case 'qq101':
+      return '101.qq.com';
+    default:
+      return '';
   }
 });
 
@@ -123,9 +131,6 @@ function wrClass(rate: number): string {
 
 <style scoped>
 .counter-suggestion {
-  background: var(--color-bg-card);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--color-border-light);
   padding: var(--space-5);
   display: flex;
   flex-direction: column;
@@ -159,12 +164,12 @@ function wrClass(rate: number): string {
 }
 
 .source-badge.opgg {
-  background: rgba(0, 113, 227, 0.08);
+  background-color: rgba(0, 113, 227, 0.08);
   color: var(--color-accent);
 }
 
-.source-badge.local {
-  background: var(--color-bg-tertiary);
+.source-badge.qq101 {
+  background-color: var(--color-bg-tertiary);
   color: var(--color-text-tertiary);
 }
 
@@ -186,7 +191,7 @@ function wrClass(rate: number): string {
 .loading-bar {
   width: 120px;
   height: 3px;
-  background: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -194,14 +199,18 @@ function wrClass(rate: number): string {
 .loading-bar-fill {
   width: 40%;
   height: 100%;
-  background: var(--color-accent);
+  background-color: var(--color-accent);
   border-radius: 2px;
   animation: loading-slide 1.2s ease infinite;
 }
 
 @keyframes loading-slide {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(350%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
 }
 
 .loading-text {
@@ -237,12 +246,12 @@ function wrClass(rate: number): string {
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
   transition: all var(--transition-fast);
 }
 
 .rec-card:hover {
-  background: var(--color-bg-active);
+  background-color: var(--color-bg-active);
 }
 
 .rec-info {
@@ -282,8 +291,12 @@ function wrClass(rate: number): string {
   color: var(--color-text-primary);
 }
 
-.rec-wr.high { color: var(--color-win); }
-.rec-wr.low { color: var(--color-lose); }
+.rec-wr.high {
+  color: var(--color-win-text);
+}
+.rec-wr.low {
+  color: var(--color-lose-text);
+}
 
 .rec-sample {
   font-size: 10px;
@@ -347,7 +360,7 @@ function wrClass(rate: number): string {
   gap: var(--space-1);
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   padding: 2px 8px;
   border-radius: var(--radius-sm);
 }

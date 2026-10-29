@@ -1,553 +1,508 @@
 <template>
-  <div
-    class="lg-player-card"
-    :class="[premadeColorClass, { 'is-me': isMe, clickable }]"
-    @click="handleClick"
-  >
-    <!-- Premade group tag (small badge, no "N人" text) -->
-    <span v-if="premadeTag" class="premade-tag" :class="premadeTag.colorClass">
-      组队
-    </span>
-
-    <div class="card-main">
-      <div class="card-left">
+  <article class="lg-player-card glass-surface" :class="{ 'is-me': isMe, clickable }">
+    <button
+      v-if="clickable"
+      class="player-link"
+      :aria-label="`查看 ${player.summonerName} 的战绩`"
+      :title="`查看 ${player.summonerName} 的战绩`"
+      @click="handleClick"
+    />
+    <div class="identity-row">
+      <div class="portrait">
+        <ChampionIcon :champion-id="player.championId" :name="player.championName" size="md" />
         <span v-if="positionLabel" class="position-tag">{{ positionLabel }}</span>
-        <ChampionIcon
-          :champion-id="player.championId"
-          :name="player.championName"
-          size="md"
-        />
-        <div class="player-info">
-          <div class="name-row">
-            <span class="player-name" :class="{ 'is-me': isMe }">
-              {{ player.summonerName }}
-            </span>
-            <span v-if="isMe" class="me-badge">我</span>
-          </div>
-
-          <div v-if="player.dataStatus === 'loaded'" class="tier-row">
-            <TierIcon :tier="player.tier || 'UNRANKED'" :division="player.tier ? player.division : ''" size="sm" />
-            <span v-if="player.tier" class="lp-text">{{ player.leaguePoints }} LP</span>
-          </div>
-          <div v-else-if="player.dataStatus === 'loading'" class="tier-row">
-            <span class="status-loading">
-              <span class="dot-pulse" />
-              加载中
-            </span>
-          </div>
-          <div v-else class="tier-row">
-            <span class="status-failed">数据获取失败</span>
-          </div>
-        </div>
       </div>
-
-      <div v-if="player.dataStatus === 'loaded'" class="card-right">
-        <div class="stat-block">
-          <span class="stat-label">英雄胜率</span>
-          <div class="stat-main">
-            <span class="stat-value" :class="winRateClass(player.championWinRate)">
-              {{ formatWinRate(player.championWinRate) }}
-            </span>
-            <span class="stat-sub">{{ player.championGamesPlayed }}场</span>
-          </div>
-          <div class="mini-bar">
-            <div class="mini-bar-fill" :class="winRateBarClass(player.championWinRate)" :style="{ width: `${player.championWinRate * 100}%` }" />
-          </div>
+      <div class="player-info">
+        <div class="name-row">
+          <strong class="player-name" :title="player.summonerName">{{
+            player.summonerName || '未知召唤师'
+          }}</strong>
+          <span v-if="isMe" class="me-badge">我</span>
+          <span
+            v-if="premadeTag"
+            class="premade-tag"
+            :class="premadeTag.colorClass"
+            :title="premadeTag.title"
+            >{{ premadeTag.label }}</span
+          >
         </div>
-
-        <div class="stat-block">
-          <span class="stat-label">近期KDA</span>
-          <div class="stat-main">
-            <span class="stat-value" :class="kdaClass(player.recentKDA)">
-              {{ player.recentKDA.toFixed(2) }}
-            </span>
-            <span class="stat-sub">{{ formatWinRate(player.recentWinRate) }}</span>
-          </div>
-          <div class="mini-bar">
-            <div class="mini-bar-fill" :class="winRateBarClass(player.recentWinRate)" :style="{ width: `${player.recentWinRate * 100}%` }" />
-          </div>
-        </div>
-
-        <div class="stat-block mastery">
-          <span class="stat-label">熟练度</span>
-          <span class="mastery-level">Lv.{{ player.championMasteryLevel }}</span>
-        </div>
+        <span class="champion-name">{{ player.championName || '英雄未确定' }}</span>
+      </div>
+      <div class="rank-info">
+        <template v-if="player.dataStatus === 'loaded'">
+          <TierIcon
+            :tier="player.tier || 'UNRANKED'"
+            :division="player.tier ? player.division : ''"
+            size="sm"
+          />
+          <span v-if="player.tier" class="lp-text">{{ player.leaguePoints }} LP</span>
+        </template>
+        <span v-else-if="player.dataStatus === 'loading'" class="status-text"
+          ><i class="loading-dot" />加载中</span
+        >
+        <span v-else class="status-text failed">获取失败</span>
       </div>
     </div>
 
-    <!-- Recent matches detail strip: show each match's result, champion, and KDA -->
-    <div v-if="recentMatchList.length > 0" class="recent-matches">
-      <div class="recent-header">
-        <span class="recent-label">最近{{ recentMatchList.length }}场</span>
-        <span class="recent-summary">
-          <span class="recent-wins">{{ recentWins }}胜</span>
-          <span class="recent-losses">{{ recentMatchList.length - recentWins }}负</span>
-          <span class="recent-wr">{{ recentWinRateText }}</span>
-        </span>
+    <div v-if="player.dataStatus === 'loaded'" class="player-stats">
+      <div class="stat-block">
+        <span class="stat-label">本英雄胜率</span>
+        <div class="stat-main">
+          <strong
+            :class="player.championGamesPlayed > 0 ? winRateClass(player.championWinRate) : ''"
+            >{{
+              player.championGamesPlayed > 0 ? formatWinRate(player.championWinRate) : '—'
+            }}</strong
+          >
+          <small>{{
+            player.championGamesPlayed > 0 ? `${player.championGamesPlayed} 场` : '暂无场次'
+          }}</small>
+        </div>
       </div>
-      <div class="match-list">
+      <div class="stat-block">
+        <span class="stat-label">近期 KDA</span>
+        <div class="stat-main">
+          <strong :class="recentMatchList.length ? kdaClass(player.recentKDA) : ''">{{
+            recentMatchList.length ? player.recentKDA.toFixed(2) : '—'
+          }}</strong>
+          <small v-if="recentMatchList.length"
+            >胜率 {{ formatWinRate(player.recentWinRate) }}</small
+          >
+        </div>
+      </div>
+      <div class="stat-block">
+        <span class="stat-label">英雄熟练度</span>
+        <div class="stat-main">
+          <strong class="mastery">{{
+            player.championMasteryLevel > 0 ? `Lv.${player.championMasteryLevel}` : '—'
+          }}</strong>
+        </div>
+      </div>
+    </div>
+    <div v-else class="stats-placeholder" :class="{ skeleton: player.dataStatus === 'loading' }">
+      {{
+        player.dataStatus === 'loading'
+          ? '正在获取段位与近期表现…'
+          : '暂时无法获取玩家统计，可刷新后重试'
+      }}
+    </div>
+
+    <div class="recent-matches">
+      <div class="recent-header">
+        <span
+          >近期战绩<span v-if="recentMatchList.length" class="recent-count">
+            · {{ recentMatchList.length }} 场</span
+          ></span
+        >
+        <span v-if="recentMatchList.length" class="recent-summary"
+          ><b class="high">{{ recentWins }}胜</b
+          ><b class="low">{{ recentMatchList.length - recentWins }}负</b></span
+        >
+        <span v-else class="no-matches">{{
+          player.dataStatus === 'loading' ? '等待加载' : '暂无记录'
+        }}</span>
+      </div>
+      <div v-if="recentMatchList.length" class="match-list">
         <div
-          v-for="(m, idx) in recentMatchList"
-          :key="idx"
+          v-for="m in recentMatchList"
+          :key="m.gameId"
           class="match-item"
           :class="m.win ? 'win' : 'lose'"
+          :title="matchTitle(m)"
+          :aria-label="matchTitle(m)"
+          tabindex="0"
         >
-          <ChampionIcon
-            :champion-id="m.championId"
-            size="xs"
-            class="match-champ-icon"
-          />
-          <span class="match-kda">{{ m.kills }}/{{ m.deaths }}/{{ m.assists }}</span>
+          <ChampionIcon :champion-id="m.championId" size="xs" class="match-champ-icon" />
+          <span class="match-result">{{ m.win ? '胜' : '负' }}</span>
+          <span class="match-tooltip" role="tooltip">{{ matchTitle(m) }}</span>
         </div>
       </div>
     </div>
-  </div>
+  </article>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { LiveGamePlayer, RecentMatchSummary } from '@lol-assistant/shared';
+import {
+  getChampionDisplayName,
+  type LiveGamePlayer,
+  type RecentMatchSummary,
+} from '@lol-assistant/shared';
 import TierIcon from '../common/TierIcon.vue';
 import ChampionIcon from '../common/ChampionIcon.vue';
 
+const props = withDefaults(
+  defineProps<{
+    player: LiveGamePlayer;
+    isMe?: boolean;
+    clickable?: boolean;
+    premadeGroups?: string[][];
+  }>(),
+  { isMe: false, clickable: false, premadeGroups: () => [] },
+);
+const emit = defineEmits<{ click: [puuid: string] }>();
 const POSITION_LABEL: Record<string, string> = {
   TOP: '上',
   JUNGLE: '野',
   MIDDLE: '中',
+  MID: '中',
   BOTTOM: '下',
+  ADC: '下',
   UTILITY: '辅',
-  top: '上',
-  jungle: '野',
-  middle: '中',
-  bottom: '下',
-  utility: '辅',
+  SUPPORT: '辅',
+  SUP: '辅',
 };
-
-/** 预组队颜色方案 - 用于卡片背景色 */
-const PREMADE_COLORS = [
-  { label: '组队A', colorClass: 'premade-a' },
-  { label: '组队B', colorClass: 'premade-b' },
-  { label: '组队C', colorClass: 'premade-c' },
-];
-
-const props = withDefaults(defineProps<{
-  player: LiveGamePlayer;
-  isMe?: boolean;
-  clickable?: boolean;
-  /** 该队伍的预组队分组（从 TeamPanel 传入） */
-  premadeGroups?: string[][];
-}>(), {
-  isMe: false,
-  clickable: false,
-  premadeGroups: () => [],
-});
-
-const emit = defineEmits<{
-  click: [puuid: string];
-}>();
-
-const positionLabel = computed(() => {
-  const pos = props.player.position;
-  if (!pos) return '';
-  return POSITION_LABEL[pos] ?? POSITION_LABEL[pos.toUpperCase()] ?? '';
-});
-
-/** 预组队标记：查找该玩家所在的预组队分组 */
+const positionLabel = computed(
+  () => POSITION_LABEL[props.player.position?.toUpperCase() ?? ''] ?? '',
+);
 const premadeTag = computed(() => {
-  if (!props.premadeGroups || props.premadeGroups.length === 0) return null;
-  for (let i = 0; i < props.premadeGroups.length; i++) {
-    if (props.premadeGroups[i].includes(props.player.puuid)) {
-      const scheme = PREMADE_COLORS[i % PREMADE_COLORS.length];
-      return {
-        colorClass: scheme.colorClass,
-      };
-    }
-  }
-  return null;
+  const index = props.premadeGroups.findIndex((group) => group.includes(props.player.puuid));
+  if (index < 0) return null;
+  return {
+    colorClass: `premade-${index % 3}`,
+    label: `组队 ${index + 1}`,
+    title: `疑似组队 ${index + 1}，根据共同对局推测`,
+  };
 });
-
-/** 预组队背景色 CSS class */
-const premadeColorClass = computed(() => {
-  if (!premadeTag.value) return '';
-  return `bg-${premadeTag.value.colorClass}`;
-});
-
-/** 近期战绩列表 */
-const recentMatchList = computed<RecentMatchSummary[]>(() => props.player.recentMatches ?? []);
-
-/** 近期胜场数 */
-const recentWins = computed(() => recentMatchList.value.filter((m: RecentMatchSummary) => m.win).length);
-
-/** 近期胜率文本 */
-const recentWinRateText = computed(() => {
-  if (recentMatchList.value.length === 0) return '';
-  return `${((recentWins.value / recentMatchList.value.length) * 100).toFixed(0)}%`;
-});
-
+const recentMatchList = computed(() => props.player.recentMatches ?? []);
+const recentWins = computed(() => recentMatchList.value.filter((m) => m.win).length);
 function handleClick() {
-  if (props.clickable) {
-    emit('click', props.player.puuid);
-  }
+  emit('click', props.player.puuid);
 }
-
-function formatWinRate(rate: number): string {
+function formatWinRate(rate: number) {
   return `${(rate * 100).toFixed(1)}%`;
 }
-
-function winRateClass(rate: number): string {
-  if (rate >= 0.6) return 'high';
-  if (rate <= 0.4) return 'low';
-  return '';
+function winRateClass(rate: number) {
+  return rate >= 0.6 ? 'high' : rate <= 0.4 ? 'low' : '';
 }
-
-function winRateBarClass(rate: number): string {
-  if (rate >= 0.6) return 'bar-high';
-  if (rate <= 0.4) return 'bar-low';
-  return 'bar-mid';
+function kdaClass(kda: number) {
+  return kda >= 4 ? 'high' : kda < 2.5 ? 'low' : '';
 }
-
-function kdaClass(kda: number): string {
-  if (kda >= 4) return 'high';
-  if (kda >= 2.5) return '';
-  return 'low';
+function matchTitle(m: RecentMatchSummary) {
+  return `${getChampionDisplayName(m.championId)} · ${m.win ? '胜利' : '失败'} · ${m.kills}/${m.deaths}/${m.assists}`;
 }
 </script>
 
 <style scoped>
 .lg-player-card {
   position: relative;
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-card);
+  min-width: 0;
+  padding: 14px 16px 12px;
+  border-radius: 15px;
+  background-color: var(--color-bg-nested);
   border: 1px solid var(--color-border-light);
-  overflow: hidden;
-  transition: all var(--transition-fast);
+  box-shadow:
+    0 3px 12px rgba(12, 25, 50, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
-
-.lg-player-card.clickable {
-  cursor: pointer;
-}
-
 .lg-player-card.clickable:hover {
-  border-color: var(--color-border);
-  box-shadow: var(--shadow-sm);
-  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--team-color, var(--color-accent)) 35%, transparent);
+  box-shadow: var(--shadow-md);
 }
-
 .lg-player-card.is-me {
-  border-color: rgba(0, 113, 227, 0.2);
-  background: rgba(0, 113, 227, 0.03);
+  border-color: color-mix(in srgb, var(--color-accent) 48%, transparent);
+  box-shadow: inset 3px 0 var(--color-accent);
 }
-
-/* Premade group background colors - soft pastels */
-.lg-player-card.bg-premade-a {
-  background: rgba(186, 135, 240, 0.08);
-  border-color: rgba(186, 135, 240, 0.2);
-}
-
-.lg-player-card.bg-premade-b {
-  background: rgba(102, 204, 153, 0.08);
-  border-color: rgba(102, 204, 153, 0.2);
-}
-
-.lg-player-card.bg-premade-c {
-  background: rgba(255, 179, 102, 0.08);
-  border-color: rgba(255, 179, 102, 0.2);
-}
-
-/* Override is-me when also has premade */
-.lg-player-card.is-me.bg-premade-a {
-  background: linear-gradient(135deg, rgba(0, 113, 227, 0.03) 0%, rgba(186, 135, 240, 0.08) 100%);
-}
-.lg-player-card.is-me.bg-premade-b {
-  background: linear-gradient(135deg, rgba(0, 113, 227, 0.03) 0%, rgba(102, 204, 153, 0.08) 100%);
-}
-.lg-player-card.is-me.bg-premade-c {
-  background: linear-gradient(135deg, rgba(0, 113, 227, 0.03) 0%, rgba(255, 179, 102, 0.08) 100%);
-}
-
-/* Premade tag */
-.premade-tag {
+.player-link {
   position: absolute;
-  top: 4px;
-  right: 6px;
-  font-size: 9px;
-  font-weight: var(--font-bold);
-  padding: 1px 6px;
-  border-radius: var(--radius-sm);
+  inset: 0;
   z-index: 1;
-  line-height: 1.4;
+  border: 0;
+  background-color: transparent;
+  border-radius: inherit;
 }
-
-.premade-tag.premade-a {
-  color: #9b59b6;
-  background: rgba(186, 135, 240, 0.15);
-}
-
-.premade-tag.premade-b {
-  color: #27ae60;
-  background: rgba(102, 204, 153, 0.15);
-}
-
-.premade-tag.premade-c {
-  color: #e67e22;
-  background: rgba(255, 179, 102, 0.15);
-}
-
-.card-main {
+.identity-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
-}
-
-.card-left {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  gap: 11px;
   min-width: 0;
-  flex: 1;
 }
-
-.position-tag {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  font-size: 10px;
-  font-weight: var(--font-bold);
-  color: var(--color-text-tertiary);
-  background: var(--color-bg-tertiary);
-  border-radius: var(--radius-sm);
+.portrait {
+  position: relative;
   flex-shrink: 0;
+  padding-bottom: 3px;
 }
-
+.position-tag {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  font-size: 10px;
+  font-weight: 600;
+}
 .player-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex: 1;
   min-width: 0;
 }
-
 .name-row {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 5px;
+  min-width: 0;
 }
-
 .player-name {
-  font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
-  color: var(--color-text-primary);
-  white-space: nowrap;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 650;
 }
-
-.player-name.is-me {
-  color: var(--color-accent);
-}
-
-.me-badge {
-  font-size: 10px;
-  font-weight: var(--font-bold);
-  color: var(--color-accent);
-  background: rgba(0, 113, 227, 0.1);
-  padding: 0px 5px;
-  border-radius: var(--radius-sm);
-  flex-shrink: 0;
-}
-
-.tier-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.lp-text {
-  font-size: var(--text-xs);
+.champion-name {
+  display: block;
   color: var(--color-text-tertiary);
-  font-family: var(--font-mono);
+  font-size: 11px;
+  margin-top: 4px;
 }
-
-.status-loading {
+.me-badge,
+.premade-tag {
+  flex-shrink: 0;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 1.5;
+}
+.me-badge {
+  color: var(--color-accent);
+  background-color: var(--color-accent-soft);
+}
+.premade-tag {
+  position: relative;
+  z-index: 2;
+}
+.premade-0 {
+  color: var(--color-tier-master);
+  background-color: rgba(155, 89, 182, 0.12);
+}
+.premade-1 {
+  color: var(--color-success);
+  background-color: rgba(20, 133, 93, 0.12);
+}
+.premade-2 {
+  color: var(--color-warning);
+  background-color: rgba(170, 103, 8, 0.12);
+}
+.rank-info {
   display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--text-xs);
-  color: var(--color-text-placeholder);
-}
-
-.dot-pulse {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-text-placeholder);
-  animation: pulse 1.2s ease infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-
-.status-failed {
-  font-size: var(--text-xs);
-  color: var(--color-error);
-  opacity: 0.8;
-}
-
-.card-right {
-  display: flex;
-  gap: var(--space-5);
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 4px;
   flex-shrink: 0;
 }
-
-.stat-block {
+.lp-text {
+  color: var(--color-text-tertiary);
+  font: 10px var(--font-mono);
+}
+.status-text {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  min-width: 64px;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
 }
-
+.failed {
+  color: var(--color-error);
+}
+.loading-dot {
+  width: 5px;
+  height: 5px;
+  background-color: var(--color-accent);
+  border-radius: 50%;
+  animation: player-pulse 1s ease infinite;
+}
+.player-stats {
+  display: grid;
+  grid-template-columns: 1.08fr 1.25fr 0.8fr;
+  gap: 12px;
+  min-height: 48px;
+  margin-top: 12px;
+}
+.stat-block {
+  min-width: 0;
+}
+.stat-block + .stat-block {
+  border-left: 1px solid var(--color-divider);
+  padding-left: 12px;
+}
 .stat-label {
-  font-size: 10px;
-  color: var(--color-text-placeholder);
-  letter-spacing: 0.3px;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
 }
-
 .stat-main {
   display: flex;
   align-items: baseline;
-  gap: var(--space-1);
+  flex-wrap: wrap;
+  gap: 3px 6px;
+  margin-top: 3px;
 }
-
-.stat-value {
-  font-size: var(--text-sm);
-  font-weight: var(--font-bold);
-  color: var(--color-text-primary);
-  font-family: var(--font-mono);
+.stat-main strong {
+  font: 600 17px var(--font-mono);
+  letter-spacing: -0.5px;
 }
-
-.stat-value.high { color: var(--color-win); }
-.stat-value.low { color: var(--color-lose); }
-
-.stat-sub {
-  font-size: 10px;
+.stat-main small {
   color: var(--color-text-tertiary);
+  font-size: 10px;
+  white-space: nowrap;
 }
-
-.mini-bar {
-  width: 100%;
-  height: 2px;
-  background: var(--color-bg-tertiary);
-  border-radius: 1px;
-  overflow: hidden;
+.high {
+  color: var(--color-win-text);
 }
-
-.mini-bar-fill {
-  height: 100%;
-  border-radius: 1px;
-  transition: width var(--transition-normal);
+.low {
+  color: var(--color-lose-text);
 }
-
-.bar-high { background: var(--color-win); }
-.bar-mid { background: var(--color-text-placeholder); }
-.bar-low { background: var(--color-lose); }
-
-.stat-block.mastery {
-  justify-content: center;
-  min-width: 48px;
+.stat-main .mastery {
+  font-size: 15px;
+  color: var(--color-highlight-text);
 }
-
-.mastery-level {
-  font-size: var(--text-sm);
-  font-weight: var(--font-bold);
-  color: var(--color-gold);
-  font-family: var(--font-mono);
-}
-
-/* ─── Recent matches detail ─── */
-.recent-matches {
-  padding: var(--space-2) var(--space-4) var(--space-3);
+.stats-placeholder {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  align-items: center;
+  min-height: 48px;
+  margin-top: 12px;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
 }
-
+.skeleton {
+  animation: player-pulse 1.5s ease infinite;
+}
+.recent-matches {
+  min-height: 58px;
+  border-top: 1px solid var(--color-divider);
+  margin-top: 10px;
+  padding-top: 9px;
+}
 .recent-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-}
-
-.recent-label {
-  font-size: 10px;
-  color: var(--color-text-placeholder);
-}
-
-.recent-summary {
-  display: flex;
-  gap: 6px;
-  font-size: 10px;
-  font-family: var(--font-mono);
-}
-
-.recent-wins {
-  color: var(--color-win);
-  font-weight: var(--font-semibold);
-}
-
-.recent-losses {
-  color: var(--color-lose);
-  font-weight: var(--font-semibold);
-}
-
-.recent-wr {
-  color: var(--color-text-tertiary);
-}
-
-.match-list {
-  display: flex;
-  gap: 3px;
-  flex-wrap: wrap;
-}
-
-.match-item {
-  display: flex;
   align-items: center;
-  gap: 3px;
-  padding: 2px 5px 2px 2px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-family: var(--font-mono);
-  line-height: 1.4;
-}
-
-.match-champ-icon {
-  flex-shrink: 0;
-}
-
-.match-champ-icon :deep(.icon-img),
-.match-champ-icon :deep(.icon-placeholder) {
-  width: 16px !important;
-  height: 16px !important;
-  font-size: 8px !important;
-  border-radius: 3px !important;
-}
-
-.match-item.win {
-  background: rgba(52, 199, 89, 0.1);
-}
-
-.match-item.lose {
-  background: rgba(255, 59, 48, 0.1);
-}
-
-.match-kda {
+  gap: 8px;
   color: var(--color-text-secondary);
   font-size: 10px;
+}
+.recent-count,
+.no-matches {
+  color: var(--color-text-tertiary);
+}
+.recent-summary {
+  display: flex;
+  gap: 8px;
+  font-weight: 500;
+}
+.match-list {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 7px;
+}
+.match-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  border-radius: 5px;
+  border-bottom: 2px solid;
+  padding: 3px 1px 2px;
+  gap: 2px;
+}
+.match-item.win {
+  background-color: var(--color-win-bg);
+  border-bottom-color: var(--color-win);
+}
+.match-item.lose {
+  background-color: var(--color-lose-bg);
+  border-bottom-color: var(--color-lose);
+}
+.match-result {
+  font-size: 9px;
+  line-height: 1;
+}
+.win .match-result {
+  color: var(--color-win-text);
+}
+.lose .match-result {
+  color: var(--color-lose-text);
+}
+.match-champ-icon :deep(.icon-img),
+.match-champ-icon :deep(.icon-placeholder) {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  font-size: 9px;
+}
+.match-item {
+  z-index: 2;
+}
+.match-item:hover,
+.match-item:focus-visible {
+  z-index: 3;
+}
+.match-tooltip {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 0;
+  z-index: 5;
+  width: max-content;
+  max-width: 200px;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  border-radius: 7px;
+  padding: 7px 9px;
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text-primary);
+  font-size: 11px;
+}
+.match-item:nth-child(n + 6) .match-tooltip {
+  left: auto;
+  right: 0;
+}
+.match-item:hover .match-tooltip,
+.match-item:focus-visible .match-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+@keyframes player-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+@container team (max-width: 370px) {
+  .lg-player-card {
+    padding: 12px;
+  }
+  .stat-main strong {
+    font-size: 15px;
+  }
+  .stat-main small {
+    display: block;
+    flex-basis: 100%;
+  }
+  .match-result {
+    display: none;
+  }
+  .player-stats,
+  .stats-placeholder {
+    min-height: 58px;
+  }
+  .player-stats {
+    gap: 8px;
+  }
+  .stat-block + .stat-block {
+    padding-left: 8px;
+  }
 }
 </style>

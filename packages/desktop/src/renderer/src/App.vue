@@ -10,46 +10,53 @@
       <n-notification-provider>
         <n-dialog-provider>
           <!-- Mini Mode Layout -->
-          <div v-if="appStore.isMiniMode" class="mini-layout">
+          <div v-if="appStore.isMiniMode" class="mini-layout" :style="wallpaperStyle">
+            <div class="app-backdrop" aria-hidden="true" />
             <div class="mini-titlebar">
               <span class="mini-title">LOL 助手</span>
               <div class="mini-controls">
                 <button class="mini-btn" title="退出迷你模式" @click="exitMiniMode">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" />
-                    <line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="15 3 21 3 21 9" />
+                    <polyline points="9 21 3 21 3 15" />
+                    <line x1="21" y1="3" x2="14" y2="10" />
+                    <line x1="3" y1="21" x2="10" y2="14" />
                   </svg>
                 </button>
                 <button class="mini-btn" title="最小化到托盘" @click="minimizeToTray">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
                     <line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
                 </button>
               </div>
             </div>
             <div class="mini-content">
-              <router-view v-slot="{ Component }">
-                <transition name="fade" mode="out-in">
-                  <component :is="Component" />
-                </transition>
-              </router-view>
+              <router-view />
             </div>
           </div>
 
           <!-- Normal Mode Layout -->
-          <div v-else class="app-layout">
+          <div v-else class="app-layout" :style="wallpaperStyle">
+            <div class="app-backdrop" aria-hidden="true" />
             <!-- Sidebar -->
-            <aside
-              class="sidebar"
-              :class="{ collapsed: appStore.sidebarCollapsed }"
-            >
+            <aside class="sidebar" :class="{ collapsed: appStore.sidebarCollapsed }">
               <div class="sidebar-header">
                 <div class="sidebar-logo" @click="appStore.toggleSidebar">
-                  <div class="logo-icon">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                  </div>
+                  <img class="brand-mascot" :src="poroIcon" alt="魄罗助手" />
                   <transition name="fade">
                     <span v-if="!appStore.sidebarCollapsed" class="logo-text">LOL 助手</span>
                   </transition>
@@ -58,9 +65,23 @@
 
               <!-- Search Box -->
               <div v-if="!appStore.sidebarCollapsed" class="sidebar-search">
-                <div class="search-wrapper" :class="{ focused: searchFocused, loading: searchLoading }">
-                  <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                <div
+                  class="search-wrapper"
+                  :class="{ focused: searchFocused, loading: searchLoading }"
+                >
+                  <svg
+                    class="search-icon"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.35-4.35" />
                   </svg>
                   <input
                     ref="searchInputRef"
@@ -71,21 +92,36 @@
                     @blur="onSearchBlur"
                     @keydown.enter="handleSearch"
                   />
-                  <svg v-if="searchLoading" class="search-spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <svg
+                    v-if="searchLoading"
+                    class="search-spinner"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
                     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                   </svg>
                 </div>
                 <div v-if="searchError" class="search-error">{{ searchError }}</div>
               </div>
               <div v-else class="sidebar-search-collapsed">
-                <div
-                  class="nav-item"
-                  title="搜索召唤师"
-                  @click="expandAndFocusSearch"
-                >
+                <div class="nav-item" title="搜索召唤师" @click="expandAndFocusSearch">
                   <span class="nav-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <circle cx="11" cy="11" r="8" />
+                      <path d="m21 21-4.35-4.35" />
                     </svg>
                   </span>
                 </div>
@@ -102,12 +138,11 @@
                 >
                   <span class="nav-icon" v-html="item.icon" />
                   <transition name="fade">
-                    <span v-if="!appStore.sidebarCollapsed" class="nav-label">{{ item.label }}</span>
+                    <span v-if="!appStore.sidebarCollapsed" class="nav-label">{{
+                      item.label
+                    }}</span>
                   </transition>
-                  <span
-                    v-if="item.badge && !appStore.sidebarCollapsed"
-                    class="nav-badge"
-                  >
+                  <span v-if="item.badge && !appStore.sidebarCollapsed" class="nav-badge">
                     {{ item.badge }}
                   </span>
                 </div>
@@ -121,8 +156,20 @@
                   @click="router.push('/settings')"
                 >
                   <span class="nav-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="3" />
+                      <path
+                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+                      />
                     </svg>
                   </span>
                   <transition name="fade">
@@ -136,9 +183,11 @@
             <main class="main-area">
               <div class="content-wrapper">
                 <router-view v-slot="{ Component }">
-                  <transition name="slide" mode="out-in">
-                    <component :is="Component" />
-                  </transition>
+                  <!-- Router snapshots provide fades without changing live glass opacity. -->
+                  <component
+                    :is="Component"
+                    :key="recommendationPage ? appStore.championDataSource : undefined"
+                  />
                 </router-view>
               </div>
 
@@ -196,6 +245,8 @@ import { lightThemeOverrides, darkThemeOverrides } from '@/styles/theme';
 import { useAppStore, useSummonerStore } from '@/stores';
 import { useLCU } from '@/composables/useLCU';
 import { useGameNotification } from '@/composables/useGameNotification';
+import { wallpapers } from '@/styles/wallpapers';
+import poroIcon from '@/assets/poro-companion.png';
 
 const appStore = useAppStore();
 const summonerStore = useSummonerStore();
@@ -209,6 +260,13 @@ let unsubUpdateAvailable: (() => void) | null = null;
 let unsubUpdateStatus: (() => void) | null = null;
 
 const currentRoute = computed(() => route.path);
+const recommendationPage = computed(() =>
+  ['/rune-builder', '/draft-assistant', '/live-game', '/champion-ranking'].includes(route.path),
+);
+const wallpaperStyle = computed(() => {
+  const selected = wallpapers.find((w) => w.id === appStore.wallpaper);
+  return { '--wallpaper-image': selected?.image ? `url("${selected.image}")` : 'none' };
+});
 
 // Search state
 const searchQuery = ref('');
@@ -306,17 +364,23 @@ const menuItems = computed(() => {
 // Connection status
 const connectionClass = computed(() => {
   switch (appStore.connectionStatus) {
-    case 'connected': return 'connected';
-    case 'connecting': return 'connecting';
-    default: return 'disconnected';
+    case 'connected':
+      return 'connected';
+    case 'connecting':
+      return 'connecting';
+    default:
+      return 'disconnected';
   }
 });
 
 const connectionLabel = computed(() => {
   switch (appStore.connectionStatus) {
-    case 'connected': return '已连接';
-    case 'connecting': return '连接中...';
-    default: return '未连接';
+    case 'connected':
+      return '已连接';
+    case 'connecting':
+      return '连接中...';
+    default:
+      return '未连接';
   }
 });
 
@@ -398,20 +462,43 @@ onUnmounted(() => {
    Normal Layout
    ============================ */
 .app-layout {
+  position: relative;
+  isolation: isolate;
   display: flex;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: var(--color-bg-secondary);
+  background: var(--app-canvas);
 }
 
+.app-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--wallpaper-image);
+  background-size: cover;
+  background-position: center right;
+}
+.app-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--wallpaper-veil);
+}
+.brand-mascot {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
 /* Sidebar */
 .sidebar {
   display: flex;
   flex-direction: column;
   width: var(--sidebar-width);
   height: 100%;
-  background: var(--color-bg-sidebar);
+  background-color: var(--color-bg-sidebar);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-right: 1px solid var(--color-border-light);
@@ -424,9 +511,17 @@ onUnmounted(() => {
 .sidebar.collapsed {
   width: var(--sidebar-collapsed-width);
 }
+.sidebar.collapsed .sidebar-header {
+  padding: 0;
+}
+.sidebar.collapsed .sidebar-logo {
+  padding: 0;
+  width: 100%;
+  justify-content: center;
+}
 
 .sidebar-header {
-  height: var(--titlebar-height);
+  height: 76px;
   display: flex;
   align-items: center;
   padding: 0 var(--space-2);
@@ -446,7 +541,7 @@ onUnmounted(() => {
 }
 
 .sidebar-logo:hover {
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
 }
 
 .logo-icon {
@@ -484,14 +579,14 @@ onUnmounted(() => {
   padding: 0 var(--space-3);
   height: 32px;
   border-radius: var(--radius-md);
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
   border: 1px solid transparent;
   transition: all var(--transition-fast);
 }
 
 .search-wrapper.focused {
   border-color: var(--color-accent);
-  background: var(--color-bg-primary);
+  background-color: var(--color-bg-primary);
   box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.1);
 }
 
@@ -504,7 +599,7 @@ onUnmounted(() => {
   flex: 1;
   border: none;
   outline: none;
-  background: transparent;
+  background-color: transparent;
   font-size: var(--text-xs);
   color: var(--color-text-primary);
   min-width: 0;
@@ -521,8 +616,12 @@ onUnmounted(() => {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .search-error {
@@ -558,18 +657,19 @@ onUnmounted(() => {
 }
 
 .nav-item:hover {
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
   color: var(--color-text-primary);
 }
 
 .nav-item.active {
-  background: var(--color-accent);
-  color: #ffffff;
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent);
+  box-shadow: inset 3px 0 0 var(--color-accent);
 }
 
 .nav-item.active:hover {
-  background: var(--color-accent-hover);
-  color: #ffffff;
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent-hover);
 }
 
 .nav-icon {
@@ -593,7 +693,7 @@ onUnmounted(() => {
   font-weight: var(--font-bold);
   padding: 1px 6px;
   border-radius: var(--radius-full);
-  background: var(--color-error);
+  background-color: var(--color-error);
   color: #ffffff;
   letter-spacing: 0.5px;
 }
@@ -617,7 +717,12 @@ onUnmounted(() => {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: var(--space-6);
+  padding: var(--page-padding);
+  min-width: 0;
+  min-height: 0;
+  container: workspace / inline-size;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
 }
 
 /* Status Bar */
@@ -627,7 +732,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--space-4);
-  background: var(--color-bg-primary);
+  background-color: var(--color-bg-sidebar);
+  backdrop-filter: var(--glass-blur);
   border-top: 1px solid var(--color-border-light);
   flex-shrink: 0;
   font-size: var(--text-xs);
@@ -649,17 +755,17 @@ onUnmounted(() => {
 }
 
 .status-indicator.connected {
-  background: var(--color-success);
+  background-color: var(--color-success);
   box-shadow: 0 0 6px rgba(48, 209, 88, 0.4);
 }
 
 .status-indicator.connecting {
-  background: var(--color-warning);
+  background-color: var(--color-warning);
   animation: pulse 1.5s ease infinite;
 }
 
 .status-indicator.disconnected {
-  background: var(--color-text-placeholder);
+  background-color: var(--color-text-placeholder);
 }
 
 .status-text {
@@ -683,37 +789,44 @@ onUnmounted(() => {
   cursor: pointer;
   padding: 1px 8px;
   border-radius: var(--radius-full);
-  background: rgba(10, 132, 255, 0.1);
+  background-color: rgba(10, 132, 255, 0.1);
   transition: background var(--transition-fast);
 }
 
 .status-update:hover {
-  background: rgba(10, 132, 255, 0.2);
+  background-color: rgba(10, 132, 255, 0.2);
 }
 
 .status-update-ready {
   color: var(--color-success);
-  background: rgba(48, 209, 88, 0.1);
+  background-color: rgba(48, 209, 88, 0.1);
 }
 
 .status-update-ready:hover {
-  background: rgba(48, 209, 88, 0.2);
+  background-color: rgba(48, 209, 88, 0.2);
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 /* ============================
    Mini Mode Layout
    ============================ */
 .mini-layout {
+  position: relative;
+  isolation: isolate;
   width: 100vw;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--color-bg-primary);
+  background: var(--app-canvas);
   border-radius: var(--radius-lg);
   overflow: hidden;
 }
@@ -724,7 +837,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--space-3);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   border-bottom: 1px solid var(--color-border-light);
   flex-shrink: 0;
 }
@@ -748,20 +861,24 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   border: none;
-  background: transparent;
+  background-color: transparent;
   color: var(--color-text-tertiary);
   border-radius: var(--radius-xs);
   transition: all var(--transition-fast);
 }
 
 .mini-btn:hover {
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
   color: var(--color-text-primary);
 }
 
 .mini-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
+  min-height: 0;
+  container: workspace / inline-size;
   padding: var(--space-2);
 }
 </style>

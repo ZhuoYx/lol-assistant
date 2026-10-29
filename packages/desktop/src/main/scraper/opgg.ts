@@ -442,7 +442,7 @@ export class OPGGScraper implements IChampionDataScraper {
     // OPGG API 结构：
     // skill_masteries[].ids 是优先级（如 ["Q", "E", "W"]，仅 3 个）
     // skill_masteries[].builds[].order 是完整加点顺序（如 ["Q","E","W","Q","Q","R",...]）
-    // 注意：order 通常只有 15 个条目（缺少 16-18 级），需要自动补齐
+    // 部分数据仅覆盖前 15 级，保留原始范围，不虚构后续加点。
     const skillMasteries = d?.skill_masteries ?? [];
     if (skillMasteries.length > 0) {
       const mastery = skillMasteries[0];
@@ -451,11 +451,6 @@ export class OPGGScraper implements IChampionDataScraper {
       const builds = mastery?.builds ?? [];
       if (builds.length > 0 && Array.isArray(builds[0]?.order) && builds[0].order.length > 0) {
         const order: string[] = builds[0].order.map(String);
-
-        // 如果不足 18 级，自动补齐剩余技能点
-        if (order.length < 18) {
-          this.completeSkillOrder(order);
-        }
 
         return order.slice(0, 18);
       }
@@ -472,51 +467,6 @@ export class OPGGScraper implements IChampionDataScraper {
     }
 
     return [];
-  }
-
-  /** 自动补齐技能加点到 18 级 */
-  private completeSkillOrder(order: string[]): void {
-    // 统计每个技能当前的等级
-    const counts: Record<string, number> = { Q: 0, W: 0, E: 0, R: 0 };
-    for (const skill of order) {
-      const key = skill.toUpperCase();
-      if (key in counts) counts[key]++;
-    }
-
-    // 最大等级限制
-    const maxLevel: Record<string, number> = { Q: 5, W: 5, E: 5, R: 3 };
-
-    while (order.length < 18) {
-      const level = order.length + 1; // 下一个要分配的等级
-
-      // R 技能在 6/11/16 级，如果还没满 3 级且到了 R 级别
-      if (counts.R < maxLevel.R && (level === 6 || level === 11 || level === 16)) {
-        order.push('R');
-        counts.R++;
-        continue;
-      }
-
-      // 按剩余空间分配普通技能（Q > E > W 或根据已有模式）
-      let allocated = false;
-      for (const skill of ['Q', 'E', 'W']) {
-        if (counts[skill] < maxLevel[skill]) {
-          order.push(skill);
-          counts[skill]++;
-          allocated = true;
-          break;
-        }
-      }
-
-      // 如果普通技能都满了，尝试 R
-      if (!allocated) {
-        if (counts.R < maxLevel.R) {
-          order.push('R');
-          counts.R++;
-        } else {
-          break; // 所有技能都已满级，退出
-        }
-      }
-    }
   }
 
   /** 解析技能优先级（仅 3 个主/副/三，如 ["Q","E","W"]） */

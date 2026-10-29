@@ -1,5 +1,5 @@
 <template>
-  <div v-if="hasData" class="spell-cooldowns">
+  <div v-if="hasData" class="spell-cooldowns glass-panel">
     <div class="cd-header">
       <span class="cd-title">技能冷却时间</span>
     </div>
@@ -19,11 +19,7 @@
       </div>
 
       <!-- 对位敌方英雄（可能多个，如下路+辅助） -->
-      <div
-        v-for="(enemy, eIdx) in enemyEntries"
-        :key="eIdx"
-        class="cd-champ-row enemy"
-      >
+      <div v-for="(enemy, eIdx) in enemyEntries" :key="eIdx" class="cd-champ-row enemy">
         <div class="cd-champ-label">
           <ChampionIcon :champion-id="enemy.champId" size="xs" />
           <span class="cd-champ-name enemy">{{ enemy.label }}</span>
@@ -59,14 +55,17 @@ interface EnemyEntry {
 
 const SPELL_KEYS = ['Q', 'W', 'E', 'R'];
 
-const props = withDefaults(defineProps<{
-  myChampId: number;
-  enemyChampIds?: number[];
-  enemyLabels?: string[];
-}>(), {
-  enemyChampIds: () => [],
-  enemyLabels: () => [],
-});
+const props = withDefaults(
+  defineProps<{
+    myChampId: number;
+    enemyChampIds?: number[];
+    enemyLabels?: string[];
+  }>(),
+  {
+    enemyChampIds: () => [],
+    enemyLabels: () => [],
+  },
+);
 
 const myChampSpells = ref<SpellData[] | null>(null);
 const enemyEntries = ref<EnemyEntry[]>([]);
@@ -83,7 +82,10 @@ async function fetchChampionSpells(championId: number): Promise<SpellData[] | nu
     if (!version) return null;
 
     const url = `https://ddragon.leagueoflegends.com/cdn/${version}/data/zh_CN/champion/${championKey}.json`;
-    const data = await window.electronAPI.getMetadata(url, `champion_${championKey}`) as Record<string, unknown> | null;
+    const data = (await window.electronAPI.getMetadata(url, `champion_${championKey}`)) as Record<
+      string,
+      unknown
+    > | null;
     if (!data || typeof data !== 'object') return null;
 
     const champData = (data.data as Record<string, Record<string, unknown>>)?.[championKey];
@@ -92,7 +94,7 @@ async function fetchChampionSpells(championId: number): Promise<SpellData[] | nu
     const spells = champData.spells as SpellData[] | undefined;
     if (!Array.isArray(spells) || spells.length < 4) return null;
 
-    return spells.slice(0, 4).map(s => ({
+    return spells.slice(0, 4).map((s) => ({
       id: s.id,
       name: s.name,
       cooldownBurn: s.cooldownBurn,
@@ -113,9 +115,7 @@ async function loadData() {
   const ids = props.enemyChampIds;
   const labels = props.enemyLabels;
 
-  const results = await Promise.allSettled(
-    ids.map(id => fetchChampionSpells(id))
-  );
+  const results = await Promise.allSettled(ids.map((id) => fetchChampionSpells(id)));
 
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
@@ -138,9 +138,6 @@ watch(() => [props.myChampId, ...props.enemyChampIds], loadData);
 
 <style scoped>
 .spell-cooldowns {
-  background: var(--color-bg-card);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border-light);
   padding: var(--space-3) var(--space-4);
 }
 
@@ -181,11 +178,11 @@ watch(() => [props.myChampId, ...props.enemyChampIds], loadData);
 }
 
 .cd-champ-name.my {
-  color: var(--color-win);
+  color: var(--color-win-text);
 }
 
 .cd-champ-name.enemy {
-  color: var(--color-lose);
+  color: var(--color-lose-text);
 }
 
 .cd-spells {
@@ -201,7 +198,7 @@ watch(() => [props.myChampId, ...props.enemyChampIds], loadData);
   gap: 2px;
   min-width: 48px;
   padding: var(--space-1) var(--space-2);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   border-radius: var(--radius-md);
 }
 
@@ -217,5 +214,12 @@ watch(() => [props.myChampId, ...props.enemyChampIds], loadData);
   font-weight: var(--font-semibold);
   color: var(--color-text-primary);
   font-family: var(--font-mono);
+}
+
+.cd-content {
+  overflow-x: auto;
+}
+.cd-champ-row {
+  min-width: 370px;
 }
 </style>

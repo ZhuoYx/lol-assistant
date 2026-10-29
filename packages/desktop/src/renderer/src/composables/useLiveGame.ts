@@ -1,4 +1,5 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
 import { useLiveGameStore } from '@/stores/live-game';
 import { useAppStore } from '@/stores/app';
 import type { GamePhase } from '@lol-assistant/shared';
@@ -15,6 +16,7 @@ const RETRY_DELAY_MS = 3000;
 export function useLiveGame() {
   const liveGameStore = useLiveGameStore();
   const appStore = useAppStore();
+  const { analysis, loading, error, hasData, myTeam, enemyTeam } = storeToRefs(liveGameStore);
 
   let unsubPhase: (() => void) | null = null;
   const refreshing = ref(false);
@@ -78,23 +80,26 @@ export function useLiveGame() {
 
   // 当页面停留在对局分析时，如果 gamePhase 变为 InProgress 也自动获取
   // 这处理了在页面已打开的状态下新对局开始的场景
-  watch(() => appStore.gamePhase, (phase, oldPhase) => {
-    if (phase === 'InProgress' || phase === 'GameStart') {
-      // 从 ChampSelect 进入对局，或当前没数据，都重新获取
-      if (oldPhase === 'ChampSelect' || !liveGameStore.hasData) {
-        liveGameStore.clear();
-        analyze();
+  watch(
+    () => appStore.gamePhase,
+    (phase, oldPhase) => {
+      if (phase === 'InProgress' || phase === 'GameStart') {
+        // 从 ChampSelect 进入对局，或当前没数据，都重新获取
+        if (oldPhase === 'ChampSelect' || !liveGameStore.hasData) {
+          liveGameStore.clear();
+          analyze();
+        }
       }
-    }
-  });
+    },
+  );
 
   return {
-    analysis: liveGameStore.analysis,
-    loading: liveGameStore.loading,
-    error: liveGameStore.error,
-    hasData: liveGameStore.hasData,
-    myTeam: liveGameStore.myTeam,
-    enemyTeam: liveGameStore.enemyTeam,
+    analysis,
+    loading,
+    error,
+    hasData,
+    myTeam,
+    enemyTeam,
     refreshing,
     analyze,
   };

@@ -420,58 +420,13 @@ function transformMatchDetail(raw: unknown): MatchDetail {
 }
 
 /**
- * 批量请求详情以填充列表中每场比赛的 MVP/SVP
- * 优先使用缓存，并发限制为 5
- */
-async function enrichMatchListMvp(matches: MatchSummary[]): Promise<void> {
-  const CONCURRENCY = 5;
-
-  for (let i = 0; i < matches.length; i += CONCURRENCY) {
-    const batch = matches.slice(i, i + CONCURRENCY);
-    await Promise.allSettled(
-      batch.map(async (match) => {
-        const cacheKey = String(match.gameId);
-        let detail = cacheStore.get('matchDetail', cacheKey) as MatchDetail | null;
-        if (detail) {
-          // 对缓存数据做位置修正
-          for (const p of detail.participants) {
-            p.lane = correctLane(p.lane, p.role);
-          }
-        }
-        if (!detail) {
-          try {
-            const raw = await lcuAPI.getMatchDetail(match.gameId);
-            detail = transformMatchDetail(raw);
-            cacheStore.set('matchDetail', cacheKey, detail);
-          } catch (err) {
-            logger.warn(`enrichMatchListMvp: gameId=${match.gameId} 请求失败:`, err);
-            return;
-          }
-        }
-        // 通过 championId + 胜负匹配当前玩家（避免镜像对局匹配到对手）
-        const player = detail.participants.find(
-          p => p.championId === match.championId && p.win === match.win,
-        ) ?? detail.participants.find(p => p.championId === match.championId);
-        if (player) {
-          match.isMVP = player.isMVP ?? false;
-          match.isSVP = player.isSVP ?? false;
-          // 从详情数据回填位置信息（详情的位置判断更准确）
-          if (player.lane && player.lane !== 'NONE') {
-            match.lane = player.lane;
-          }
-        }
-      }),
-    );
-  }
-}
-
-/**
- * 获取战绩列表核心逻辑（含缓存、数据转换、MVP/SVP）
+ * 获取战绩分页（含缓存、数据转换和本地筛选）
  * 可被 match:getList IPC handler 和 champion:getStats 等其他模块复用
  */
 export async function fetchMatchList(params: MatchListParams): Promise<MatchList> {
+  params = { ...params, begIndex: params.begIndex ?? 0, endIndex: params.endIndex ?? (params.begIndex ?? 0) + 19 };
   const puuid = params.puuid;
-  const cacheKey = `list_${puuid ?? 'me'}_${params.begIndex ?? 0}_${params.endIndex ?? 20}_q${params.queue ?? 'all'}_c${params.championId ?? 'all'}`;
+  const cacheKey = `list_v2_${puuid ?? 'me'}_${params.begIndex}_${params.endIndex}_q${params.queue ?? 'all'}_c${params.championId ?? 'all'}`;
   const cached = cacheStore.get<MatchList>('matchList', cacheKey);
   if (cached) {
     // 对缓存数据做位置修正（旧缓存中 lane 可能是错误值）
@@ -493,15 +448,21 @@ export async function fetchMatchList(params: MatchListParams): Promise<MatchList
     ? await lcuAPI.getMatchListByPUUID(puuid, apiParams)
     : await lcuAPI.getMatchList(apiParams);
   const matchList = transformMatchList(raw);
+  const rawCount = matchList.matches.length;
+  matchList.pageGameIds = matchList.matches.map(m => m.gameId);
+  matchList.nextIndex = (params.begIndex ?? 0) + rawCount;
+  matchList.hasMore = rawCount >= (params.endIndex ?? 19) - (params.begIndex ?? 0) + 1;
 
   // 按队列类型过滤
   if (params.queue !== undefined) {
     matchList.matches = matchList.matches.filter(m => m.queueId === params.queue);
-    matchList.totalGames = matchList.matches.length;
+  }
+  if (params.championId !== undefined) {
+    matchList.matches = matchList.matches.filter(m => m.championId === params.championId);
   }
 
-  // 批量请求详情以填充 MVP/SVP（带缓存，并发限制）
-  await enrichMatchListMvp(matchList.matches);
+  // 列表不预取每局详情
+  // Detail requests are deferred until the user opens a match, avoiding N+1 calls per page.
 
   logger.debug(`fetchMatchList 转换完成: ${matchList.matches.length} 场, 共 ${matchList.totalGames} 场`);
   cacheStore.set('matchList', cacheKey, matchList);
@@ -509,7 +470,7 @@ export async function fetchMatchList(params: MatchListParams): Promise<MatchList
 }
 
 export function registerMatchIpcHandlers(): void {
-  // 获取战绩列表（含 MVP/SVP，通过批量请求详情计算）
+  // 获取战绩分页；单局详情按需请求
   ipcMain.handle('match:getList', async (_event, params: MatchListParams) => {
     try {
       return await fetchMatchList(params);

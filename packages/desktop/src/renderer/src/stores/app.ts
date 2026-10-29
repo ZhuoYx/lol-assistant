@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia';
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onScopeDispose } from 'vue';
 import type { ConnectionStatus, AppSettings, GamePhase, AppError } from '@lol-assistant/shared';
+import type { ChampionDataSource } from '@lol-assistant/shared';
+import { wallpapers, type WallpaperId } from '@/styles/wallpapers';
 
 export const useAppStore = defineStore('app', () => {
   // Connection state
@@ -8,8 +10,9 @@ export const useAppStore = defineStore('app', () => {
   const gamePhase = ref<GamePhase>('None');
 
   // Settings
+  const savedTheme = localStorage.getItem('lol-assistant-theme');
   const settings = ref<AppSettings>({
-    theme: 'light',
+    theme: savedTheme === 'dark' || savedTheme === 'system' ? savedTheme : 'light',
     language: 'zh-CN',
     cacheEnabled: true,
     lanProxyEnabled: false,
@@ -19,6 +22,32 @@ export const useAppStore = defineStore('app', () => {
   });
 
   // UI state
+  const championDataSource = ref<ChampionDataSource>('opgg');
+  const savedWallpaper = localStorage.getItem('lol-assistant-wallpaper');
+  const wallpaper = ref<WallpaperId>(
+    wallpapers.some((w) => w.id === savedWallpaper) ? (savedWallpaper as WallpaperId) : 'anime',
+  );
+  watch(wallpaper, (value) => localStorage.setItem('lol-assistant-wallpaper', value));
+  function readGlassSetting(key: string, fallback: number, min: number, max: number): number {
+    const saved = localStorage.getItem(key);
+    const value = saved === null ? fallback : Number(saved);
+    return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+  }
+  const glassTransparency = ref(readGlassSetting('lol-assistant-glass-transparency', 60, 20, 75));
+  const glassBlur = ref(readGlassSetting('lol-assistant-glass-blur', 28, 12, 48));
+  watch(
+    [glassTransparency, glassBlur],
+    ([transparency, blur]) => {
+      localStorage.setItem('lol-assistant-glass-transparency', String(transparency));
+      localStorage.setItem('lol-assistant-glass-blur', String(blur));
+      document.documentElement.style.setProperty(
+        '--glass-opacity',
+        String((100 - transparency) / 100),
+      );
+      document.documentElement.style.setProperty('--glass-blur-radius', `${blur}px`);
+    },
+    { immediate: true },
+  );
   const sidebarCollapsed = ref(false);
   const error = ref<AppError | null>(null);
   const isFirstLaunch = ref(false);
@@ -31,12 +60,17 @@ export const useAppStore = defineStore('app', () => {
   // Computed
   const isConnected = computed(() => connectionStatus.value === 'connected');
   const isConnecting = computed(() => connectionStatus.value === 'connecting');
-  const isDarkTheme = computed(() => {
-    if (settings.value.theme === 'system') {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return settings.value.theme === 'dark';
-  });
+  const systemPrefersDark = ref(window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  const onSystemThemeChange = (event: MediaQueryListEvent) => {
+    systemPrefersDark.value = event.matches;
+  };
+  systemThemeQuery.addEventListener('change', onSystemThemeChange);
+  onScopeDispose(() => systemThemeQuery.removeEventListener('change', onSystemThemeChange));
+
+  const isDarkTheme = computed(() =>
+    settings.value.theme === 'system' ? systemPrefersDark.value : settings.value.theme === 'dark',
+  );
   const isMiniMode = computed(() => settings.value.miniMode);
 
   // Actions
@@ -50,6 +84,9 @@ export const useAppStore = defineStore('app', () => {
 
   function updateSettings(partial: Partial<AppSettings>) {
     settings.value = { ...settings.value, ...partial };
+    if (partial.theme) {
+      localStorage.setItem('lol-assistant-theme', partial.theme);
+    }
   }
 
   function setError(err: AppError | null) {
@@ -84,11 +121,20 @@ export const useAppStore = defineStore('app', () => {
   }
 
   // Sync theme to DOM
-  watch(isDarkTheme, (dark) => {
-    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-  }, { immediate: true });
+  watch(
+    isDarkTheme,
+    (dark) => {
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+    },
+    { immediate: true },
+  );
 
   return {
+    championDataSource,
+    wallpaper,
+    glassTransparency,
+    glassBlur,
     // State
     connectionStatus,
     gamePhase,

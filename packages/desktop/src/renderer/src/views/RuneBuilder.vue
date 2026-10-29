@@ -1,28 +1,30 @@
 <template>
   <div class="page rune-page">
-    <header class="page-header">
-      <div class="header-left">
-        <h1 class="page-title">符文与出装</h1>
-        <p class="page-subtitle">热门配置推荐 · 一键应用</p>
-      </div>
-      <div v-if="buildConfig" class="header-right">
-        <div class="source-badge" :class="buildConfig.dataSource ?? 'local'">
-          <span class="source-label">{{ sourceLabel }}</span>
-          <span v-if="buildConfig.patch" class="source-version">v{{ buildConfig.patch }}</span>
-        </div>
-      </div>
-    </header>
+    <PageHeader title="符文与出装" subtitle="热门配置推荐 · 一键应用"
+      ><template #actions><DataSourceSelect /></template
+    ></PageHeader>
 
     <div class="rune-content">
       <!-- Not connected -->
       <EmptyState
+        class="glass-panel"
         v-if="!appStore.isConnected"
         title="未连接客户端"
         description="请启动英雄联盟客户端以使用符文推荐"
       >
         <template #icon>
-          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18.36 6.64a9 9 0 1 1-12.73 0" /><line x1="12" y1="2" x2="12" y2="12" />
+          <svg
+            width="44"
+            height="44"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+            <line x1="12" y1="2" x2="12" y2="12" />
           </svg>
         </template>
       </EmptyState>
@@ -32,8 +34,19 @@
         <!-- Search bar -->
         <div class="search-section">
           <div class="search-bar">
-            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            <svg
+              class="search-icon"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
             <input
               v-model="searchQuery"
@@ -43,8 +56,18 @@
               @focus="showDropdown = true"
             />
             <button v-if="searchQuery" class="search-clear" @click="clearSearch">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
           </div>
@@ -70,16 +93,27 @@
         </div>
 
         <!-- Loading -->
-        <div v-if="loading" class="loading-section">
+        <div v-if="loading" class="loading-section glass-surface">
           <LoadingSpinner size="lg" />
           <span class="loading-text">正在获取 {{ loadingChampName }} 的配置数据...</span>
         </div>
 
         <!-- Error -->
         <div v-else-if="error && !buildConfig" class="error-section">
-          <div class="error-card">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+          <div class="error-card glass-surface">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
             <span class="error-text">{{ error }}</span>
           </div>
@@ -99,9 +133,23 @@
               >
                 <ChampionIcon :champion-id="champ.id" :name="champ.name" size="md" />
                 <span class="favorite-name">{{ champ.name }}</span>
-                <button class="favorite-remove" title="取消收藏" @click.stop="removeFavorite(champ.id)">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                <button
+                  class="favorite-remove"
+                  title="取消收藏"
+                  @click.stop="removeFavorite(champ.id)"
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
                 </button>
               </div>
@@ -110,12 +158,24 @@
 
           <!-- Empty hint -->
           <EmptyState
+            class="glass-panel"
             title="选择一个英雄"
             description="搜索或从选人阶段自动获取英雄配置"
           >
             <template #icon>
-              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              <svg
+                width="44"
+                height="44"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <polygon
+                  points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+                />
               </svg>
             </template>
           </EmptyState>
@@ -124,7 +184,7 @@
         <!-- Build content -->
         <div v-else class="build-layout">
           <!-- Champion header with integrated role switcher -->
-          <div class="champion-header">
+          <div class="champion-header glass-panel">
             <div class="header-main">
               <ChampionIcon
                 :champion-id="buildConfig.championId"
@@ -135,8 +195,12 @@
                 <div class="champion-name-row">
                   <h2 class="champion-name">{{ buildConfig.championName }}</h2>
                   <div class="champion-badges">
-                    <span class="meta-tag source-tag" :class="buildConfig.dataSource ?? 'local'">{{ sourceLabel }}</span>
-                    <span v-if="buildConfig.patch" class="meta-tag patch-tag">v{{ buildConfig.patch }}</span>
+                    <span class="meta-tag source-tag" :class="buildConfig.dataSource ?? 'opgg'">{{
+                      sourceLabel
+                    }}</span>
+                    <span v-if="buildConfig.patch" class="meta-tag patch-tag"
+                      >v{{ buildConfig.patch }}</span
+                    >
                   </div>
                 </div>
                 <!-- Role switcher: show all 5 positions -->
@@ -151,7 +215,9 @@
                       'not-recommended': !r.recommended,
                     }"
                     :disabled="switchingRole"
-                    :title="r.recommended ? roleLabel(r.role) : `${roleLabel(r.role)}（非常规位置）`"
+                    :title="
+                      r.recommended ? roleLabel(r.role) : `${roleLabel(r.role)}（非常规位置）`
+                    "
                     @click="switchRole(r.role)"
                   >
                     <span class="role-icon">{{ roleIcon(r.role) }}</span>
@@ -160,10 +226,28 @@
                 </div>
               </div>
               <div class="header-actions">
-                <button class="action-btn" :disabled="refreshing" title="刷新数据" @click="refreshBuilds">
-                  <svg :class="{ spin: refreshing }" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
-                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                <button
+                  class="action-btn"
+                  :disabled="refreshing"
+                  title="刷新数据"
+                  @click="refreshBuilds"
+                >
+                  <svg
+                    :class="{ spin: refreshing }"
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polyline points="23 4 23 10 17 10" />
+                    <polyline points="1 20 1 14 7 14" />
+                    <path
+                      d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                    />
                   </svg>
                 </button>
                 <button
@@ -172,8 +256,19 @@
                   :title="isFavorite(buildConfig.championId) ? '取消收藏' : '收藏英雄'"
                   @click="toggleFavorite(buildConfig.championId)"
                 >
-                  <svg width="15" height="15" viewBox="0 0 24 24" :fill="isFavorite(buildConfig.championId) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    :fill="isFavorite(buildConfig.championId) ? 'currentColor' : 'none'"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polygon
+                      points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+                    />
                   </svg>
                 </button>
               </div>
@@ -182,8 +277,19 @@
 
           <!-- Role switch hint -->
           <div v-if="error && buildConfig" class="role-hint">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
             <span>{{ error }}</span>
           </div>
@@ -213,14 +319,17 @@
           </div>
 
           <!-- Skill order as independent full-width card -->
-          <SkillOrderCard :skill-order="buildConfig.skillOrder" :skill-priority="buildConfig.skillPriority" />
+          <SkillOrderCard
+            :skill-order="buildConfig.skillOrder"
+            :skill-priority="buildConfig.skillPriority"
+          />
 
           <!-- Footer -->
           <div class="build-footer">
             <span class="footer-note">
               数据来源：
               <template v-if="buildConfig.dataSource === 'opgg'">OP.GG</template>
-              <template v-else>本地默认</template>
+              <template v-else>101.qq.com</template>
               <template v-if="buildConfig.patch"> · 版本 {{ buildConfig.patch }}</template>
             </span>
           </div>
@@ -231,6 +340,8 @@
 </template>
 
 <script setup lang="ts">
+import DataSourceSelect from '@/components/common/DataSourceSelect.vue';
+import PageHeader from '@/components/common/PageHeader.vue';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAppStore } from '@/stores';
@@ -240,7 +351,12 @@ import ItemBuildDisplay from '@/components/rune/ItemBuildDisplay.vue';
 import SkillOrderCard from '@/components/rune/SkillOrderCard.vue';
 import { useRuneBuilder } from '@/composables/useRuneBuilder';
 import { useFavoriteChampions } from '@/composables/useFavoriteChampions';
-import { CHAMPION_ID_MAP, CHAMPION_CN_NAME_MAP, CHAMPION_TITLE_MAP, getChampionDisplayName } from '@lol-assistant/shared';
+import {
+  CHAMPION_ID_MAP,
+  CHAMPION_CN_NAME_MAP,
+  CHAMPION_TITLE_MAP,
+  getChampionDisplayName,
+} from '@lol-assistant/shared';
 
 const route = useRoute();
 const appStore = useAppStore();
@@ -296,10 +412,8 @@ const allChampions = computed(() => {
 const filteredChampions = computed(() => {
   const q = searchQuery.value.trim().toLowerCase();
   if (!q) return allChampions.value;
-  return allChampions.value.filter((c) =>
-    c.name.toLowerCase().includes(q)
-    || c.cnName.includes(q)
-    || c.title.includes(q),
+  return allChampions.value.filter(
+    (c) => c.name.toLowerCase().includes(q) || c.cnName.includes(q) || c.title.includes(q),
   );
 });
 
@@ -398,35 +512,6 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
-.page-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: var(--space-6);
-}
-
-.header-left {
-  display: flex;
-  flex-direction: column;
-}
-
-.page-title {
-  font-size: var(--text-2xl);
-  font-weight: var(--font-bold);
-  letter-spacing: -0.5px;
-  color: var(--color-text-primary);
-}
-
-.page-subtitle {
-  font-size: var(--text-sm);
-  color: var(--color-text-tertiary);
-  margin-top: var(--space-1);
-}
-
-.header-right {
-  flex-shrink: 0;
-}
-
 /* Source badge */
 .source-badge {
   display: inline-flex;
@@ -436,16 +521,16 @@ onUnmounted(() => {
   border-radius: var(--radius-full);
   font-size: var(--text-xs);
   font-weight: var(--font-medium);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
 }
 
 .source-badge.opgg {
-  background: rgba(59, 130, 246, 0.08);
-  color: var(--color-win);
+  background-color: rgba(59, 130, 246, 0.08);
+  color: var(--color-win-text);
 }
 
-.source-badge.local {
-  background: var(--color-bg-secondary);
+.source-badge.qq101 {
+  background-color: var(--color-bg-secondary);
   color: var(--color-text-secondary);
 }
 
@@ -464,7 +549,9 @@ onUnmounted(() => {
 }
 
 .rune-content > .empty-state {
-  background: var(--color-bg-card);
+  background-color: var(--color-bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-light);
   min-height: 300px;
@@ -491,7 +578,9 @@ onUnmounted(() => {
   gap: var(--space-2);
   padding: 0 var(--space-4);
   height: 44px;
-  background: var(--color-bg-card);
+  background-color: var(--color-bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-light);
   transition: all var(--transition-normal);
@@ -511,7 +600,7 @@ onUnmounted(() => {
   flex: 1;
   border: none;
   outline: none;
-  background: transparent;
+  background-color: transparent;
   font-size: var(--text-sm);
   color: var(--color-text-primary);
   font-family: var(--font-family);
@@ -529,14 +618,14 @@ onUnmounted(() => {
   height: 24px;
   border-radius: var(--radius-full);
   border: none;
-  background: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary);
   color: var(--color-text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .search-clear:hover {
-  background: var(--color-bg-active);
+  background-color: var(--color-bg-active);
   color: var(--color-text-primary);
 }
 
@@ -545,7 +634,9 @@ onUnmounted(() => {
   top: calc(100% + var(--space-1));
   left: 0;
   right: 0;
-  background: var(--color-bg-card);
+  background-color: var(--color-bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-lg);
@@ -561,14 +652,14 @@ onUnmounted(() => {
   width: 100%;
   padding: var(--space-2) var(--space-4);
   border: none;
-  background: transparent;
+  background-color: transparent;
   cursor: pointer;
   transition: background var(--transition-fast);
   text-align: left;
 }
 
 .dropdown-item:hover {
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
 }
 
 .champ-info {
@@ -606,7 +697,9 @@ onUnmounted(() => {
 }
 
 .favorites-section {
-  background: var(--color-bg-card);
+  background-color: var(--color-bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-light);
   padding: var(--space-5);
@@ -640,7 +733,7 @@ onUnmounted(() => {
 }
 
 .favorite-item:hover {
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
 }
 
 .favorite-name {
@@ -664,7 +757,7 @@ onUnmounted(() => {
   height: 18px;
   border-radius: var(--radius-full);
   border: none;
-  background: var(--color-bg-active);
+  background-color: var(--color-bg-active);
   color: var(--color-text-tertiary);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -675,7 +768,7 @@ onUnmounted(() => {
 }
 
 .favorite-remove:hover {
-  background: var(--color-error);
+  background-color: var(--color-error);
   color: #ffffff;
 }
 
@@ -687,7 +780,9 @@ onUnmounted(() => {
   justify-content: center;
   gap: var(--space-3);
   padding: var(--space-12) 0;
-  background: var(--color-bg-card);
+  background-color: var(--color-bg-card);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-light);
 }
@@ -707,7 +802,8 @@ onUnmounted(() => {
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  background: rgba(255, 69, 58, 0.06);
+  --glass-tint: linear-gradient(var(--color-lose-bg), var(--color-lose-bg));
+  background-color: var(--color-bg-card);
   border-radius: var(--radius-lg);
   border: 1px solid rgba(255, 69, 58, 0.12);
 }
@@ -731,9 +827,6 @@ onUnmounted(() => {
 
 /* ─── Champion header (integrated role switcher) ─── */
 .champion-header {
-  background: var(--color-bg-card);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--color-border-light);
   padding: var(--space-4) var(--space-5);
 }
 
@@ -778,17 +871,17 @@ onUnmounted(() => {
 }
 
 .source-tag.opgg {
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--color-win);
+  background-color: rgba(59, 130, 246, 0.1);
+  color: var(--color-win-text);
 }
 
-.source-tag.local {
-  background: var(--color-bg-tertiary);
+.source-tag.qq101 {
+  background-color: var(--color-bg-tertiary);
   color: var(--color-text-tertiary);
 }
 
 .patch-tag {
-  background: var(--color-bg-tertiary);
+  background-color: var(--color-bg-tertiary);
   color: var(--color-text-tertiary);
   font-family: var(--font-mono);
 }
@@ -814,7 +907,7 @@ onUnmounted(() => {
   padding: 4px var(--space-3);
   border-radius: var(--radius-md);
   border: 1px solid transparent;
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   font-size: var(--text-xs);
   font-weight: var(--font-medium);
   color: var(--color-text-secondary);
@@ -824,13 +917,13 @@ onUnmounted(() => {
 }
 
 .role-tab:hover:not(:disabled) {
-  background: var(--color-bg-hover);
+  background-color: var(--color-bg-hover);
   color: var(--color-text-primary);
   border-color: var(--color-border);
 }
 
 .role-tab.active {
-  background: var(--color-accent);
+  background-color: var(--color-accent);
   color: #ffffff;
   border-color: var(--color-accent);
 }
@@ -868,12 +961,12 @@ onUnmounted(() => {
   border-radius: var(--radius-sm);
   font-size: 9px;
   font-weight: var(--font-bold);
-  background: rgba(0, 0, 0, 0.08);
+  background-color: rgba(0, 0, 0, 0.08);
   flex-shrink: 0;
 }
 
 .role-tab.active .role-icon {
-  background: rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.2);
 }
 
 .role-text {
@@ -895,14 +988,14 @@ onUnmounted(() => {
   height: 32px;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   color: var(--color-text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .action-btn:hover:not(:disabled) {
-  background: var(--color-bg-active);
+  background-color: var(--color-bg-active);
   color: var(--color-accent);
   border-color: var(--color-accent);
 }
@@ -913,13 +1006,13 @@ onUnmounted(() => {
 }
 
 .action-btn.is-fav {
-  color: var(--color-gold);
+  color: var(--color-highlight-text);
   border-color: var(--color-gold);
-  background: rgba(255, 215, 0, 0.08);
+  background-color: rgba(255, 215, 0, 0.08);
 }
 
 .action-btn.is-fav:hover {
-  color: var(--color-gold);
+  color: var(--color-highlight-text);
   border-color: var(--color-gold);
 }
 
@@ -929,16 +1022,16 @@ onUnmounted(() => {
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
-  background: rgba(255, 179, 0, 0.08);
+  background-color: rgba(255, 179, 0, 0.08);
   border-radius: var(--radius-lg);
   border: 1px solid rgba(255, 179, 0, 0.15);
   font-size: var(--text-xs);
-  color: var(--color-gold);
+  color: var(--color-highlight-text);
 }
 
 .role-hint svg {
   flex-shrink: 0;
-  color: var(--color-gold);
+  color: var(--color-highlight-text);
 }
 
 /* ─── Switching overlay ─── */
@@ -962,22 +1055,14 @@ onUnmounted(() => {
   gap: var(--space-4);
   align-items: stretch;
   min-width: 0; /* 防止 grid 容器本身溢出父级 */
-  transition: opacity var(--transition-normal);
 }
 
 .build-columns.is-switching {
-  opacity: 0.4;
   pointer-events: none;
 }
 
 .build-columns > * {
   min-width: 0; /* 防止 grid 子项溢出列宽 */
-}
-
-@media (max-width: 768px) {
-  .build-columns {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* Footer */
@@ -993,10 +1078,55 @@ onUnmounted(() => {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .spin {
   animation: spin 0.8s linear infinite;
+}
+
+.build-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.header-main,
+.champion-name-row,
+.role-tabs-inline {
+  flex-wrap: wrap;
+}
+.header-main > .champion-info {
+  min-width: 0;
+  flex: 1;
+}
+.header-actions {
+  flex-shrink: 0;
+}
+.search-input {
+  min-width: 0;
+}
+.search-dropdown {
+  background-color: var(--color-bg-primary);
+  box-shadow: var(--shadow-lg);
+}
+@container workspace (max-width: 900px) {
+  .build-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@container workspace (max-width: 580px) {
+  .header-main {
+    gap: 12px;
+  }
+  .champion-name {
+    font-size: 19px;
+  }
+  .role-tabs-inline {
+    gap: 4px;
+  }
+  .role-tab {
+    padding: 5px 7px;
+  }
 }
 </style>

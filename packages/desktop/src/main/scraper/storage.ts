@@ -32,14 +32,14 @@ import { logger } from '../utils/logger';
 interface ScraperMeta {
   patch: string;
   lastUpdated: number;
-  source: 'opgg' | 'local';
+  source: 'opgg' | 'qq101';
 }
 
 export class ScraperStorage {
   private baseDir: string;
 
-  constructor() {
-    this.baseDir = path.join(app.getPath('userData'), 'scraper-data');
+  constructor(source: 'opgg' | 'qq101' = 'opgg') {
+    this.baseDir = path.join(app.getPath('userData'), 'scraper-data', source);
   }
 
   /** 确保目录存在 */

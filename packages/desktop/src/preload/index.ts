@@ -64,6 +64,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   analyzeLiveGame: () => ipcRenderer.invoke('live-game:analyze'),
 
   // ─── 第三方数据 ────────────────────────────────────────
+    getChampionDataSource: () => ipcRenderer.invoke('scraper:getSource'),
+    setChampionDataSource: (source: 'opgg' | 'qq101') => ipcRenderer.invoke('scraper:setSource', source),
   getChampionBuilds: (championId: number, role?: string) =>
     ipcRenderer.invoke('scraper:getChampionBuilds', championId, role),
   refreshChampionBuilds: (championId: number) =>

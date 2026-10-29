@@ -1,5 +1,5 @@
 <template>
-  <div class="champion-detail">
+  <div class="champion-detail glass-panel">
     <div v-if="stat" class="detail-content">
       <!-- Header -->
       <div class="detail-header">
@@ -56,10 +56,10 @@
       <!-- Win/Loss Bar -->
       <div class="winloss-section">
         <div class="winloss-bar">
-          <div class="win-part" :style="{ width: (stat.winRate * 100) + '%' }">
+          <div class="win-part" :style="{ width: stat.winRate * 100 + '%' }">
             <span v-if="stat.wins > 0" class="wl-count">{{ stat.wins }}W</span>
           </div>
-          <div class="loss-part" :style="{ width: ((1 - stat.winRate) * 100) + '%' }">
+          <div class="loss-part" :style="{ width: (1 - stat.winRate) * 100 + '%' }">
             <span v-if="stat.losses > 0" class="wl-count">{{ stat.losses }}L</span>
           </div>
         </div>
@@ -113,9 +113,6 @@ const lastPlayedText = computed(() => {
 
 <style scoped>
 .champion-detail {
-  background: var(--color-bg-card);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--color-border-light);
   padding: var(--space-5);
 }
 
@@ -173,11 +170,21 @@ const lastPlayedText = computed(() => {
   letter-spacing: 0.3px;
 }
 
-.wins-color { color: var(--color-win); }
-.losses-color { color: var(--color-lose); }
-.deaths-color { color: var(--color-lose); }
-.kda-excellent { color: var(--color-gold); }
-.kda-good { color: var(--color-win); }
+.wins-color {
+  color: var(--color-win-text);
+}
+.losses-color {
+  color: var(--color-lose-text);
+}
+.deaths-color {
+  color: var(--color-lose-text);
+}
+.kda-excellent {
+  color: var(--color-highlight-text);
+}
+.kda-good {
+  color: var(--color-win-text);
+}
 
 /* Extra Stats */
 .extra-stats {
@@ -211,10 +218,20 @@ const lastPlayedText = computed(() => {
   font-family: var(--font-mono);
 }
 
-.mvp-icon { color: var(--color-gold); opacity: 1; }
-.mvp-value { color: var(--color-gold); }
-.svp-icon { color: var(--color-text-secondary); opacity: 1; }
-.svp-value { color: var(--color-text-secondary); }
+.mvp-icon {
+  color: var(--color-highlight-text);
+  opacity: 1;
+}
+.mvp-value {
+  color: var(--color-highlight-text);
+}
+.svp-icon {
+  color: var(--color-text-secondary);
+  opacity: 1;
+}
+.svp-value {
+  color: var(--color-text-secondary);
+}
 
 /* Win/Loss Bar */
 .winloss-section {
@@ -230,7 +247,7 @@ const lastPlayedText = computed(() => {
 }
 
 .win-part {
-  background: var(--color-win);
+  background-color: var(--color-win);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -238,7 +255,7 @@ const lastPlayedText = computed(() => {
 }
 
 .loss-part {
-  background: var(--color-lose);
+  background-color: var(--color-lose);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -251,5 +268,21 @@ const lastPlayedText = computed(() => {
   color: #ffffff;
   padding: 0 var(--space-2);
   white-space: nowrap;
+}
+
+.detail-header > .header-info {
+  min-width: 0;
+}
+.champion-name {
+  overflow-wrap: anywhere;
+}
+.detail-stats {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+@container workspace (max-width: 480px) {
+  .detail-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    row-gap: 16px;
+  }
 }
 </style>

@@ -1,24 +1,31 @@
 <template>
-  <div class="rune-display">
+  <div class="rune-display glass-panel">
     <!-- Header: selector for multiple rune builds -->
     <div class="rune-header">
       <h3 class="section-title">符文推荐</h3>
       <div v-if="runeBuilds.length > 1" class="rune-selector-wrap">
         <select
           class="rune-selector"
+          aria-label="符文配置"
           :value="selectedIndex"
           @change="$emit('select', Number(($event.target as HTMLSelectElement).value))"
         >
-          <option
-            v-for="(rune, idx) in runeBuilds"
-            :key="idx"
-            :value="idx"
-          >
+          <option v-for="(rune, idx) in runeBuilds" :key="idx" :value="idx">
             {{ rune.name || `配置 ${idx + 1}` }}
             {{ rune.winRate ? `(${formatPercent(rune.winRate)})` : '' }}
           </option>
         </select>
-        <svg class="selector-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg
+          class="selector-arrow"
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </div>
@@ -77,7 +84,7 @@
                   class="perk-img"
                   :src="getPerkIconUrl(perkId)"
                   :alt="String(perkId)"
-                  @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+                  @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
                 />
                 <span v-else class="perk-id">{{ perkId }}</span>
               </div>
@@ -99,18 +106,14 @@
             <span class="tree-type">副系</span>
           </div>
           <div class="perk-grid">
-            <div
-              v-for="perkId in currentRune.secondaryPerks"
-              :key="perkId"
-              class="perk-slot"
-            >
+            <div v-for="perkId in currentRune.secondaryPerks" :key="perkId" class="perk-slot">
               <div class="perk-icon" :style="{ borderColor: secondaryInfo.color }">
                 <img
                   v-if="getPerkIconUrl(perkId)"
                   class="perk-img"
                   :src="getPerkIconUrl(perkId)"
                   :alt="String(perkId)"
-                  @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+                  @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
                 />
                 <span v-else class="perk-id">{{ perkId }}</span>
               </div>
@@ -123,18 +126,14 @@
       <div v-if="currentRune.statShards?.length" class="stat-shards">
         <span class="shards-label">属性碎片</span>
         <div class="shards-row">
-          <div
-            v-for="(shardId, idx) in currentRune.statShards"
-            :key="idx"
-            class="shard-slot"
-          >
+          <div v-for="(shardId, idx) in currentRune.statShards" :key="idx" class="shard-slot">
             <div class="shard-icon">
               <img
                 v-if="getPerkIconUrl(shardId)"
                 class="shard-img"
                 :src="getPerkIconUrl(shardId)"
                 :alt="String(shardId)"
-                @error="(e: Event) => (e.target as HTMLImageElement).style.display = 'none'"
+                @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
               />
               <span v-else class="shard-id">{{ shardId }}</span>
             </div>
@@ -153,10 +152,29 @@
         :disabled="applying"
         @click="$emit('apply', currentRune)"
       >
-        <svg v-if="applySuccess" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg
+          v-if="applySuccess"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
           <polyline points="20 6 9 17 4 12" />
         </svg>
-        <svg v-else-if="applying" class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg
+          v-else-if="applying"
+          class="spin"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
           <path d="M21 12a9 9 0 1 1-6.22-8.56" />
         </svg>
         <span>{{ applyLabel }}</span>
@@ -180,18 +198,21 @@ const RUNE_TREE_MAP: Record<number, { name: string; color: string }> = {
   8400: { name: '坚决', color: '#a1d586' },
 };
 
-const props = withDefaults(defineProps<{
-  runeBuilds: RuneBuild[];
-  selectedIndex?: number;
-  applying?: boolean;
-  applySuccess?: boolean;
-  applyError?: string | null;
-}>(), {
-  selectedIndex: 0,
-  applying: false,
-  applySuccess: false,
-  applyError: null,
-});
+const props = withDefaults(
+  defineProps<{
+    runeBuilds: RuneBuild[];
+    selectedIndex?: number;
+    applying?: boolean;
+    applySuccess?: boolean;
+    applyError?: string | null;
+  }>(),
+  {
+    selectedIndex: 0,
+    applying: false,
+    applySuccess: false,
+    applyError: null,
+  },
+);
 
 defineEmits<{
   (e: 'select', index: number): void;
@@ -205,13 +226,19 @@ const currentRune = computed(() => {
 
 const primaryInfo = computed(() => {
   if (!currentRune.value) return { name: '—', color: '#888', iconUrl: '' };
-  const tree = RUNE_TREE_MAP[currentRune.value.primaryTree] ?? { name: `#${currentRune.value.primaryTree}`, color: '#888' };
+  const tree = RUNE_TREE_MAP[currentRune.value.primaryTree] ?? {
+    name: `#${currentRune.value.primaryTree}`,
+    color: '#888',
+  };
   return { ...tree, iconUrl: getRuneTreeIconUrl(currentRune.value.primaryTree) };
 });
 
 const secondaryInfo = computed(() => {
   if (!currentRune.value) return { name: '—', color: '#888', iconUrl: '' };
-  const tree = RUNE_TREE_MAP[currentRune.value.secondaryTree] ?? { name: `#${currentRune.value.secondaryTree}`, color: '#888' };
+  const tree = RUNE_TREE_MAP[currentRune.value.secondaryTree] ?? {
+    name: `#${currentRune.value.secondaryTree}`,
+    color: '#888',
+  };
   return { ...tree, iconUrl: getRuneTreeIconUrl(currentRune.value.secondaryTree) };
 });
 
@@ -238,9 +265,6 @@ function formatSample(v: number): string {
 
 <style scoped>
 .rune-display {
-  background: var(--color-bg-card);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--color-border-light);
   overflow: hidden;
   min-width: 0; /* 防止 grid 子项溢出 */
   display: flex;
@@ -275,7 +299,7 @@ function formatSample(v: number): string {
 .rune-selector {
   appearance: none;
   -webkit-appearance: none;
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 4px 28px 4px 10px;
@@ -325,7 +349,7 @@ function formatSample(v: number): string {
   justify-content: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
 }
 
 .stat-item {
@@ -350,13 +374,13 @@ function formatSample(v: number): string {
 }
 
 .stat-value.win-rate {
-  color: var(--color-win);
+  color: var(--color-win-text);
 }
 
 .stat-divider {
   width: 1px;
   height: 20px;
-  background: var(--color-border);
+  background-color: var(--color-border);
   flex-shrink: 0;
 }
 
@@ -431,7 +455,7 @@ function formatSample(v: number): string {
   width: 32px;
   height: 32px;
   border-radius: var(--radius-md);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   border: 1.5px solid var(--color-border);
   display: flex;
   align-items: center;
@@ -492,7 +516,7 @@ function formatSample(v: number): string {
   width: 24px;
   height: 24px;
   border-radius: var(--radius-full);
-  background: var(--color-bg-secondary);
+  background-color: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   display: flex;
   align-items: center;
@@ -524,8 +548,8 @@ function formatSample(v: number): string {
   height: 36px;
   border-radius: var(--radius-lg);
   border: none;
-  background: var(--color-accent);
-  color: #ffffff;
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
   font-size: var(--text-xs);
   font-weight: var(--font-semibold);
   cursor: pointer;
@@ -533,13 +557,13 @@ function formatSample(v: number): string {
 }
 
 .apply-btn:hover:not(:disabled) {
-  background: var(--color-accent-hover);
+  background-color: var(--color-accent-hover);
   transform: translateY(-0.5px);
   box-shadow: 0 2px 8px rgba(0, 113, 227, 0.25);
 }
 
 .apply-btn:active:not(:disabled) {
-  background: var(--color-accent-active);
+  background-color: var(--color-accent-active);
   transform: none;
   box-shadow: none;
 }
@@ -550,11 +574,11 @@ function formatSample(v: number): string {
 }
 
 .apply-btn.success {
-  background: var(--color-success);
+  background-color: var(--color-success);
 }
 
 .apply-btn.error {
-  background: var(--color-error);
+  background-color: var(--color-error);
 }
 
 .apply-error {
@@ -566,7 +590,9 @@ function formatSample(v: number): string {
 
 /* Spinner animation */
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .spin {
