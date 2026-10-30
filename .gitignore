@@ -35,6 +35,8 @@ pnpm-debug.log*
 
 # Local specifications and UI validation artifacts
 /specs/
+# Local UI validation screenshots and measurements
+/specs/previews/
 
 # Scraper data (runtime generated)
 scraper-data/
