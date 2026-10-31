@@ -73,7 +73,7 @@
               <img
                 v-if="getItemImgUrl(itemId)"
                 class="item-img"
-                :src="getItemImgUrl(itemId)"
+                v-cached-src="getItemImgUrl(itemId)"
                 :alt="getItemName(itemId)"
                 @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
               />
@@ -97,7 +97,7 @@
                 <img
                   v-if="getItemImgUrl(itemId)"
                   class="item-img"
-                  :src="getItemImgUrl(itemId)"
+                  v-cached-src="getItemImgUrl(itemId)"
                   :alt="getItemName(itemId)"
                   @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
                 />
@@ -135,7 +135,7 @@
               <img
                 v-if="getItemImgUrl(currentBuild.boots)"
                 class="item-img"
-                :src="getItemImgUrl(currentBuild.boots)"
+                v-cached-src="getItemImgUrl(currentBuild.boots)"
                 :alt="getItemName(currentBuild.boots)"
                 @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
               />

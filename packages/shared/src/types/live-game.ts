@@ -31,6 +31,7 @@ export interface RecentMatchSummary {
 export interface LiveGamePlayer {
   puuid: string;
   summonerName: string;
+  tagLine?: string;
   championId: number;
   championName: string;
   /** 段位 */

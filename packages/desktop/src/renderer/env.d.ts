@@ -22,9 +22,12 @@ interface ElectronAPI {
   getCurrentSummoner: () => Promise<import('@lol-assistant/shared').Summoner>;
   getSummonerById: (puuid: string) => Promise<import('@lol-assistant/shared').Summoner>;
   searchSummoner: (query: string) => Promise<import('@lol-assistant/shared').Summoner>;
+  getSummonerIcon: (iconId: number) => Promise<string>;
 
   // 战绩
-  getMatchList: (params: import('@lol-assistant/shared').MatchListParams) => Promise<import('@lol-assistant/shared').MatchList>;
+  getMatchList: (
+    params: import('@lol-assistant/shared').MatchListParams,
+  ) => Promise<import('@lol-assistant/shared').MatchList>;
   getMatchDetail: (gameId: number) => Promise<import('@lol-assistant/shared').MatchDetail>;
 
   // 排位
@@ -39,23 +42,45 @@ interface ElectronAPI {
 
   // WebSocket 事件
   lcuSubscribe: (uri: string) => void;
+  getGameflowState: () => Promise<{
+    phase: import('@lol-assistant/shared').GamePhase;
+    queueId: number;
+  } | null>;
   lcuUnsubscribe: (uri: string) => void;
   onLCUEvent: (callback: (event: unknown) => void) => () => void;
-  onConnectionChange: (callback: (status: import('@lol-assistant/shared').ConnectionStatus) => void) => () => void;
+  onConnectionChange: (
+    callback: (status: import('@lol-assistant/shared').ConnectionStatus) => void,
+  ) => () => void;
 
   // 对局实时分析
   analyzeLiveGame: () => Promise<import('@lol-assistant/shared').LiveGameAnalysis>;
 
   // 第三方数据
+  getMayhemRecommendations: (
+    championId: number,
+    refresh?: boolean,
+  ) => Promise<import('@lol-assistant/shared').MayhemChampionRecommendations>;
+  openMayhemSource: (url: string) => Promise<void>;
   getChampionDataSource: () => Promise<import('@lol-assistant/shared').ChampionDataSource>;
-  setChampionDataSource: (source: import('@lol-assistant/shared').ChampionDataSource) => Promise<import('@lol-assistant/shared').ChampionDataSource>;
-  getChampionBuilds: (championId: number, role?: string) => Promise<import('@lol-assistant/shared').ChampionBuilds>;
+  setChampionDataSource: (
+    source: import('@lol-assistant/shared').ChampionDataSource,
+  ) => Promise<import('@lol-assistant/shared').ChampionDataSource>;
+  getChampionBuilds: (
+    championId: number,
+    role?: string,
+  ) => Promise<import('@lol-assistant/shared').ChampionBuilds>;
   refreshChampionBuilds: (championId: number) => Promise<void>;
-  getChampionCounters: (championId: number, role?: string) => Promise<import('@lol-assistant/shared').ChampionCounters>;
+  getChampionCounters: (
+    championId: number,
+    role?: string,
+  ) => Promise<import('@lol-assistant/shared').ChampionCounters>;
   updateScraperData: () => Promise<void>;
   getScraperDataVersion: () => Promise<import('@lol-assistant/shared').ScraperDataVersion | null>;
   getAramTierList: () => Promise<import('@lol-assistant/shared').AramChampionTier[]>;
-  getChampionRankings: (position?: string, tier?: string) => Promise<import('@lol-assistant/shared').ChampionRankingList>;
+  getChampionRankings: (
+    position?: string,
+    tier?: string,
+  ) => Promise<import('@lol-assistant/shared').ChampionRankingList>;
 
   // 符文页管理
   getPerksPages: () => Promise<unknown[]>;
@@ -83,7 +108,9 @@ interface ElectronAPI {
   }>;
   onUpdateProgress: (callback: (progress: number) => void) => () => void;
   onUpdateStatusChange: (callback: (status: string) => void) => () => void;
-  onUpdateAvailable: (callback: (info: import('@lol-assistant/shared').UpdateInfo) => void) => () => void;
+  onUpdateAvailable: (
+    callback: (info: import('@lol-assistant/shared').UpdateInfo) => void,
+  ) => () => void;
 
   // 日志
   exportLog: () => Promise<string>;
@@ -95,7 +122,11 @@ interface ElectronAPI {
   // 静态资源
   getGameVersion: () => Promise<string | null>;
   getMajorVersion: () => Promise<string | null>;
-  getCachedAsset: (remoteUrl: string, assetType: string, assetId: string | number) => Promise<string>;
+  getCachedAsset: (
+    remoteUrl: string,
+    assetType: string,
+    assetId: string | number,
+  ) => Promise<string>;
   getMetadata: (url: string, metaKey: string) => Promise<unknown>;
   getAssetCacheStats: () => Promise<import('@lol-assistant/shared').CacheStats>;
   clearAssetCache: () => Promise<void>;
@@ -132,7 +163,11 @@ interface ElectronAPI {
 
   // 客户端设置 - 藏品背景皮肤
   getBackdrop: (summonerId: number) => Promise<unknown>;
-  setBackdrop: (summonerId: number, championId: number, skinId: number) => Promise<{ success: boolean }>;
+  setBackdrop: (
+    summonerId: number,
+    championId: number,
+    skinId: number,
+  ) => Promise<{ success: boolean }>;
 
   // 客户端设置 - 个性签名
   getStatusMessage: () => Promise<string>;

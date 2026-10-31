@@ -12,7 +12,12 @@ import pLimit from 'p-limit';
 import { lcuAPI } from '../lcu/api';
 import { logger } from '../utils/logger';
 import { ErrorCode, createAppError } from '@lol-assistant/shared';
-import type { LiveGameAnalysis, LiveGameTeam, LiveGamePlayer, RecentMatchSummary } from '@lol-assistant/shared';
+import type {
+  LiveGameAnalysis,
+  LiveGameTeam,
+  LiveGamePlayer,
+  RecentMatchSummary,
+} from '@lol-assistant/shared';
 
 /** 并发数限制 */
 const limit = pLimit(5);
@@ -22,6 +27,11 @@ interface GameflowPlayer {
   puuid: string;
   summonerId: number;
   summonerName?: string;
+  gameName?: string;
+  gameTag?: string;
+  tagLine?: string;
+  riotIdGameName?: string;
+  riotIdTagline?: string;
   championId: number;
   teamId: number;
   selectedPosition?: string;
@@ -50,10 +60,7 @@ export function registerLiveGameIpcHandlers(): void {
       const session = (await lcuAPI.getGameflowSession()) as GameflowSession;
 
       if (!session?.gameData) {
-        throw createAppError(
-          ErrorCode.LIVE_GAME_NOT_IN_GAME,
-          '当前不在对局中',
-        );
+        throw createAppError(ErrorCode.LIVE_GAME_NOT_IN_GAME, '当前不在对局中');
       }
 
       const { gameData } = session;
@@ -88,11 +95,7 @@ export function registerLiveGameIpcHandlers(): void {
         throw err; // AppError，直接抛出
       }
       logger.error('IPC live-game:analyze 失败:', err);
-      throw createAppError(
-        ErrorCode.LIVE_GAME_NOT_IN_GAME,
-        '获取对局数据失败',
-        String(err),
-      );
+      throw createAppError(ErrorCode.LIVE_GAME_NOT_IN_GAME, '获取对局数据失败', String(err));
     }
   });
 }
@@ -157,13 +160,15 @@ async function fetchTeamData(
  * 则认为他们是预组队。使用并查集合并重叠的组。
  */
 function detectPremadeGroups(players: LiveGamePlayer[]): string[][] {
-  const loadedPlayers = players.filter(p => p.dataStatus === 'loaded' && p.recentMatches && p.recentMatches.length > 0);
+  const loadedPlayers = players.filter(
+    (p) => p.dataStatus === 'loaded' && p.recentMatches && p.recentMatches.length > 0,
+  );
   if (loadedPlayers.length < 2) return [];
 
   // 构建每个玩家的 gameId 集合
   const playerGameIds = new Map<string, Set<number>>();
   for (const p of loadedPlayers) {
-    const gameIds = new Set((p.recentMatches ?? []).map(m => m.gameId));
+    const gameIds = new Set((p.recentMatches ?? []).map((m) => m.gameId));
     playerGameIds.set(p.puuid, gameIds);
   }
 
@@ -214,20 +219,44 @@ function detectPremadeGroups(players: LiveGamePlayer[]): string[][] {
   }
 
   // 只返回 >= 2 人的组（单人不算预组队）
-  return Array.from(groups.values()).filter(g => g.length >= 2);
+  return Array.from(groups.values()).filter((g) => g.length >= 2);
 }
 
 /**
  * 获取单个玩家的详细数据
  */
-async function fetchPlayerData(player: GameflowPlayer, queueId: number = 0): Promise<LiveGamePlayer> {
-  const { puuid, summonerId, championId, summonerName: rawName } = player;
+export async function resolvePlayerIdentity(player: GameflowPlayer) {
+  let summoner;
+  if (player.puuid && !/^0+$/.test(player.puuid.replace(/-/g, ''))) {
+    summoner = await lcuAPI.getSummonerByPUUID(player.puuid).catch(() => undefined);
+  }
+  if (!summoner && player.summonerId > 0) {
+    summoner = await lcuAPI.getSummonerById(player.summonerId).catch(() => undefined);
+  }
+  return {
+    summonerName:
+      summoner?.gameName ||
+      player.gameName ||
+      player.riotIdGameName ||
+      summoner?.displayName ||
+      player.summonerName ||
+      '',
+    tagLine: summoner?.tagLine || player.tagLine || player.gameTag || player.riotIdTagline || '',
+  };
+}
+
+async function fetchPlayerData(
+  player: GameflowPlayer,
+  queueId: number = 0,
+): Promise<LiveGamePlayer> {
+  const { puuid, summonerId, championId } = player;
 
   // 并发请求：段位、英雄熟练度、近期战绩
-  const [rankResult, masteryResult, recentResult] = await Promise.allSettled([
+  const [rankResult, masteryResult, recentResult, identityResult] = await Promise.allSettled([
     lcuAPI.getRankStats(puuid),
     lcuAPI.getChampionMastery(summonerId),
-    lcuAPI.getMatchListByPUUID(puuid, { begIndex: 0, endIndex: 10 }),
+    lcuAPI.getMatchListByPUUID(puuid, { begIndex: 0, endIndex: 9 }),
+    resolvePlayerIdentity(player),
   ]);
 
   // 段位信息：根据队列类型优先显示对应段位
@@ -281,7 +310,10 @@ async function fetchPlayerData(player: GameflowPlayer, queueId: number = 0): Pro
       matches = matchList.matches;
     } else if (matchList.games && typeof matchList.games === 'object') {
       const gamesWrapper = matchList.games as Record<string, unknown>;
-      matches = (Array.isArray(gamesWrapper.games) ? gamesWrapper.games : []) as Record<string, unknown>[];
+      matches = (Array.isArray(gamesWrapper.games) ? gamesWrapper.games : []) as Record<
+        string,
+        unknown
+      >[];
     }
 
     if (matches.length > 0) {
@@ -294,12 +326,16 @@ async function fetchPlayerData(player: GameflowPlayer, queueId: number = 0): Pro
 
       for (const match of matches) {
         // 兼容两种格式：stats 嵌套或直接在 match 上
-        const stats = (match.stats && typeof match.stats === 'object' ? match.stats : match) as Record<string, unknown>;
+        const stats = (
+          match.stats && typeof match.stats === 'object' ? match.stats : match
+        ) as Record<string, unknown>;
         const participants = (match.participants ?? []) as Record<string, unknown>[];
         // 列表中只有一个 participant（当前玩家）
         const participant = participants[0];
         const pStats = participant
-          ? ((participant.stats && typeof participant.stats === 'object' ? participant.stats : participant) as Record<string, unknown>)
+          ? ((participant.stats && typeof participant.stats === 'object'
+              ? participant.stats
+              : participant) as Record<string, unknown>)
           : stats;
 
         const isWin = Boolean(pStats.win ?? stats.win ?? match.win);
@@ -332,9 +368,12 @@ async function fetchPlayerData(player: GameflowPlayer, queueId: number = 0): Pro
       }
 
       recentWinRate = matches.length > 0 ? wins / matches.length : 0;
-      recentKDA = totalDeaths > 0
-        ? Math.round(((totalKills + totalAssists) / totalDeaths) * 100) / 100
-        : totalKills + totalAssists > 0 ? 999 : 0;
+      recentKDA =
+        totalDeaths > 0
+          ? Math.round(((totalKills + totalAssists) / totalDeaths) * 100) / 100
+          : totalKills + totalAssists > 0
+            ? 999
+            : 0;
 
       championGamesPlayed = champGames;
       championWinRate = champGames > 0 ? champWins / champGames : 0;
@@ -343,7 +382,9 @@ async function fetchPlayerData(player: GameflowPlayer, queueId: number = 0): Pro
 
   return {
     puuid,
-    summonerName: rawName ?? '',
+    ...(identityResult.status === 'fulfilled'
+      ? identityResult.value
+      : { summonerName: player.gameName || player.summonerName || '' }),
     championId,
     championName: '',
     tier,
@@ -368,7 +409,8 @@ async function fetchPlayerData(player: GameflowPlayer, queueId: number = 0): Pro
 function createFailedPlayer(player: GameflowPlayer): LiveGamePlayer {
   return {
     puuid: player.puuid,
-    summonerName: player.summonerName ?? '',
+    summonerName: player.gameName || player.riotIdGameName || player.summonerName || '',
+    tagLine: player.tagLine || player.gameTag || player.riotIdTagline || '',
     championId: player.championId,
     championName: '',
     tier: '',

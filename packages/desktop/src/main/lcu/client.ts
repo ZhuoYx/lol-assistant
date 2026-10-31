@@ -16,6 +16,7 @@ interface LCURequestOptions {
   timeout?: number;
   /** 请求体编码格式，默认 'json'。部分 LCU 端点需要 'form' (application/x-www-form-urlencoded) */
   contentType?: 'json' | 'form';
+  responseType?: 'json' | 'buffer';
 }
 
 /** 重连配置 */
@@ -90,7 +91,8 @@ export class LCUClient extends EventEmitter {
 
     try {
       // 如果没有传入手动路径，尝试从持久化存储读取
-      const pathToUse = manualPath || cacheStore.getSetting<string>('lolInstallPath', '') || undefined;
+      const pathToUse =
+        manualPath || cacheStore.getSetting<string>('lolInstallPath', '') || undefined;
       const lockfileData = await readLockfile(pathToUse);
       if (!lockfileData) {
         this.setStatus('disconnected');
@@ -214,15 +216,18 @@ export class LCUClient extends EventEmitter {
   /**
    * 发送 LCU API 请求
    */
-  async request<T = unknown>(
-    endpoint: string,
-    options: LCURequestOptions = {},
-  ): Promise<T> {
+  async request<T = unknown>(endpoint: string, options: LCURequestOptions = {}): Promise<T> {
     if (!this.credentials) {
       throw new Error('未连接到 LCU 客户端');
     }
 
-    const { method = 'GET', data, timeout = REQUEST_TIMEOUT, contentType = 'json' } = options;
+    const {
+      method = 'GET',
+      data,
+      timeout = REQUEST_TIMEOUT,
+      contentType = 'json',
+      responseType = 'json',
+    } = options;
     const { port, password } = this.credentials;
 
     const url = `https://127.0.0.1:${port}${endpoint}`;
@@ -231,9 +236,7 @@ export class LCUClient extends EventEmitter {
     return new Promise<T>((resolve, reject) => {
       const urlObj = new URL(url);
 
-      const ct = contentType === 'form'
-        ? 'application/x-www-form-urlencoded'
-        : 'application/json';
+      const ct = contentType === 'form' ? 'application/x-www-form-urlencoded' : 'application/json';
 
       // 预先序列化 body 以计算 Content-Length
       let bodyStr: string | undefined;
@@ -250,9 +253,10 @@ export class LCUClient extends EventEmitter {
       }
 
       const headers: Record<string, string> = {
-        'Authorization': `Basic ${auth}`,
+        Authorization: `Basic ${auth}`,
         'Content-Type': ct,
-        'Accept': 'application/json',
+        // LCU's asset routes reject image/* with HTTP 406 despite returning images.
+        Accept: responseType === 'buffer' ? '*/*' : 'application/json',
       };
       // 必须设置 Content-Length，否则 LCU 不会读取 body
       if (bodyStr !== undefined) {
@@ -270,15 +274,21 @@ export class LCUClient extends EventEmitter {
       };
 
       const req = https.request(reqOptions, (res) => {
-        let body = '';
+        const chunks: Buffer[] = [];
         res.on('data', (chunk: Buffer) => {
-          body += chunk.toString();
+          chunks.push(Buffer.from(chunk));
         });
         res.on('end', () => {
+          const buffer = Buffer.concat(chunks);
+          const body = buffer.toString('utf8');
           // 收到响应说明连接正常，重置失败计数
           this.consecutiveFailures = 0;
 
           if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            if (responseType === 'buffer') {
+              resolve(buffer as T);
+              return;
+            }
             try {
               resolve(body ? JSON.parse(body) : ({} as T));
             } catch {
@@ -296,7 +306,9 @@ export class LCUClient extends EventEmitter {
         // 连接错误：累计失败次数，达到阈值后才判定连接断开
         if (this._status === 'connected') {
           this.consecutiveFailures++;
-          logger.warn(`LCU 请求失败 (${this.consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}): ${err.message}`);
+          logger.warn(
+            `LCU 请求失败 (${this.consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}): ${err.message}`,
+          );
 
           if (this.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
             logger.warn('连续请求失败次数过多，判定连接已断开');

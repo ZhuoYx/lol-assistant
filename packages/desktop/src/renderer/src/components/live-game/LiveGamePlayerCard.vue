@@ -3,8 +3,8 @@
     <button
       v-if="clickable"
       class="player-link"
-      :aria-label="`查看 ${player.summonerName} 的战绩`"
-      :title="`查看 ${player.summonerName} 的战绩`"
+      :aria-label="`查看 ${player.summonerName}${player.tagLine ? '#' + player.tagLine : ''} 的战绩`"
+      :title="`查看 ${player.summonerName}${player.tagLine ? '#' + player.tagLine : ''} 的战绩`"
       @click="handleClick"
     />
     <div class="identity-row">
@@ -14,9 +14,12 @@
       </div>
       <div class="player-info">
         <div class="name-row">
-          <strong class="player-name" :title="player.summonerName">{{
-            player.summonerName || '未知召唤师'
-          }}</strong>
+          <strong
+            class="player-name"
+            :title="`${player.summonerName}${player.tagLine ? '#' + player.tagLine : ''}`"
+            >{{ player.summonerName || '未知召唤师' }}</strong
+          >
+          <span v-if="player.tagLine" class="player-tag">#{{ player.tagLine }}</span>
           <span v-if="isMe" class="me-badge">我</span>
           <span
             v-if="premadeTag"
@@ -184,6 +187,11 @@ function matchTitle(m: RecentMatchSummary) {
 </script>
 
 <style scoped>
+.player-tag {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
 .lg-player-card {
   position: relative;
   min-width: 0;

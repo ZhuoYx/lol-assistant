@@ -44,7 +44,7 @@
       <!-- Recent Matches Quick View -->
       <div class="card recent-card">
         <h3 class="card-section-title">最近战绩</h3>
-        <div v-if="matchStore.matchList?.length > 0" class="recent-matches">
+        <div v-if="matchStore.recentMatches?.length > 0" class="recent-matches">
           <div
             v-for="match in recentMatches"
             :key="match.gameId"
@@ -78,10 +78,10 @@
             <span class="match-time">{{ formatRelativeTime(match.gameCreation) }}</span>
           </div>
         </div>
-        <div v-else-if="appStore.isConnected && !matchStore.loading" class="card-empty">
-          <span class="empty-hint">暂无战绩数据</span>
+        <div v-else-if="appStore.isConnected && !matchStore.loadingRecent" class="card-empty">
+          <span class="empty-hint">{{ matchStore.recentError || '暂无战绩数据' }}</span>
         </div>
-        <div v-else-if="matchStore.loading" class="card-empty">
+        <div v-else-if="matchStore.loadingRecent" class="card-empty">
           <LoadingSpinner size="sm" />
         </div>
         <div v-else class="card-empty">
@@ -116,7 +116,7 @@ const displaySummoner = computed(() => summonerStore.displaySummoner);
 const soloQueue = computed(() => rankStore.rankStats?.queueMap?.RANKED_SOLO_5x5 ?? null);
 const flexQueue = computed(() => rankStore.rankStats?.queueMap?.RANKED_FLEX_SR ?? null);
 
-const recentMatches = computed(() => matchStore.matchList.slice(0, 8));
+const recentMatches = computed(() => matchStore.recentMatches);
 
 function getQueueName(match: { queueId: number; gameMode: string }): string {
   const name = getQueueNameById(match.queueId);
@@ -184,7 +184,7 @@ function reloadAllData() {
   const puuid = summonerStore.activePUUID;
   if (!puuid) return;
   rankStore.fetchRankStats(puuid);
-  matchStore.fetchMatchList(true);
+  matchStore.fetchRecentMatches();
 }
 
 function loadHomeData() {
@@ -201,8 +201,8 @@ function loadHomeData() {
   if (!rankStore.rankStats && !rankStore.loading) {
     rankStore.fetchRankStats(puuid);
   }
-  if (matchStore.matchList.length === 0 && !matchStore.loading) {
-    matchStore.fetchMatchList(true);
+  if (!matchStore.loadingRecent) {
+    matchStore.fetchRecentMatches();
   }
 }
 
@@ -232,6 +232,8 @@ onMounted(async () => {
   } else if (summonerStore.isViewingOther) {
     // 从其他页面切回首页，已在查看他人，确保数据是最新的
     reloadAllData();
+  } else {
+    loadHomeData();
   }
 });
 </script>

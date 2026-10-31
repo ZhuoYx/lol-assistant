@@ -2,7 +2,10 @@
   <div class="page live-game-page">
     <PageHeader title="对局分析" subtitle="双方阵容一览，掌握每位玩家的近期表现"
       ><template #actions
-        ><DataSourceSelect /><span v-if="analysis" class="load-status" role="status"
+        ><DataSourceSelect v-if="analysis?.queueId !== 2400" /><span
+          v-if="analysis"
+          class="load-status"
+          role="status"
           ><span
             class="load-dot"
             :class="{ active: loadedPlayerCount === totalPlayerCount, pending: hasLoadingPlayers }"
@@ -83,6 +86,11 @@
       <div v-else-if="analysis" class="analysis-view">
         <!-- Game info panel -->
         <LiveGamePanel :analysis="analysis" :refreshing="refreshing" @refresh="analyze()" />
+        <MayhemAugmentPanel
+          v-if="analysis.queueId === 2400 && myChampId"
+          :champion-id="myChampId"
+          compact
+        />
 
         <div v-if="error" class="refresh-error" role="alert">
           {{ error }}，当前保留上次成功加载的数据。
@@ -121,7 +129,7 @@
 
         <!-- Spell Cooldowns -->
         <SpellCooldowns
-          v-if="myChampId"
+          v-if="myChampId && (analysis.queueId === 420 || analysis.queueId === 440)"
           :my-champ-id="myChampId"
           :enemy-champ-ids="enemyLaneChampIds"
           :enemy-labels="enemyLaneLabels"
@@ -144,6 +152,7 @@ import TeamPanel from '@/components/live-game/TeamPanel.vue';
 import SpellCooldowns from '@/components/live-game/SpellCooldowns.vue';
 import ChampionInsights from '@/components/live-game/ChampionInsights.vue';
 import DataSourceSelect from '@/components/common/DataSourceSelect.vue';
+import MayhemAugmentPanel from '@/components/aram/MayhemAugmentPanel.vue';
 
 const appStore = useAppStore();
 const summonerStore = useSummonerStore();

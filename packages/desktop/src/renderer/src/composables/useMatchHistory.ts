@@ -13,17 +13,17 @@ export function useMatchHistory() {
     if (puuid) {
       await summonerStore.switchPlayer(puuid);
     }
-    await matchStore.fetchMatchList(true);
+    await matchStore.fetchMatchList(1);
   }
 
   async function loadMore() {
     if (matchStore.hasMore && !matchStore.loading) {
-      await matchStore.fetchMatchList(false);
+      await matchStore.fetchMatchList(matchStore.currentPage + 1);
     }
   }
 
   async function refresh() {
-    await matchStore.fetchMatchList(true);
+    await matchStore.fetchMatchList(1);
   }
 
   async function loadDetail(gameId: number) {
@@ -32,7 +32,7 @@ export function useMatchHistory() {
 
   function applyFilters(filters: MatchFilters) {
     matchStore.setFilters(filters);
-    matchStore.fetchMatchList(true);
+    matchStore.fetchMatchList(1);
   }
 
   return {

@@ -5,8 +5,29 @@ import { ipcMain } from 'electron';
 import { lcuAPI } from '../lcu/api';
 import { cacheStore } from '../cache/store';
 import { logger } from '../utils/logger';
+import { lcuClient } from '../lcu/client';
 
 export function registerSummonerIpcHandlers(): void {
+  ipcMain.handle('summoner:getIcon', async (_event, iconId: number) => {
+    if (!Number.isSafeInteger(iconId) || iconId < 0 || iconId > 1000000) {
+      throw new Error('无效的召唤师头像编号');
+    }
+    try {
+      const image = await lcuClient.request<Buffer>(
+        `/lol-game-data/assets/v1/profile-icons/${iconId}.jpg`,
+        { responseType: 'buffer' },
+      );
+      if (image.length > 0 && image[0] === 0xff && image[1] === 0xd8) {
+        return `data:image/jpeg;base64,${image.toString('base64')}`;
+      }
+      if (image.length > 4 && image.subarray(0, 4).equals(Buffer.from([137, 80, 78, 71]))) {
+        return `data:image/png;base64,${image.toString('base64')}`;
+      }
+    } catch {
+      // Offline/CDN fallback never exposes the local client's credentials.
+    }
+    return `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/profile-icons/${iconId}.jpg`;
+  });
   // 获取当前召唤师
   ipcMain.handle('summoner:getCurrent', async () => {
     try {

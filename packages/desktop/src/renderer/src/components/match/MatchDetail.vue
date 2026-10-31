@@ -11,8 +11,31 @@
         <span class="detail-time">{{ formatDate(detail.gameCreation) }}</span>
       </div>
 
+      <div class="detail-view-switch" role="group" aria-label="战绩详情视图">
+        <button
+          v-for="option in viewOptions"
+          :key="option.value"
+          :class="{ active: detailView === option.value }"
+          :aria-pressed="detailView === option.value"
+          @click="detailView = option.value"
+        >
+          {{ option.label }}
+        </button>
+      </div>
+      <TeamRadarComparison v-show="detailView === 'radar'" :detail="detail" />
+      <MatchStatsChart
+        v-show="detailView === 'charts'"
+        :detail="detail"
+        :current-p-u-u-i-d="currentPUUID"
+      />
+
       <!-- Teams -->
-      <div v-for="team in displayTeams" :key="team.teamId" class="team-section">
+      <div
+        v-for="team in displayTeams"
+        v-show="detailView === 'combat'"
+        :key="team.teamId"
+        class="team-section"
+      >
         <div
           class="team-header"
           :class="{ 'team-blue': team.teamId === 100, 'team-red': team.teamId !== 100 }"
@@ -36,7 +59,7 @@
           <div class="participant-header-row">
             <span class="ph-champ">英雄</span>
             <span class="ph-kda">KDA</span>
-            <span class="ph-damage">输出</span>
+            <span class="ph-damage">对英雄伤害</span>
             <span class="ph-damage-taken">承受</span>
             <span class="ph-gold">经济</span>
             <span class="ph-items">装备</span>
@@ -49,6 +72,7 @@
             :max-damage="allMaxDamage"
             :max-damage-taken="allMaxDamageTaken"
             :show-lane="isRanked"
+            :highlights="highlights[p.participantId] ?? []"
             @click-player="$emit('viewPlayer', p.puuid)"
           />
         </div>
@@ -77,17 +101,37 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { MatchDetail as MatchDetailType } from '@lol-assistant/shared';
-import { formatGameDuration, formatDate, getQueueNameById } from '@lol-assistant/shared';
+import {
+  formatGameDuration,
+  formatDate,
+  getQueueNameById,
+  getMatchHighlights,
+} from '@lol-assistant/shared';
 import { LoadingSpinner } from '@/components/common';
 import ParticipantRow from './ParticipantRow.vue';
+import TeamRadarComparison from './TeamRadarComparison.vue';
+import MatchStatsChart from './MatchStatsChart.vue';
 
 const props = defineProps<{
   detail: MatchDetailType | null;
   loading: boolean;
   currentPUUID?: string;
 }>();
+
+const detailView = ref<'combat' | 'charts' | 'radar'>('combat');
+const viewOptions = [
+  { value: 'combat', label: '战斗数据' },
+  { value: 'charts', label: '图表' },
+  { value: 'radar', label: '六维对比' },
+] as const;
+watch(
+  () => props.detail?.gameId,
+  () => {
+    detailView.value = 'combat';
+  },
+);
 
 defineEmits<{
   viewPlayer: [puuid: string];
@@ -124,14 +168,16 @@ const displayTeams = computed(() => {
 // 全场最高伤害（用于伤害条百分比计算）
 const allMaxDamage = computed(() => {
   if (!props.detail) return 1;
-  return Math.max(...props.detail.participants.map((p) => p.totalDamageDealt), 1);
+  return Math.max(...props.detail.participants.map((p) => p.totalDamageDealtToChampions ?? 0), 1);
 });
 
 // 全场最高承受伤害
 const allMaxDamageTaken = computed(() => {
   if (!props.detail) return 1;
-  return Math.max(...props.detail.participants.map((p) => p.totalDamageTaken), 1);
+  return Math.max(...props.detail.participants.map((p) => p.totalDamageTaken ?? 0), 1);
 });
+
+const highlights = computed(() => getMatchHighlights(props.detail?.participants ?? []));
 
 const POSITION_ORDER: Record<string, number> = {
   TOP: 1,
@@ -273,7 +319,7 @@ function getTeamParticipants(teamId: number) {
 .participant-header-row {
   display: grid;
   grid-template-columns: var(--participant-columns);
-  min-width: 820px;
+  min-width: var(--participant-min-width, 820px);
   padding: var(--space-1) var(--space-4);
   font-size: 10px;
   color: var(--color-text-placeholder);
@@ -313,6 +359,31 @@ function getTeamParticipants(teamId: number) {
   --participant-columns: minmax(180px, 1fr) 120px 100px 100px 80px 180px;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
+}
+.detail-view-switch {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-divider);
+}
+.detail-view-switch button {
+  padding: 7px 14px;
+  min-height: 34px;
+  border: 1px solid var(--color-filter-border);
+  border-radius: 8px;
+  background-color: var(--color-filter-bg);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.detail-view-switch button.active {
+  color: var(--color-filter-on-active);
+  background-color: var(--color-filter-active);
+  border-color: var(--color-filter-active);
+}
+.detail-view-switch button:hover {
+  box-shadow: 0 0 0 2px var(--color-accent-soft);
 }
 .detail-header {
   flex-wrap: wrap;

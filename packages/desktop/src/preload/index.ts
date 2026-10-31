@@ -10,10 +10,7 @@ import { contextBridge, ipcRenderer } from 'electron';
  * 创建安全的事件监听器，返回 unsubscribe 函数
  * 使用具体的 listener 引用确保精确移除，而非 removeAllListeners
  */
-function createEventListener<T>(
-  channel: string,
-  callback: (data: T) => void,
-): () => void {
+function createEventListener<T>(channel: string, callback: (data: T) => void): () => void {
   const listener = (_event: Electron.IpcRendererEvent, data: T): void => {
     callback(data);
   };
@@ -37,6 +34,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ─── 战绩 ──────────────────────────────────────────────
   getMatchList: (params: object) => ipcRenderer.invoke('match:getList', params),
   getMatchDetail: (gameId: number) => ipcRenderer.invoke('match:getDetail', gameId),
+  getSummonerIcon: (iconId: number) => ipcRenderer.invoke('summoner:getIcon', iconId),
 
   // ─── 排位 ──────────────────────────────────────────────
   getRankStats: (puuid: string) => ipcRenderer.invoke('rank:getStats', puuid),
@@ -50,6 +48,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ─── WebSocket 事件监听 ─────────────────────────────────
   lcuSubscribe: (uri: string) => ipcRenderer.send('lcu:subscribe', uri),
+  getGameflowState: () => ipcRenderer.invoke('lcu:getGameflowState'),
   lcuUnsubscribe: (uri: string) => ipcRenderer.send('lcu:unsubscribe', uri),
   onLCUEvent: (callback: (event: unknown) => void) => {
     return createEventListener('lcu:event', callback);
@@ -64,8 +63,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   analyzeLiveGame: () => ipcRenderer.invoke('live-game:analyze'),
 
   // ─── 第三方数据 ────────────────────────────────────────
-    getChampionDataSource: () => ipcRenderer.invoke('scraper:getSource'),
-    setChampionDataSource: (source: 'opgg' | 'qq101') => ipcRenderer.invoke('scraper:setSource', source),
+  getMayhemRecommendations: (championId: number, refresh = false) =>
+    ipcRenderer.invoke('aram:getChampionRecommendations', championId, refresh),
+  openMayhemSource: (url: string) => ipcRenderer.invoke('aram:openSource', url),
+  getChampionDataSource: () => ipcRenderer.invoke('scraper:getSource'),
+  setChampionDataSource: (source: 'opgg' | 'qq101') =>
+    ipcRenderer.invoke('scraper:setSource', source),
   getChampionBuilds: (championId: number, role?: string) =>
     ipcRenderer.invoke('scraper:getChampionBuilds', championId, role),
   refreshChampionBuilds: (championId: number) =>
@@ -152,19 +155,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAutoAccept: () => ipcRenderer.invoke('client:getAutoAccept'),
 
   // 藏品背景皮肤
-  getBackdrop: (summonerId: number) =>
-    ipcRenderer.invoke('client:getBackdrop', summonerId),
+  getBackdrop: (summonerId: number) => ipcRenderer.invoke('client:getBackdrop', summonerId),
   setBackdrop: (summonerId: number, championId: number, skinId: number) =>
     ipcRenderer.invoke('client:setBackdrop', summonerId, championId, skinId),
 
   // 个性签名
   getStatusMessage: () => ipcRenderer.invoke('client:getStatusMessage'),
-  setStatusMessage: (message: string) =>
-    ipcRenderer.invoke('client:setStatusMessage', message),
+  setStatusMessage: (message: string) => ipcRenderer.invoke('client:setStatusMessage', message),
 
   // ARAM 板凳英雄交换
-  benchSwap: (championId: number) =>
-    ipcRenderer.invoke('client:benchSwap', championId),
+  benchSwap: (championId: number) => ipcRenderer.invoke('client:benchSwap', championId),
 
   // 选人阶段 session
   getChampSelectSession: () => ipcRenderer.invoke('client:getChampSelectSession'),

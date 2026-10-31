@@ -14,7 +14,7 @@
         <img
           v-if="tierIconSrc"
           class="rank-tier-img"
-          :src="tierIconSrc"
+          v-cached-src="tierIconSrc"
           :alt="tierLabel"
           @error="iconError = true"
         />
@@ -26,7 +26,9 @@
       <div class="rank-detail">
         <div class="rank-tier-row">
           <span class="rank-tier-name">{{ tierLabel }}</span>
-          <span v-if="queue.division && queue.division !== 'NA'" class="rank-division">{{ queue.division }}</span>
+          <span v-if="queue.division && queue.division !== 'NA'" class="rank-division">{{
+            queue.division
+          }}</span>
         </div>
 
         <div class="rank-lp-row">
@@ -64,8 +66,20 @@
 
     <div v-else class="rank-empty">
       <div class="empty-icon">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.25">
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          opacity="0.25"
+        >
+          <polygon
+            points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+          />
         </svg>
       </div>
       <span class="empty-text">未定级</span>
@@ -81,23 +95,29 @@ import { computed, ref, watch } from 'vue';
 import type { QueueInfo } from '@lol-assistant/shared';
 import { calculateWinRate, formatPercent, getTierIconUrl } from '@lol-assistant/shared';
 
-const props = withDefaults(defineProps<{
-  title: string;
-  queue: QueueInfo | null | undefined;
-  loading?: boolean;
-  /** 是否查看他人（他人不显示胜负数据） */
-  isOther?: boolean;
-}>(), {
-  loading: false,
-  isOther: false,
-});
+const props = withDefaults(
+  defineProps<{
+    title: string;
+    queue: QueueInfo | null | undefined;
+    loading?: boolean;
+    /** 是否查看他人（他人不显示胜负数据） */
+    isOther?: boolean;
+  }>(),
+  {
+    loading: false,
+    isOther: false,
+  },
+);
 
 const iconError = ref(false);
 
 // 当段位变化时重置 iconError
-watch(() => props.queue?.tier, () => {
-  iconError.value = false;
-});
+watch(
+  () => props.queue?.tier,
+  () => {
+    iconError.value = false;
+  },
+);
 
 const hasTier = computed(() => {
   if (!props.queue) return false;
@@ -145,9 +165,6 @@ const winRate = computed(() => {
   return calculateWinRate(props.queue.wins, total);
 });
 
-
-
-
 const winRateText = computed(() => formatPercent(winRate.value));
 
 const winRateColorClass = computed(() => {
@@ -161,7 +178,9 @@ const winRateColorClass = computed(() => {
 .rank-card {
   position: relative;
   overflow: hidden;
-  transition: box-shadow var(--transition-normal), border-color var(--transition-normal);
+  transition:
+    box-shadow var(--transition-normal),
+    border-color var(--transition-normal);
 }
 
 /* ── Top accent stripe ── */
@@ -175,17 +194,39 @@ const winRateColorClass = computed(() => {
   opacity: 0.9;
 }
 
-.tier-iron .rank-accent-stripe { background: linear-gradient(90deg, #6b6b6b, #9a9a9a, #6b6b6b); }
-.tier-bronze .rank-accent-stripe { background: linear-gradient(90deg, #8b6914, #c49b3c, #8b6914); }
-.tier-silver .rank-accent-stripe { background: linear-gradient(90deg, #7b8a8e, #c0d0d4, #7b8a8e); }
-.tier-gold .rank-accent-stripe { background: linear-gradient(90deg, #c89b3c, #ffd700, #c89b3c); }
-.tier-platinum .rank-accent-stripe { background: linear-gradient(90deg, #22a38b, #4ce8c5, #22a38b); }
-.tier-emerald .rank-accent-stripe { background: linear-gradient(90deg, #1ba88f, #3ef0c0, #1ba88f); }
-.tier-diamond .rank-accent-stripe { background: linear-gradient(90deg, #576cce, #9aa8ff, #576cce); }
-.tier-master .rank-accent-stripe { background: linear-gradient(90deg, #9b59b6, #d4a0e8, #9b59b6); }
-.tier-grandmaster .rank-accent-stripe { background: linear-gradient(90deg, #e74c3c, #ff8a7a, #e74c3c); }
-.tier-challenger .rank-accent-stripe { background: linear-gradient(90deg, #f1c40f, #fff4a3, #f1c40f); }
-.tier-unranked .rank-accent-stripe { background-color: var(--color-border-light); }
+.tier-iron .rank-accent-stripe {
+  background: linear-gradient(90deg, #6b6b6b, #9a9a9a, #6b6b6b);
+}
+.tier-bronze .rank-accent-stripe {
+  background: linear-gradient(90deg, #8b6914, #c49b3c, #8b6914);
+}
+.tier-silver .rank-accent-stripe {
+  background: linear-gradient(90deg, #7b8a8e, #c0d0d4, #7b8a8e);
+}
+.tier-gold .rank-accent-stripe {
+  background: linear-gradient(90deg, #c89b3c, #ffd700, #c89b3c);
+}
+.tier-platinum .rank-accent-stripe {
+  background: linear-gradient(90deg, #22a38b, #4ce8c5, #22a38b);
+}
+.tier-emerald .rank-accent-stripe {
+  background: linear-gradient(90deg, #1ba88f, #3ef0c0, #1ba88f);
+}
+.tier-diamond .rank-accent-stripe {
+  background: linear-gradient(90deg, #576cce, #9aa8ff, #576cce);
+}
+.tier-master .rank-accent-stripe {
+  background: linear-gradient(90deg, #9b59b6, #d4a0e8, #9b59b6);
+}
+.tier-grandmaster .rank-accent-stripe {
+  background: linear-gradient(90deg, #e74c3c, #ff8a7a, #e74c3c);
+}
+.tier-challenger .rank-accent-stripe {
+  background: linear-gradient(90deg, #f1c40f, #fff4a3, #f1c40f);
+}
+.tier-unranked .rank-accent-stripe {
+  background-color: var(--color-border-light);
+}
 
 /* ── Decorative glow overlay ── */
 .rank-glow-overlay {
@@ -205,16 +246,36 @@ const winRateColorClass = computed(() => {
   opacity: 1;
 }
 
-.tier-iron .rank-glow-overlay { background: radial-gradient(circle, rgba(138,138,138,0.06), transparent 70%); }
-.tier-bronze .rank-glow-overlay { background: radial-gradient(circle, rgba(181,137,58,0.08), transparent 70%); }
-.tier-silver .rank-glow-overlay { background: radial-gradient(circle, rgba(168,184,188,0.08), transparent 70%); }
-.tier-gold .rank-glow-overlay { background: radial-gradient(circle, rgba(232,194,82,0.10), transparent 70%); }
-.tier-platinum .rank-glow-overlay { background: radial-gradient(circle, rgba(54,209,176,0.08), transparent 70%); }
-.tier-emerald .rank-glow-overlay { background: radial-gradient(circle, rgba(46,216,176,0.08), transparent 70%); }
-.tier-diamond .rank-glow-overlay { background: radial-gradient(circle, rgba(123,143,240,0.10), transparent 70%); }
-.tier-master .rank-glow-overlay { background: radial-gradient(circle, rgba(194,124,222,0.10), transparent 70%); }
-.tier-grandmaster .rank-glow-overlay { background: radial-gradient(circle, rgba(255,107,90,0.10), transparent 70%); }
-.tier-challenger .rank-glow-overlay { background: radial-gradient(circle, rgba(255,224,102,0.12), transparent 70%); }
+.tier-iron .rank-glow-overlay {
+  background: radial-gradient(circle, rgba(138, 138, 138, 0.06), transparent 70%);
+}
+.tier-bronze .rank-glow-overlay {
+  background: radial-gradient(circle, rgba(181, 137, 58, 0.08), transparent 70%);
+}
+.tier-silver .rank-glow-overlay {
+  background: radial-gradient(circle, rgba(168, 184, 188, 0.08), transparent 70%);
+}
+.tier-gold .rank-glow-overlay {
+  background: radial-gradient(circle, rgba(232, 194, 82, 0.1), transparent 70%);
+}
+.tier-platinum .rank-glow-overlay {
+  background: radial-gradient(circle, rgba(54, 209, 176, 0.08), transparent 70%);
+}
+.tier-emerald .rank-glow-overlay {
+  background: radial-gradient(circle, rgba(46, 216, 176, 0.08), transparent 70%);
+}
+.tier-diamond .rank-glow-overlay {
+  background: radial-gradient(circle, rgba(123, 143, 240, 0.1), transparent 70%);
+}
+.tier-master .rank-glow-overlay {
+  background: radial-gradient(circle, rgba(194, 124, 222, 0.1), transparent 70%);
+}
+.tier-grandmaster .rank-glow-overlay {
+  background: radial-gradient(circle, rgba(255, 107, 90, 0.1), transparent 70%);
+}
+.tier-challenger .rank-glow-overlay {
+  background: radial-gradient(circle, rgba(255, 224, 102, 0.12), transparent 70%);
+}
 
 /* ── Static subtle background glow ── */
 .rank-card::after {
@@ -230,16 +291,43 @@ const winRateColorClass = computed(() => {
   transform: translate(30%, -30%);
 }
 
-.tier-iron::after { background: radial-gradient(circle, #8a8a8a, transparent 70%); }
-.tier-bronze::after { background: radial-gradient(circle, #b5893a, transparent 70%); }
-.tier-silver::after { background: radial-gradient(circle, #a8b8bc, transparent 70%); }
-.tier-gold::after { background: radial-gradient(circle, #e8c252, transparent 70%); opacity: 0.06; }
-.tier-platinum::after { background: radial-gradient(circle, #36d1b0, transparent 70%); opacity: 0.05; }
-.tier-emerald::after { background: radial-gradient(circle, #2ed8b0, transparent 70%); opacity: 0.05; }
-.tier-diamond::after { background: radial-gradient(circle, #7b8ff0, transparent 70%); opacity: 0.06; }
-.tier-master::after { background: radial-gradient(circle, #c27cde, transparent 70%); opacity: 0.06; }
-.tier-grandmaster::after { background: radial-gradient(circle, #ff6b5a, transparent 70%); opacity: 0.06; }
-.tier-challenger::after { background: radial-gradient(circle, #ffe066, transparent 70%); opacity: 0.08; }
+.tier-iron::after {
+  background: radial-gradient(circle, #8a8a8a, transparent 70%);
+}
+.tier-bronze::after {
+  background: radial-gradient(circle, #b5893a, transparent 70%);
+}
+.tier-silver::after {
+  background: radial-gradient(circle, #a8b8bc, transparent 70%);
+}
+.tier-gold::after {
+  background: radial-gradient(circle, #e8c252, transparent 70%);
+  opacity: 0.06;
+}
+.tier-platinum::after {
+  background: radial-gradient(circle, #36d1b0, transparent 70%);
+  opacity: 0.05;
+}
+.tier-emerald::after {
+  background: radial-gradient(circle, #2ed8b0, transparent 70%);
+  opacity: 0.05;
+}
+.tier-diamond::after {
+  background: radial-gradient(circle, #7b8ff0, transparent 70%);
+  opacity: 0.06;
+}
+.tier-master::after {
+  background: radial-gradient(circle, #c27cde, transparent 70%);
+  opacity: 0.06;
+}
+.tier-grandmaster::after {
+  background: radial-gradient(circle, #ff6b5a, transparent 70%);
+  opacity: 0.06;
+}
+.tier-challenger::after {
+  background: radial-gradient(circle, #ffe066, transparent 70%);
+  opacity: 0.08;
+}
 
 /* ── Header ── */
 .rank-header {
@@ -268,8 +356,13 @@ const winRateColorClass = computed(() => {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
 }
 
 /* ── Body ── */
@@ -300,22 +393,42 @@ const winRateColorClass = computed(() => {
   opacity: 1;
 }
 
-.tier-iron .rank-icon-glow { background: radial-gradient(circle, rgba(138,138,138,0.15), transparent 70%); }
-.tier-bronze .rank-icon-glow { background: radial-gradient(circle, rgba(181,137,58,0.15), transparent 70%); }
-.tier-silver .rank-icon-glow { background: radial-gradient(circle, rgba(168,184,188,0.15), transparent 70%); }
-.tier-gold .rank-icon-glow { background: radial-gradient(circle, rgba(255,215,0,0.2), transparent 70%); }
-.tier-platinum .rank-icon-glow { background: radial-gradient(circle, rgba(54,209,176,0.18), transparent 70%); }
-.tier-emerald .rank-icon-glow { background: radial-gradient(circle, rgba(46,216,176,0.18), transparent 70%); }
-.tier-diamond .rank-icon-glow { background: radial-gradient(circle, rgba(123,143,240,0.2), transparent 70%); }
-.tier-master .rank-icon-glow { background: radial-gradient(circle, rgba(194,124,222,0.2), transparent 70%); }
-.tier-grandmaster .rank-icon-glow { background: radial-gradient(circle, rgba(255,107,90,0.2), transparent 70%); }
-.tier-challenger .rank-icon-glow { background: radial-gradient(circle, rgba(255,224,102,0.25), transparent 70%); }
+.tier-iron .rank-icon-glow {
+  background: radial-gradient(circle, rgba(138, 138, 138, 0.15), transparent 70%);
+}
+.tier-bronze .rank-icon-glow {
+  background: radial-gradient(circle, rgba(181, 137, 58, 0.15), transparent 70%);
+}
+.tier-silver .rank-icon-glow {
+  background: radial-gradient(circle, rgba(168, 184, 188, 0.15), transparent 70%);
+}
+.tier-gold .rank-icon-glow {
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.2), transparent 70%);
+}
+.tier-platinum .rank-icon-glow {
+  background: radial-gradient(circle, rgba(54, 209, 176, 0.18), transparent 70%);
+}
+.tier-emerald .rank-icon-glow {
+  background: radial-gradient(circle, rgba(46, 216, 176, 0.18), transparent 70%);
+}
+.tier-diamond .rank-icon-glow {
+  background: radial-gradient(circle, rgba(123, 143, 240, 0.2), transparent 70%);
+}
+.tier-master .rank-icon-glow {
+  background: radial-gradient(circle, rgba(194, 124, 222, 0.2), transparent 70%);
+}
+.tier-grandmaster .rank-icon-glow {
+  background: radial-gradient(circle, rgba(255, 107, 90, 0.2), transparent 70%);
+}
+.tier-challenger .rank-icon-glow {
+  background: radial-gradient(circle, rgba(255, 224, 102, 0.25), transparent 70%);
+}
 
 .rank-tier-img {
   width: 64px;
   height: 64px;
   object-fit: contain;
-  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.2));
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.2));
   transition: transform var(--transition-normal);
   position: relative;
   z-index: 1;
@@ -360,16 +473,36 @@ const winRateColorClass = computed(() => {
 }
 
 /* ── Tier-specific text colors ── */
-.tier-iron .rank-tier-name { color: #8a8a8a; }
-.tier-bronze .rank-tier-name { color: #c49b3c; }
-.tier-silver .rank-tier-name { color: #a0b0b4; }
-.tier-gold .rank-tier-name { color: #daa520; }
-.tier-platinum .rank-tier-name { color: #2ec4a0; }
-.tier-emerald .rank-tier-name { color: #22c99c; }
-.tier-diamond .rank-tier-name { color: #6b80e0; }
-.tier-master .rank-tier-name { color: #b370d0; }
-.tier-grandmaster .rank-tier-name { color: #f06050; }
-.tier-challenger .rank-tier-name { color: #e8b418; }
+.tier-iron .rank-tier-name {
+  color: #8a8a8a;
+}
+.tier-bronze .rank-tier-name {
+  color: #c49b3c;
+}
+.tier-silver .rank-tier-name {
+  color: #a0b0b4;
+}
+.tier-gold .rank-tier-name {
+  color: #daa520;
+}
+.tier-platinum .rank-tier-name {
+  color: #2ec4a0;
+}
+.tier-emerald .rank-tier-name {
+  color: #22c99c;
+}
+.tier-diamond .rank-tier-name {
+  color: #6b80e0;
+}
+.tier-master .rank-tier-name {
+  color: #b370d0;
+}
+.tier-grandmaster .rank-tier-name {
+  color: #f06050;
+}
+.tier-challenger .rank-tier-name {
+  color: #e8b418;
+}
 
 .rank-division {
   font-size: var(--text-sm);
@@ -413,16 +546,36 @@ const winRateColorClass = computed(() => {
   transition: width var(--transition-slow);
 }
 
-.tier-iron .lp-progress-fill { background: linear-gradient(90deg, #6b6b6b, #9a9a9a); }
-.tier-bronze .lp-progress-fill { background: linear-gradient(90deg, #8b6914, #c49b3c); }
-.tier-silver .lp-progress-fill { background: linear-gradient(90deg, #7b8a8e, #c0d0d4); }
-.tier-gold .lp-progress-fill { background: linear-gradient(90deg, #c89b3c, #ffd700); }
-.tier-platinum .lp-progress-fill { background: linear-gradient(90deg, #22a38b, #4ce8c5); }
-.tier-emerald .lp-progress-fill { background: linear-gradient(90deg, #1ba88f, #3ef0c0); }
-.tier-diamond .lp-progress-fill { background: linear-gradient(90deg, #576cce, #9aa8ff); }
-.tier-master .lp-progress-fill { background: linear-gradient(90deg, #9b59b6, #d4a0e8); }
-.tier-grandmaster .lp-progress-fill { background: linear-gradient(90deg, #e74c3c, #ff8a7a); }
-.tier-challenger .lp-progress-fill { background: linear-gradient(90deg, #f1c40f, #fff4a3); }
+.tier-iron .lp-progress-fill {
+  background: linear-gradient(90deg, #6b6b6b, #9a9a9a);
+}
+.tier-bronze .lp-progress-fill {
+  background: linear-gradient(90deg, #8b6914, #c49b3c);
+}
+.tier-silver .lp-progress-fill {
+  background: linear-gradient(90deg, #7b8a8e, #c0d0d4);
+}
+.tier-gold .lp-progress-fill {
+  background: linear-gradient(90deg, #c89b3c, #ffd700);
+}
+.tier-platinum .lp-progress-fill {
+  background: linear-gradient(90deg, #22a38b, #4ce8c5);
+}
+.tier-emerald .lp-progress-fill {
+  background: linear-gradient(90deg, #1ba88f, #3ef0c0);
+}
+.tier-diamond .lp-progress-fill {
+  background: linear-gradient(90deg, #576cce, #9aa8ff);
+}
+.tier-master .lp-progress-fill {
+  background: linear-gradient(90deg, #9b59b6, #d4a0e8);
+}
+.tier-grandmaster .lp-progress-fill {
+  background: linear-gradient(90deg, #e74c3c, #ff8a7a);
+}
+.tier-challenger .lp-progress-fill {
+  background: linear-gradient(90deg, #f1c40f, #fff4a3);
+}
 
 /* ── Record Row ── */
 .rank-record-row {
@@ -432,13 +585,33 @@ const winRateColorClass = computed(() => {
   font-size: var(--text-xs);
 }
 
-.wins { color: var(--color-win-text); font-weight: var(--font-medium); }
-.losses { color: var(--color-lose-text); font-weight: var(--font-medium); }
-.winrate-divider { color: var(--color-text-placeholder); }
-.winrate { color: var(--color-text-tertiary); }
-.winrate.high { color: var(--color-win-text); font-weight: var(--font-semibold); }
-.winrate.low { color: var(--color-lose-text); font-weight: var(--font-semibold); }
-.winrate-na { color: var(--color-text-placeholder); font-style: italic; font-size: var(--text-xs); }
+.wins {
+  color: var(--color-win-text);
+  font-weight: var(--font-medium);
+}
+.losses {
+  color: var(--color-lose-text);
+  font-weight: var(--font-medium);
+}
+.winrate-divider {
+  color: var(--color-text-placeholder);
+}
+.winrate {
+  color: var(--color-text-tertiary);
+}
+.winrate.high {
+  color: var(--color-win-text);
+  font-weight: var(--font-semibold);
+}
+.winrate.low {
+  color: var(--color-lose-text);
+  font-weight: var(--font-semibold);
+}
+.winrate-na {
+  color: var(--color-text-placeholder);
+  font-style: italic;
+  font-size: var(--text-xs);
+}
 
 /* ── Mini Series ── */
 .mini-series {
@@ -476,9 +649,18 @@ const winRateColorClass = computed(() => {
   transform: scale(1.15);
 }
 
-.series-dot.win { background-color: var(--color-win); box-shadow: 0 0 6px rgba(52,199,89,0.3); }
-.series-dot.loss { background-color: var(--color-lose); box-shadow: 0 0 6px rgba(255,59,48,0.3); }
-.series-dot.pending { background-color: var(--color-bg-tertiary); border: 1.5px solid var(--color-border); }
+.series-dot.win {
+  background-color: var(--color-win);
+  box-shadow: 0 0 6px rgba(52, 199, 89, 0.3);
+}
+.series-dot.loss {
+  background-color: var(--color-lose);
+  box-shadow: 0 0 6px rgba(255, 59, 48, 0.3);
+}
+.series-dot.pending {
+  background-color: var(--color-bg-tertiary);
+  border: 1.5px solid var(--color-border);
+}
 
 /* ── Empty State ── */
 .rank-empty {

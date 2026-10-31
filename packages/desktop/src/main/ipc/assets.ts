@@ -22,21 +22,18 @@ export function registerAssetIpcHandlers(): void {
     return assetCacheManager.getMajorVersion();
   });
 
-  // 获取缓存的资源文件路径（本地 file:// URL 或远程 URL）
+  // 获取缓存图片（data URL；下载失败返回远程 URL）
   ipcMain.handle(
     'assets:getCachedAsset',
     async (_event, remoteUrl: string, assetType: string, assetId: string | number) => {
       return assetCacheManager.getAssetFileUrl(remoteUrl, assetType, assetId);
-    }
+    },
   );
 
   // 获取缓存的元数据 JSON
-  ipcMain.handle(
-    'assets:getMetadata',
-    async (_event, url: string, metaKey: string) => {
-      return assetCacheManager.getCachedMetadata(url, metaKey);
-    }
-  );
+  ipcMain.handle('assets:getMetadata', async (_event, url: string, metaKey: string) => {
+    return assetCacheManager.getCachedMetadata(url, metaKey);
+  });
 
   // 获取资源缓存统计
   ipcMain.handle('assets:getCacheStats', async () => {

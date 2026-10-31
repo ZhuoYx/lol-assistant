@@ -31,66 +31,7 @@
 
       <!-- Champion search -->
       <div v-else class="rune-main">
-        <!-- Search bar -->
-        <div class="search-section">
-          <div class="search-bar">
-            <svg
-              class="search-icon"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <input
-              v-model="searchQuery"
-              type="text"
-              class="search-input"
-              placeholder="输入英雄名称搜索..."
-              @focus="showDropdown = true"
-            />
-            <button v-if="searchQuery" class="search-clear" @click="clearSearch">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-
-          <!-- Dropdown results -->
-          <div v-if="showDropdown && filteredChampions.length > 0" class="search-dropdown">
-            <button
-              v-for="champ in filteredChampions.slice(0, 8)"
-              :key="champ.id"
-              class="dropdown-item"
-              @click="selectChampion(champ.id)"
-            >
-              <ChampionIcon :champion-id="champ.id" :name="champ.cnName" size="sm" />
-              <div class="champ-info">
-                <span class="champ-label">{{ champ.cnName || champ.name }}</span>
-                <span v-if="champ.title" class="champ-title">{{ champ.title }}</span>
-              </div>
-            </button>
-          </div>
-
-          <!-- Click overlay to close dropdown -->
-          <div v-if="showDropdown" class="dropdown-overlay" @click="showDropdown = false" />
-        </div>
+        <ChampionPicker :model-value="currentChampionId" @update:model-value="onChampionChange" />
 
         <!-- Loading -->
         <div v-if="loading" class="loading-section glass-surface">
@@ -342,7 +283,8 @@
 <script setup lang="ts">
 import DataSourceSelect from '@/components/common/DataSourceSelect.vue';
 import PageHeader from '@/components/common/PageHeader.vue';
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import ChampionPicker from '@/components/common/ChampionPicker.vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useAppStore } from '@/stores';
 import { EmptyState, ChampionIcon, LoadingSpinner } from '@/components/common';
@@ -351,12 +293,7 @@ import ItemBuildDisplay from '@/components/rune/ItemBuildDisplay.vue';
 import SkillOrderCard from '@/components/rune/SkillOrderCard.vue';
 import { useRuneBuilder } from '@/composables/useRuneBuilder';
 import { useFavoriteChampions } from '@/composables/useFavoriteChampions';
-import {
-  CHAMPION_ID_MAP,
-  CHAMPION_CN_NAME_MAP,
-  CHAMPION_TITLE_MAP,
-  getChampionDisplayName,
-} from '@lol-assistant/shared';
+import { getChampionDisplayName } from '@lol-assistant/shared';
 
 const route = useRoute();
 const appStore = useAppStore();
@@ -392,31 +329,6 @@ const {
   selectItem,
 } = useRuneBuilder();
 
-// Search
-const searchQuery = ref('');
-const showDropdown = ref(false);
-
-// Champion list
-const allChampions = computed(() => {
-  return Object.entries(CHAMPION_ID_MAP)
-    .map(([id, name]) => ({
-      id: Number(id),
-      name,
-      cnName: CHAMPION_CN_NAME_MAP[Number(id)] ?? '',
-      title: CHAMPION_TITLE_MAP[Number(id)] ?? '',
-      displayName: getChampionDisplayName(Number(id)),
-    }))
-    .sort((a, b) => a.cnName.localeCompare(b.cnName, 'zh-CN'));
-});
-
-const filteredChampions = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase();
-  if (!q) return allChampions.value;
-  return allChampions.value.filter(
-    (c) => c.name.toLowerCase().includes(q) || c.cnName.includes(q) || c.title.includes(q),
-  );
-});
-
 const loadingChampName = computed(() => {
   if (currentChampionId.value) {
     return getChampionDisplayName(currentChampionId.value);
@@ -425,16 +337,16 @@ const loadingChampName = computed(() => {
 });
 
 function selectChampion(championId: number) {
-  showDropdown.value = false;
-  searchQuery.value = getChampionDisplayName(championId);
   fetchBuilds(championId);
 }
 
-function clearSearch() {
-  searchQuery.value = '';
-  showDropdown.value = false;
-  buildConfig.value = null;
-  currentChampionId.value = null;
+function onChampionChange(championId: number | null) {
+  if (championId !== null) {
+    selectChampion(championId);
+  } else {
+    buildConfig.value = null;
+    currentChampionId.value = null;
+  }
 }
 
 function roleLabel(role: string): string {
@@ -481,7 +393,6 @@ function handleChampSelectEvent(event: unknown) {
 
   const me = data.myTeam.find((m) => m.cellId === data.localPlayerCellId);
   if (me && me.championId > 0 && me.championId !== currentChampionId.value) {
-    searchQuery.value = getChampionDisplayName(me.championId);
     fetchBuilds(me.championId);
   }
 }
@@ -564,129 +475,6 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-}
-
-/* Search section */
-.search-section {
-  position: relative;
-  z-index: var(--z-dropdown);
-}
-
-.search-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-4);
-  height: 44px;
-  background-color: var(--color-bg-card);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--color-border-light);
-  transition: all var(--transition-normal);
-}
-
-.search-bar:focus-within {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.12);
-}
-
-.search-icon {
-  color: var(--color-text-placeholder);
-  flex-shrink: 0;
-}
-
-.search-input {
-  flex: 1;
-  border: none;
-  outline: none;
-  background-color: transparent;
-  font-size: var(--text-sm);
-  color: var(--color-text-primary);
-  font-family: var(--font-family);
-}
-
-.search-input::placeholder {
-  color: var(--color-text-placeholder);
-}
-
-.search-clear {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-full);
-  border: none;
-  background-color: var(--color-bg-tertiary);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.search-clear:hover {
-  background-color: var(--color-bg-active);
-  color: var(--color-text-primary);
-}
-
-.search-dropdown {
-  position: absolute;
-  top: calc(100% + var(--space-1));
-  left: 0;
-  right: 0;
-  background-color: var(--color-bg-card);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-lg);
-  overflow: hidden;
-  max-height: 320px;
-  overflow-y: auto;
-}
-
-.dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  padding: var(--space-2) var(--space-4);
-  border: none;
-  background-color: transparent;
-  cursor: pointer;
-  transition: background var(--transition-fast);
-  text-align: left;
-}
-
-.dropdown-item:hover {
-  background-color: var(--color-bg-hover);
-}
-
-.champ-info {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.champ-label {
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  color: var(--color-text-primary);
-}
-
-.champ-title {
-  font-size: 11px;
-  color: var(--color-text-tertiary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dropdown-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
 }
 
 /* Start screen */
@@ -1102,13 +890,6 @@ onUnmounted(() => {
 }
 .header-actions {
   flex-shrink: 0;
-}
-.search-input {
-  min-width: 0;
-}
-.search-dropdown {
-  background-color: var(--color-bg-primary);
-  box-shadow: var(--shadow-lg);
 }
 @container workspace (max-width: 900px) {
   .build-columns {

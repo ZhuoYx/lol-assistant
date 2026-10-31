@@ -226,9 +226,8 @@ function handleGamePhaseChange(phase: GamePhase): void {
     }
   }
 
-  // 对局结束：通知 + 通知渲染进程刷新战绩
+  // 对局结束事件不弹通知；战绩由页面按需请求
   if (phase === 'EndOfGame' || phase === 'WaitingForStats') {
-    showSystemNotification('英雄联盟助手', '对局已结束，战绩已自动刷新');
     mainWindow?.webContents.send('game:match-ended');
   }
 }
@@ -263,23 +262,26 @@ function initLCUConnection(): void {
     logger.info('LCU 客户端已连接，初始化 WebSocket...');
     const credentials = lcuClient.getCredentials();
     if (credentials) {
-      lcuWebSocket.connect(credentials).then(async () => {
-        // WebSocket 连接成功后注册 Gameflow 监听
-        initGameflowMonitor();
+      lcuWebSocket
+        .connect(credentials)
+        .then(async () => {
+          // WebSocket 连接成功后注册 Gameflow 监听
+          initGameflowMonitor();
 
-        // 主动查询当前 gameflow 状态，解决应用在 BP 中打开时的问题
-        try {
-          const session = await lcuAPI.getGameflowSession() as { phase?: string } | null;
-          if (session?.phase) {
-            logger.info(`WebSocket 连接后获取到当前游戏阶段: ${session.phase}`);
-            handleGamePhaseChange(session.phase as GamePhase);
+          // 主动查询当前 gameflow 状态，解决应用在 BP 中打开时的问题
+          try {
+            const session = (await lcuAPI.getGameflowSession()) as { phase?: string } | null;
+            if (session?.phase) {
+              logger.info(`WebSocket 连接后获取到当前游戏阶段: ${session.phase}`);
+              handleGamePhaseChange(session.phase as GamePhase);
+            }
+          } catch {
+            // 静默失败，可能不在对局中
           }
-        } catch {
-          // 静默失败，可能不在对局中
-        }
-      }).catch((err) => {
-        logger.error('WebSocket 连接失败:', err);
-      });
+        })
+        .catch((err) => {
+          logger.error('WebSocket 连接失败:', err);
+        });
     }
   });
 
@@ -352,7 +354,9 @@ async function initApp(): Promise<void> {
     // net session 成功 = 管理员权限
     logger.info('已以管理员身份运行');
   } catch {
-    logger.warn('未以管理员身份运行，国服可能无法获取 LCU 凭证（lockfile 为空时需要管理员权限读取进程命令行参数）');
+    logger.warn(
+      '未以管理员身份运行，国服可能无法获取 LCU 凭证（lockfile 为空时需要管理员权限读取进程命令行参数）',
+    );
   }
 
   // 清理过期日志

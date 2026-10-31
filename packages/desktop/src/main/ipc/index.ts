@@ -21,6 +21,7 @@ import { registerPerksIpcHandlers } from './perks';
 import { registerProxyIpcHandlers } from './proxy';
 import { registerChampionIpcHandlers } from './champion';
 import { registerClientSettingsIpcHandlers } from './client-settings';
+import { registerAramMayhemIpcHandlers } from './aram-mayhem';
 
 /**
  * 注册所有 IPC 处理器
@@ -49,6 +50,7 @@ export function registerAllIpcHandlers(): void {
 
   // 第三方数据爬取
   registerScraperIpcHandlers();
+  registerAramMayhemIpcHandlers();
 
   // 窗口管理
   registerWindowIpcHandlers();

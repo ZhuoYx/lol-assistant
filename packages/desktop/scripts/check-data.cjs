@@ -44,87 +44,46 @@ test('101 source decodes captured ranked, rune, item and counter responses', asy
   assert.throws(() => unpack101({ code: 500 }), /数据请求失败/);
 });
 
-test('pagination uses the unfiltered cursor and stops a repeated LCU page', async () => {
-  setActivePinia(createPinia());
-  const calls = [];
-  const pageIds = Array.from({ length: 20 }, (_, i) => i + 1);
-  global.window = { electronAPI: { getMatchList: async params => {
-    calls.push(params);
-    return { matches: [{ gameId: 1 }], totalGames: 20, pageGameIds: pageIds, nextIndex: params.begIndex + 20, hasMore: true };
-  } } };
-  const { useMatchStore } = load('src/renderer/src/stores/match.ts', { './summoner': { useSummonerStore: () => ({ activePUUID: 'test-player' }) } });
-  const store = useMatchStore();
-  store.setFilters({ queue: 420 });
-  await store.fetchMatchList(true);
-  assert.equal(store.hasMore, true);
-  await store.fetchMatchList(false);
-  assert.equal(calls[1].begIndex, 20);
-  assert.equal(store.matchList.length, 1);
-  assert.equal(store.hasMore, false);
-  assert.match(store.paginationNotice, /重复/);
+test('pagination requests exactly one server page and replaces previous rows', async () => {
+  setActivePinia(createPinia()); const calls=[];
+  const history=Array.from({length:65},(_,i)=>({gameId:i+1}));
+  global.window={electronAPI:{getMatchList:async p=>{calls.push(p);const matches=history.slice(p.begIndex,p.endIndex+1);return {matches,totalGames:0,hasMore:matches.length===10,pageGameIds:matches.map(m=>m.gameId),source:'sgp'};}}};
+  const {useMatchStore}=load('src/renderer/src/stores/match.ts',{'./summoner':{useSummonerStore:()=>({activePUUID:'player'})}});
+  const store=useMatchStore();
+  for(let page=1;page<=7;page++) {assert.equal(await store.fetchMatchList(page),true);assert.equal(store.currentPage,page);assert.equal(store.matchList[0].gameId,(page-1)*10+1);assert.equal(store.matchList.length,page===7?5:10);}
+  assert.equal(store.hasMore,false);
+  await store.fetchMatchList(2); assert.equal(store.matchList[0].gameId,11);
+  assert.deepEqual(calls.map(p=>p.begIndex),[0,10,20,30,40,50,60,10]);
+  assert.ok(calls.every(p=>p.endIndex-p.begIndex===9));
 });
 
-test('history continues through 20, 40, 60 and 65 games using raw page offsets', async () => {
-  setActivePinia(createPinia());
-  const calls = [];
-  const history = Array.from({ length: 65 }, (_, i) => ({ gameId: i + 1 }));
-  global.window = { electronAPI: { getMatchList: async params => {
-    calls.push(params);
-    const page = history.slice(params.begIndex, params.endIndex + 1);
-    return { matches: page, totalGames: page.length, pageGameIds: page.map(m => m.gameId), nextIndex: params.begIndex + page.length, hasMore: page.length === 20 };
-  } } };
-  const { useMatchStore } = load('src/renderer/src/stores/match.ts', { './summoner': { useSummonerStore: () => ({ activePUUID: 'test-player' }) } });
-  const store = useMatchStore();
-  for (const [index, count] of [20, 40, 60, 65].entries()) {
-    assert.equal(await store.fetchMatchList(index === 0), true);
-    assert.equal(store.matchList.length, count);
-  }
-  assert.deepEqual(calls.map(p => [p.begIndex, p.endIndex]), [[0, 19], [20, 39], [40, 59], [60, 79]]);
-  assert.equal(store.hasMore, false);
-  assert.equal(new Set(store.matchList.map(m => m.gameId)).size, 65);
+test('failed and repeated pages preserve the current page and retry its target', async () => {
+  setActivePinia(createPinia()); const calls=[];let attempt=0;
+  global.window={electronAPI:{getMatchList:async p=>{calls.push(p.begIndex);attempt++;if(attempt===2)throw Error('temporary');const start=attempt===3?0:p.begIndex;const matches=Array.from({length:10},(_,i)=>({gameId:start+i+1}));return {matches,totalGames:0,hasMore:true};}}};
+  const {useMatchStore}=load('src/renderer/src/stores/match.ts',{'./summoner':{useSummonerStore:()=>({activePUUID:'player'})}});
+  const store=useMatchStore(); await store.fetchMatchList(1);
+  assert.equal(await store.fetchMatchList(2),false);assert.equal(store.currentPage,1);assert.equal(store.matchList.length,10);
+  assert.equal(await store.fetchMatchList(2),false);assert.match(store.error,/重复/);
+  assert.equal(await store.fetchMatchList(2),true);assert.equal(store.matchList[0].gameId,11);
+  assert.deepEqual(calls,[0,10,10,10]);
 });
 
-test('a failed older-history request preserves records and retries the same cursor', async () => {
-  setActivePinia(createPinia());
-  const calls = [];
-  let attempts = 0;
-  global.window = { electronAPI: { getMatchList: async params => {
-    calls.push(params.begIndex);
-    if (++attempts === 2) throw new Error('temporary history failure');
-    const page = Array.from({ length: 20 }, (_, i) => ({ gameId: params.begIndex + i + 1 }));
-    return { matches: params.begIndex ? [...page, page[0]] : page, totalGames: 20, pageGameIds: page.map(m => m.gameId), nextIndex: params.begIndex + 20, hasMore: true };
-  } } };
-  const { useMatchStore } = load('src/renderer/src/stores/match.ts', { './summoner': { useSummonerStore: () => ({ activePUUID: 'test-player' }) } });
-  const store = useMatchStore();
-  await store.fetchMatchList(true);
-  const originalCount = store.matchList.length;
-  assert.equal(await store.fetchMatchList(false), false);
-  assert.equal(store.matchList.length, originalCount);
-  assert.equal(store.hasMore, true);
-  assert.match(store.error, /temporary history failure/);
-  assert.equal(await store.fetchMatchList(false), true);
-  assert.deepEqual(calls, [0, 20, 20]);
-  assert.equal(store.error, null);
-  assert.equal(store.matchList.length, 40);
-  assert.equal(store.matchList.filter(m => m.gameId === 21).length, 1);
+test('queue requests reset to server offset zero and discard an older in-flight response', async () => {
+  setActivePinia(createPinia());const calls=[];let finish;
+  global.window={electronAPI:{getMatchList:p=>{calls.push(p);if(!p.queue)return new Promise(r=>{finish=r;});return Promise.resolve({matches:[{gameId:440}],totalGames:0,hasMore:false});}}};
+  const {useMatchStore}=load('src/renderer/src/stores/match.ts',{'./summoner':{useSummonerStore:()=>({activePUUID:'player'})}});
+  const store=useMatchStore();const old=store.fetchMatchList(1);store.setFilters({queue:440});await store.fetchMatchList(1);
+  finish({matches:[{gameId:1}],totalGames:0});await old;
+  assert.equal(store.matchList[0].gameId,440);assert.equal(calls[1].queue,440);assert.equal(calls[1].begIndex,0);assert.equal(store.currentPage,1);
 });
 
-test('an empty filtered page still allows loading older matching records', async () => {
-  setActivePinia(createPinia());
-  const calls = [];
-  global.window = { electronAPI: { getMatchList: async params => {
-    calls.push(params.begIndex);
-    return { matches: params.begIndex === 0 ? [] : [{ gameId: 21 }], totalGames: 20, pageGameIds: Array.from({ length: 20 }, (_, i) => params.begIndex + i + 1), nextIndex: params.begIndex + 20, hasMore: true };
-  } } };
-  const { useMatchStore } = load('src/renderer/src/stores/match.ts', { './summoner': { useSummonerStore: () => ({ activePUUID: 'test-player' }) } });
-  const store = useMatchStore();
-  store.setFilters({ queue: 420 });
-  await store.fetchMatchList(true);
-  assert.equal(store.matchList.length, 0);
-  assert.equal(store.hasMore, true);
-  await store.fetchMatchList(false);
-  assert.deepEqual(calls, [0, 20]);
-  assert.equal(store.matchList[0].gameId, 21);
+test('home requests eight latest games independently of history filters and page', async () => {
+  setActivePinia(createPinia());const calls=[];
+  global.window={electronAPI:{getMatchList:async p=>{calls.push(p);return {matches:[{gameId:p.queue?420:1}],totalGames:0};}}};
+  const {useMatchStore}=load('src/renderer/src/stores/match.ts',{'./summoner':{useSummonerStore:()=>({activePUUID:'player'})}});
+  const store=useMatchStore();store.setFilters({queue:420});await store.fetchMatchList(4);await store.fetchRecentMatches();await store.fetchRecentMatches();
+  assert.deepEqual(calls.slice(1).map(p=>[p.begIndex,p.endIndex,p.queue]),[[0,7,undefined],[0,7,undefined]]);
+  assert.equal(store.currentPage,4);assert.equal(store.matchList[0].gameId,420);assert.equal(store.recentMatches[0].gameId,1);
 });
 
 test('changing player invalidates an in-flight match result', async () => {
@@ -133,7 +92,7 @@ test('changing player invalidates an in-flight match result', async () => {
   global.window = { electronAPI: { getMatchList: () => new Promise(resolve => { resolveRequest = resolve; }) } };
   const { useMatchStore } = load('src/renderer/src/stores/match.ts', { './summoner': { useSummonerStore: () => ({ activePUUID: 'old-player' }) } });
   const store = useMatchStore();
-  const pending = store.fetchMatchList(true);
+  const pending = store.fetchMatchList(1);
   store.clear();
   resolveRequest({ matches: [{ gameId: 99 }], totalGames: 1 });
   await pending;
@@ -164,6 +123,80 @@ test('live analysis keeps reactive state when async data arrives and refresh fai
   await live.analyze(3); // Last attempt skips the scheduled retry in this regression check.
   assert.match(live.error.value, /refresh unavailable/);
   assert.equal(live.analysis.value.gameId, 101);
+});
+
+async function gameNavigationFixture({queueId=2400,phase='ChampSelect',session,api:overrides={}}={}) {
+  const vue=scopedRequire('vue');const {createRouter,createMemoryHistory}=scopedRequire('vue-router');
+  const router=createRouter({history:createMemoryHistory(),routes:[['/','Home'],['/draft-assistant','DraftAssistant'],['/live-game','LiveGame'],['/mayhem-augments','MayhemAugments']].map(([path,name])=>({path,name,component:{}}))});
+  await router.push('/');
+  const mounted=[],unmounted=[],listeners={};
+  const store={gamePhase:'None',setGamePhase(value){this.gamePhase=value;}};
+  const state={phase,queueId};
+  const api={getGameflowState:async()=>({...state}),getChampSelectSession:async()=>session,...overrides};
+  for(const key of ['onGamePhaseChange','onLCUEvent','onConnectionChange'])api[key]=callback=>{listeners[key]=callback;return()=>delete listeners[key];};
+  global.window={electronAPI:api};
+  const {useGameNotification}=load('src/renderer/src/composables/useGameNotification.ts',{
+    vue:{...vue,onMounted:fn=>mounted.push(fn),onUnmounted:fn=>unmounted.push(fn)},
+    'vue-router':{useRouter:()=>router},'@/stores/app':{useAppStore:()=>store},
+  });
+  useGameNotification();mounted.forEach(fn=>fn());
+  const flush=async()=>{await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setImmediate(resolve));};
+  return {router,store,state,listeners,flush,
+    select(data,eventType='Update'){listeners.onLCUEvent({uri:'/lol-champ-select/v1/session',eventType,data});},
+    gameflow(id,gamePhase='ChampSelect'){state.queueId=id;state.phase=gamePhase;listeners.onLCUEvent({uri:'/lol-gameflow/v1/session',eventType:'Update',data:{phase:gamePhase,gameData:{queue:{id}}}});},
+    dispose(){unmounted.forEach(fn=>fn());},
+  };
+}
+const selectedSession=championId=>({localPlayerCellId:3,myTeam:[{cellId:0,championId:222},{cellId:3,championId}]});
+
+test('Mayhem selection opens the local champion and follows rerolls without stealing navigation on repeated events', async () => {
+  const f=await gameNavigationFixture({session:selectedSession(157)});await f.flush();
+  assert.equal(f.router.currentRoute.value.name,'MayhemAugments');assert.equal(f.router.currentRoute.value.query.championId,'157');
+  f.select(selectedSession(99));await f.flush();
+  assert.equal(f.router.currentRoute.value.query.championId,'99');
+  await f.router.push('/');
+  f.select({...selectedSession(99),timer:{adjustedTimeLeftInPhase:20000}});await f.flush();
+  assert.equal(f.router.currentRoute.value.name,'Home');
+  f.select({localPlayerCellId:3,myTeam:[{cellId:0,championId:777},{cellId:3,championId:99}]});await f.flush();
+  assert.equal(f.router.currentRoute.value.name,'Home');
+  f.select(selectedSession(17));await f.flush();assert.equal(f.router.currentRoute.value.query.championId,'17');
+  f.dispose();assert.deepEqual(Object.keys(f.listeners),[]);
+});
+
+test('only queue 2400 navigates to Mayhem and waits for the local champion and mode in either order', async () => {
+  for(const queueId of [420,440,450,2401]){
+    const f=await gameNavigationFixture({queueId,session:selectedSession(99)});await f.flush();
+    assert.equal(f.router.currentRoute.value.name,'DraftAssistant');f.dispose();
+  }
+  const f=await gameNavigationFixture({queueId:0,session:selectedSession(0)});await f.flush();
+  f.select(selectedSession(99));await f.flush();assert.equal(f.router.currentRoute.value.name,'DraftAssistant');
+  f.gameflow(2400);await f.flush();assert.equal(f.router.currentRoute.value.query.championId,'99');
+  f.gameflow(2400,'Lobby');await f.flush();await f.router.push('/');
+  f.gameflow(2400);await f.flush();assert.equal(f.router.currentRoute.value.name,'DraftAssistant');
+  f.select(selectedSession(117));await f.flush();assert.equal(f.router.currentRoute.value.query.championId,'117');f.dispose();
+});
+
+test('newer selection events beat initial snapshots and late replies cannot navigate after leaving champion select', async () => {
+  let finish;
+  const f=await gameNavigationFixture({session:selectedSession(157),api:{getChampSelectSession:()=>new Promise(resolve=>{finish=resolve;})}});
+  f.gameflow(2400);f.select(selectedSession(99));finish(selectedSession(157));await f.flush();
+  assert.equal(f.router.currentRoute.value.query.championId,'99');
+  f.gameflow(2400,'Lobby');await f.router.push('/');
+  f.select(selectedSession(17));await f.flush();assert.equal(f.router.currentRoute.value.name,'Home');
+  f.dispose();
+  let resolveState;
+  const late=await gameNavigationFixture({session:selectedSession(99),api:{getGameflowState:()=>new Promise(resolve=>{resolveState=resolve;})}});
+  late.listeners.onGamePhaseChange('Lobby');resolveState({phase:'ChampSelect',queueId:2400});await late.flush();
+  assert.equal(late.router.currentRoute.value.name,'Home');late.dispose();
+});
+
+test('selection delete and disconnection clear Mayhem state while game start retains live analysis navigation', async () => {
+  const f=await gameNavigationFixture({session:selectedSession(99)});await f.flush();
+  f.select(null,'Delete');await f.router.push('/');
+  f.select(selectedSession(99));await f.flush();assert.equal(f.router.currentRoute.value.name,'MayhemAugments');
+  f.listeners.onGamePhaseChange('GameStart');await f.flush();assert.equal(f.router.currentRoute.value.name,'LiveGame');
+  f.listeners.onConnectionChange('disconnected');f.select(selectedSession(17));await f.flush();
+  assert.equal(f.store.gamePhase,'None');assert.equal(f.router.currentRoute.value.name,'LiveGame');f.dispose();
 });
 
 test('system theme responds to OS changes and releases the listener', async () => {
@@ -213,4 +246,442 @@ test('source caches stay isolated and a provider error is propagated', async () 
   assert.equal(savedSource, 'qq101');
   await assert.rejects(manager.getChampionBuilds(999, 'mid'), /source unavailable/);
   assert.throws(() => manager.setSource('local'), /不支持/);
+});
+
+const quietLog = { debug() {}, info() {}, warn() {}, error() {} };
+function matchModule(api, sgp, cache = new Map()) {
+  return {
+    cache,
+    ...load('src/main/ipc/match.ts', {
+      electron: { ipcMain: { handle() {} } },
+      '../lcu/api': { lcuAPI: api },
+      '../lcu/sgp': { getSgpMatchPage: sgp },
+      '../cache/store': { cacheStore: { get: (category, key) => cache.get(`${category}/${key}`), set: (category, key, value) => cache.set(`${category}/${key}`, value) } },
+      '../utils/logger': { logger: quietLog },
+    }),
+  };
+}
+function rawGame(id, target = 'player') {
+  return {
+    gameId: id, queueId: 420, gameDuration: 1800, gameCreation: 1000,
+    participants: [{ participantId: 1, puuid: target, teamId: 100, championId: 99,
+      stats: { win: true, kills: 9, deaths: 2, assists: 11, totalDamageDealtToChampions: 30000, totalDamageDealt: 200000, totalDamageTaken: 15000, goldEarned: 12000, item0: 1056 } }],
+  };
+}
+
+test('repeated real LCU pages fall back to SGP and select the requested player', async () => {
+  const first = Array.from({ length: 20 }, (_, i) => rawGame(i + 1));
+  let sgpCalls = 0;
+  const { fetchMatchList, cache } = matchModule({
+    getMatchListByPUUID: async () => ({ platformId: 'HN1', games: { games: first } }),
+    getCurrentSummoner: async () => ({ puuid: 'player' }),
+    getMatchList: async () => ({ games: { games: first } }),
+  }, async (puuid, start, count, platform) => {
+    assert.deepEqual([puuid, start, count, platform], ['player', 20, 20, 'HN1']);
+    sgpCalls++;
+    return Array.from({ length: 20 }, (_, i) => {
+      const game = rawGame(21 + i);
+      game.participants.unshift({ ...game.participants[0], participantId: 2, puuid: 'other', stats: { ...game.participants[0].stats, kills: 1 } });
+      return game;
+    });
+  });
+  const page = await fetchMatchList({ puuid: 'player', begIndex: 20, endIndex: 39, historySource: 'lcu', knownGameIds: first.map(g => g.gameId) });
+  assert.equal(sgpCalls, 1);
+  assert.equal(page.source, 'sgp');
+  assert.equal(page.nextIndex, 40);
+  assert.equal(page.matches[0].gameId, 21);
+  assert.equal(page.matches[0].kills, 9);
+  assert.equal(cache.get('matchDetail/v5_21').participants.length, 2);
+  assert.equal(cache.get('matchDetail/v5_21').participants[0].totalDamageDealt, 30000);
+});
+
+test('short LCU batches advance by the raw count until the next page is empty', async () => {
+  const { fetchMatchList } = matchModule({
+    getMatchListByPUUID: async (_puuid, p) => ({ games: { games: p.begIndex === 0 ? Array.from({ length: 10 }, (_, i) => rawGame(i + 1)) : [] } }),
+  }, async () => { throw Error('must not request SGP'); });
+  const page = await fetchMatchList({ puuid: 'player', begIndex: 0, endIndex: 19, historySource: 'lcu' });
+  assert.equal(page.matches.length, 10);
+  assert.equal(page.nextIndex, 10);
+  assert.equal(page.hasMore, true);
+  const end = await fetchMatchList({ puuid: 'player', begIndex: 10, endIndex: 29, historySource: 'lcu' });
+  assert.equal(end.hasMore, false);
+});
+
+test('SGP uses allowlisted origins and never propagates credentials on failure', async () => {
+  let requested;
+  let fail = false;
+  const token = 'private-test-token';
+  const { getSgpMatchPage, resolveSgpOrigin } = load('src/main/lcu/sgp.ts', {
+    './client': { lcuClient: { get: async endpoint => endpoint === '/entitlements/v1/token' ? { accessToken: token } : { region: 'TENCENT' } } },
+    axios: { default: { get: async (url, options) => { requested = { url, options }; if (fail) throw { response: { status: 503 }, config: { secret: token } }; return { data: { games: [{ json: rawGame(1) }] } }; }, isAxiosError: error => !!error?.response } },
+  });
+  const games = await getSgpMatchPage('player', 20, 20, 'HN1');
+  assert.equal(games[0].gameId, 1);
+  assert.equal(requested.url.startsWith('https://hn1-k8s-sgp.lol.qq.com:21019/'), true);
+  assert.deepEqual(requested.options.params, { startIndex: 20, count: 20 });
+  assert.equal(requested.options.headers.Authorization, `Bearer ${token}`);
+  assert.equal(requested.options.maxRedirects, 0);
+  assert.throws(() => resolveSgpOrigin('attacker.example'), /大区/);
+  fail = true;
+  await assert.rejects(getSgpMatchPage('player', 20, 20, 'HN1'), error => !error.message.includes(token) && error.message.includes('503'));
+});
+
+test('LCU identities are matched by participant ID and total damage is not hero damage', () => {
+  const { transformMatchDetail } = matchModule({}, async () => []);
+  const game = rawGame(1);
+  game.participants.push({ participantId: 2, championId: 17, teamId: 200, stats: { totalDamageDealt: 999999, kills: 1, deaths: 2, assists: 3 } });
+  game.participantIdentities = [{ participantId: 2, player: { puuid: 'two', gameName: '第二位' } }, { participantId: 1, player: { puuid: 'one', gameName: '第一位' } }];
+  const detail = transformMatchDetail(game);
+  assert.equal(detail.participants[0].summonerName, '第一位');
+  assert.equal(detail.participants[1].summonerName, '第二位');
+  assert.equal(detail.participants[1].totalDamageDealtToChampions, undefined);
+  assert.equal(detail.participants[1].totalDamageTaken, undefined);
+  const sgp = transformMatchDetail({ ...game, participantIdentities: [], participants: [{
+    participantId: 1, puuid: 'one', championId: 99, summonerName: 'old-name', riotIdGameName: '当前ID', riotIdTagline: 'CN',
+    kills: 9, deaths: 2, assists: 8, totalDamageDealtToChampions: 40000, totalDamageDealt: 300000, item0: 1056,
+    perks: { styles: [{ style: 8200, selections: [{ perk: 8229 }] }, { style: 8100, selections: [{ perk: 8126 }] }] },
+  }] });
+  assert.equal(sgp.participants[0].summonerName, '当前ID');
+  assert.equal(sgp.participants[0].tagLine, 'CN');
+  assert.equal(sgp.participants[0].items[0], 1056);
+  assert.equal(sgp.participants[0].totalDamageDealt, 40000);
+  assert.deepEqual(sgp.participants[0].perks, { perkStyle: 8200, perkSubStyle: 8100, perkIds: [8229, 8126] });
+});
+
+test('performance tags preserve ties and omit missing, zero and non-finite metrics', () => {
+  const { getMatchHighlights } = scopedRequire('@lol-assistant/shared');
+  const players = [
+    { participantId: 1, kills: 3, assists: 5, totalDamageDealtToChampions: 200, totalDamageTaken: 100, visionScore: 0 },
+    { participantId: 2, kills: 3, assists: 2, totalDamageDealtToChampions: 100, totalDamageTaken: 200, visionScore: 0 },
+    { participantId: 3, kills: 1, assists: 1, totalDamageDealtToChampions: 50, totalDamageTaken: 50, visionScore: 0 },
+  ];
+  const tags = getMatchHighlights(players);
+  assert.ok(tags[1].some(t => t.label === '输出最高'));
+  assert.ok(tags[2].some(t => t.label === '承伤最高'));
+  assert.ok(tags[1].some(t => t.label === '并列击杀最多'));
+  assert.equal(tags[1].some(t => t.key === 'goldEarned' || t.key === 'visionScore'), false);
+  players[0].totalDamageDealtToChampions = NaN;
+  assert.equal(getMatchHighlights(players)[2].some(t => t.key === 'totalDamageDealtToChampions'), false);
+});
+
+test('profile icon IPC loads from the local client, validates IDs and falls back offline', async () => {
+  const handlers = new Map();
+  let offline = false;
+  const { registerSummonerIpcHandlers } = load('src/main/ipc/summoner.ts', {
+    electron: { ipcMain: { handle: (name, fn) => handlers.set(name, fn) } },
+    '../lcu/api': { lcuAPI: {} },
+    '../lcu/client': { lcuClient: { request: async (endpoint, options) => { assert.equal(options.responseType, 'buffer'); assert.ok(endpoint.endsWith('/12345.jpg')); if (offline) throw Error('offline'); return Buffer.from([0xff, 0xd8, 0xff]); } } },
+    '../cache/store': { cacheStore: {} }, '../utils/logger': { logger: quietLog },
+  });
+  registerSummonerIpcHandlers();
+  const getIcon = handlers.get('summoner:getIcon');
+  assert.equal((await getIcon(null, 12345)).startsWith('data:image/jpeg;base64,'), true);
+  offline = true;
+  assert.ok((await getIcon(null, 12345)).includes('/latest/'));
+  await assert.rejects(getIcon(null, -1), /无效/);
+});
+
+test('LCU binary responses and split UTF-8 JSON chunks survive transport unchanged', async () => {
+  const { EventEmitter } = require('node:events');
+  let bytes = Buffer.from([0xff, 0xd8, 0x00, 0x80, 0xff]);
+  const accepts = [];
+  const https = { Agent: class {}, request: (options, callback) => {
+    accepts.push(options.headers.Accept);
+    const req = new EventEmitter(); req.write = () => {}; req.destroy = () => {};
+    req.end = () => { const res = new EventEmitter(); res.statusCode = 200; callback(res); res.emit('data', bytes.subarray(0, 10)); res.emit('data', bytes.subarray(10)); res.emit('end'); };
+    return req;
+  } };
+  const { LCUClient } = load('src/main/lcu/client.ts', {
+    https: { default: https }, './lockfile': {}, '../utils/logger': { logger: quietLog }, '../cache/store': { cacheStore: {} },
+  });
+  const client = new LCUClient();
+  client.credentials = { port: 1234, password: 'test' };
+  assert.deepEqual(await client.request('/icon', { responseType: 'buffer' }), bytes);
+  bytes = Buffer.from(JSON.stringify({ name: '星光' }));
+  assert.deepEqual(await client.request('/json'), { name: '星光' });
+  assert.deepEqual(accepts, ['*/*', 'application/json']);
+});
+
+test('Tencent tokens without cpid discover the platform and refresh it after login changes', async () => {
+  const connection = {};
+  let token = 'client-token-one';
+  let platform = 'HN1';
+  let lookups = 0;
+  let requestedUrl;
+  const { getSgpMatchPage } = load('src/main/lcu/sgp.ts', {
+    './client': { lcuClient: {
+      getCredentials: () => connection,
+      get: async endpoint => {
+        if (endpoint === '/entitlements/v1/token') return { accessToken: token };
+        if (endpoint === '/riotclient/region-locale') return { region: 'TENCENT' };
+        assert.equal(endpoint, '/lol-match-history/v1/products/lol/current-summoner/matches?begIndex=0&endIndex=0');
+        lookups++; return { platformId: platform, games: { games: [] } };
+      },
+    } },
+    axios: { default: {
+      get: async (url, options) => { requestedUrl = url; assert.equal(options.params.tag, 'q_420'); return { data: { games: [{ json: rawGame(1) }] } }; },
+      isAxiosError: () => false,
+    } },
+  });
+  await Promise.all([getSgpMatchPage('player',0,10,undefined,420),getSgpMatchPage('player',10,10,undefined,420)]);
+  assert.equal(lookups,1);
+  assert.ok(requestedUrl.startsWith('https://hn1-k8s-sgp.lol.qq.com:21019/'));
+  token = 'client-token-two'; platform = 'HN10';
+  await getSgpMatchPage('player',0,10,undefined,420);
+  assert.equal(lookups,2);
+  assert.ok(requestedUrl.startsWith('https://hn10-k8s-sgp.lol.qq.com:21019/'));
+});
+
+test('six-axis comparison keeps a shared scale and computes raw team averages', () => {
+  const { buildMatchRadar } = scopedRequire('@lol-assistant/shared');
+  const player = (participantId, teamId, damage, kills, assists) => ({ participantId, teamId,
+    totalDamageDealtToChampions: damage, totalDamageTaken: damage * 2, goldEarned: 10000,
+    visionScore: 20, timeCCingOthers: 10, kills, assists });
+  const model = buildMatchRadar([player(1,100,100,2,3),player(2,100,300,8,1),player(3,200,800,3,2),player(4,200,1000,5,1)]);
+  assert.equal(model.limits[0], 1000);
+  assert.equal(model.limits[3], 100);
+  assert.equal(model.teams[0].average[0], 200);
+  assert.equal(model.teams[1].average[0], 900);
+  assert.equal(model.players[1][3], 50);
+  assert.equal(model.players[2][3], 90);
+  assert.equal(model.teams[0].average[3], 70);
+  assert.deepEqual(model.teams[0].coverage, [2,2,2,2,2,2]);
+});
+
+test('radar averages never replace missing statistics with zero', () => {
+  const { buildMatchRadar } = scopedRequire('@lol-assistant/shared');
+  const model = buildMatchRadar([
+    { participantId:1,teamId:100,kills:1,assists:0,visionScore:20,totalDamageDealtToChampions:NaN,timeCCingOthers:-1 },
+    { participantId:2,teamId:100,kills:2,assists:0,visionScore:undefined,totalDamageDealtToChampions:100,timeCCingOthers:4 },
+    { participantId:3,teamId:200,kills:1,assists:0,visionScore:40,totalDamageDealtToChampions:200,timeCCingOthers:5 },
+  ]);
+  assert.equal(model.teams[0].average[0], null);
+  assert.equal(model.teams[0].average[4], null);
+  assert.equal(model.teams[0].average[5], null);
+  assert.equal(model.teams[0].coverage[4], 1);
+  assert.equal(model.teams[1].average[4], 40);
+  assert.equal(model.limits[0], 200);
+});
+
+test('zero-kill teams and empty radar data remain finite', () => {
+  const { buildMatchRadar } = scopedRequire('@lol-assistant/shared');
+  const model = buildMatchRadar([{ participantId:1,teamId:100,kills:0,assists:0,totalDamageDealtToChampions:0,
+    totalDamageTaken:0,goldEarned:0,visionScore:0,timeCCingOthers:0 }]);
+  assert.deepEqual(model.teams[0].average, [0,0,0,0,0,0]);
+  assert.equal(model.limits[3], 100);
+  assert.ok(buildMatchRadar([]).limits.every(Number.isFinite));
+});
+
+test('chart statistics preserve nested and flat values and never confuse all-target and champion damage', () => {
+  const { transformMatchDetail } = matchModule({}, async () => []);
+  const raw = rawGame(1);
+  const values = {physicalDamageDealtToChampions:15000,magicDamageDealtToChampions:14000,trueDamageDealtToChampions:1000,
+    physicalDamageDealt:100000,magicDamageDealt:90000,trueDamageDealt:10000,physicalDamageTaken:8000,magicDamageTaken:6000,trueDamageTaken:1000,
+    damageDealtToObjectives:2500,goldSpent:11000,wardsPlaced:8,wardsKilled:0,visionWardsBoughtInGame:2,totalTimeSpentDead:55};
+  Object.assign(raw.participants[0].stats,values);
+  const nested = transformMatchDetail(raw).participants[0];
+  const flat = transformMatchDetail({...raw,participants:[{...raw.participants[0],...raw.participants[0].stats,stats:undefined}]}).participants[0];
+  for(const [key,value] of Object.entries(values)){assert.equal(nested[key],value);assert.equal(flat[key],value);}
+  assert.equal(nested.totalDamageDealtAllTargets,200000);assert.equal(nested.totalDamageDealtToChampions,30000);
+  const normalized = transformMatchDetail({...raw,participants:[nested]}).participants[0];
+  assert.equal(normalized.totalDamageDealtAllTargets,200000);
+  const old={...nested};delete old.totalDamageDealtAllTargets;
+  assert.equal(transformMatchDetail({...raw,participants:[old]}).participants[0].totalDamageDealtAllTargets,undefined);
+  Object.assign(raw.participants[0].stats,{physicalDamageTaken:-1,magicDamageTaken:NaN,wardsPlaced:'8',wardsKilled:0});
+  const invalid=transformMatchDetail(raw).participants[0];
+  for(const key of ['physicalDamageTaken','magicDamageTaken','wardsPlaced'])assert.equal(invalid[key],undefined);
+  assert.equal(invalid.wardsKilled,0);
+});
+
+test('bar comparisons share a scale, preserve missing versus zero and offer only available metrics', () => {
+  const {MATCH_COMPARISON_METRICS,availableMatchMetrics,buildMatchComparison}=scopedRequire('@lol-assistant/shared');
+  const players=[{participantId:1,teamId:100,totalDamageDealtToChampions:10000,totalHeal:0,totalMinionsKilled:100,neutralMinionsKilled:20},
+    {participantId:2,teamId:200,totalDamageDealtToChampions:20000,totalMinionsKilled:80},
+    {participantId:3,teamId:200,totalDamageDealtToChampions:0}];
+  const metrics=availableMatchMetrics(players,1200),keys=metrics.map(m=>m.key);
+  assert.ok(keys.includes('totalHeal'));assert.ok(!keys.includes('physicalDamageDealtToChampions'));
+  const damage=metrics.find(m=>m.key==='totalDamageDealtToChampions');const model=buildMatchComparison(players,damage,1200);
+  assert.equal(model.teams.length,2);assert.equal(model.limit,20000);
+  assert.equal(model.teams[0].rows[0].percent,50);assert.equal(model.teams[1].rows[0].percent,100);assert.equal(model.teams[1].rows[1].value,0);
+  const heal=buildMatchComparison(players,metrics.find(m=>m.key==='totalHeal'),1200);
+  assert.equal(heal.available,1);assert.equal(heal.teams[0].rows[0].value,0);assert.equal(heal.teams[1].rows[0].value,null);
+  assert.ok(heal.ticks.every(t=>Number.isFinite(t.value)&&Number.isFinite(t.percent)));
+  const cs=metrics.find(m=>m.key==='totalCS');assert.equal(cs.read(players[0],1200),120);assert.equal(cs.read(players[1],1200),null);
+  const dpm=metrics.find(m=>m.key==='damagePerMinute');assert.equal(dpm.read(players[0],1200),500);
+  assert.ok(!availableMatchMetrics(players,0).some(m=>m.key==='damagePerMinute'));
+  for(const value of [-1,NaN,Infinity,'100',undefined])assert.equal(damage.read({totalDamageDealtToChampions:value},1200),null);
+  assert.deepEqual(availableMatchMetrics([],1200),[]);assert.equal(new Set(MATCH_COMPARISON_METRICS.map(m=>m.key)).size,MATCH_COMPARISON_METRICS.length);
+});
+
+test('expanded chart stats bypass old detail caches and reuse the new schema', async () => {
+  const handlers=new Map();let calls=0;
+  const raw=rawGame(7);raw.participants[0].stats.physicalDamageDealtToChampions=1234;
+  const cached=new Map([['v4_7',{gameId:7,participants:[]}]]);
+  const {registerMatchIpcHandlers}=load('src/main/ipc/match.ts',{
+    electron:{ipcMain:{handle:(key,fn)=>handlers.set(key,fn)}},'../lcu/api':{lcuAPI:{getMatchDetail:async()=>{calls++;return raw;}}},
+    '../cache/store':{cacheStore:{get:(_category,key)=>cached.get(key),set:(_category,key,value)=>cached.set(key,value)}},
+    '../utils/logger':{logger:quietLog},'../lcu/sgp':{},
+  });
+  registerMatchIpcHandlers();const get=handlers.get('match:getDetail');
+  assert.equal((await get(null,7)).participants[0].physicalDamageDealtToChampions,1234);
+  assert.equal((await get(null,7)).participants[0].physicalDamageDealtToChampions,1234);assert.equal(calls,1);assert.ok(cached.has('v5_7'));
+});
+
+test('healing, teammate healing and teammate shields keep their own values', () => {
+  const { transformMatchDetail } = matchModule({}, async () => []);
+  const game = rawGame(1);
+  Object.assign(game.participants[0].stats,{totalHeal:5000,totalHealsOnTeammates:1200,totalDamageShieldedOnTeammates:800,timeCCingOthers:12.5});
+  const player = transformMatchDetail(game).participants[0];
+  assert.deepEqual([player.totalHeal,player.totalHealsOnTeammates,player.totalDamageShieldedOnTeammates,player.timeCCingOthers],[5000,1200,800,12.5]);
+  delete game.participants[0].stats.totalHealsOnTeammates;
+  delete game.participants[0].stats.totalDamageShieldedOnTeammates;
+  const missing = transformMatchDetail(game).participants[0];
+  assert.equal(missing.totalHeal,5000);
+  assert.equal(missing.totalHealsOnTeammates,undefined);
+  assert.equal(missing.totalDamageShieldedOnTeammates,undefined);
+});
+
+test('queue pagination goes directly to SGP and never reads or writes a list cache', async () => {
+  let calls = 0;
+  const cache = new Map([['matchList/list_v4_player_10_19_q440_call', { matches: [{ gameId: 999 }] }]]);
+  const { fetchMatchList } = matchModule({ getMatchListByPUUID: () => { throw Error('LCU must not filter'); } }, async (...args) => {
+    assert.deepEqual(args, ['player', 10, 10, undefined, 440]); calls++;
+    return [{ ...rawGame(21), queueId: 440 }];
+  }, cache);
+  for (let i=0;i<2;i++) assert.equal((await fetchMatchList({ puuid:'player',begIndex:10,endIndex:19,queue:440 })).matches[0].queueId,440);
+  assert.equal(calls,2);
+  assert.equal([...cache.keys()].filter(k=>k.startsWith('matchList/')).length,1);
+  const failing = matchModule({ getMatchListByPUUID: () => { throw Error('must not fall back'); } }, async () => {throw Error('unavailable');});
+  await assert.rejects(failing.fetchMatchList({puuid:'player',queue:420}), /按模式分页需要/);
+});
+
+test('SGP sends a queue tag before pagination and rejects ignored filters', async () => {
+  let params;let queue=440;
+  const { getSgpMatchPage } = load('src/main/lcu/sgp.ts', {
+    './client':{lcuClient:{get:async endpoint=>endpoint==='/entitlements/v1/token'?{accessToken:'test'}:{region:'TENCENT'}}},
+    axios:{default:{get:async (_url, options)=>{params=options.params;return {data:{games:[{json:{...rawGame(1),queueId:queue}}]}};},isAxiosError:()=>false}},
+  });
+  await getSgpMatchPage('player',10,10,'HN1',440);
+  assert.deepEqual(params,{startIndex:10,count:10,tag:'q_440'});
+  queue=420;
+  await assert.rejects(getSgpMatchPage('player',10,10,'HN1',440), /请求失败/);
+});
+
+test('live player names resolve Riot ID, use summoner ID fallback and survive failures', async () => {
+  const calls=[];
+  const { resolvePlayerIdentity } = load('src/main/ipc/live-game.ts', {
+    electron:{ipcMain:{}},'p-limit':{default:()=>fn=>fn()},'../utils/logger':{logger:quietLog},
+    '../lcu/api':{lcuAPI:{
+      getSummonerByPUUID:async p=>{calls.push(p);if(p==='valid')return {gameName:'当前昵称',tagLine:'CN1',displayName:'旧昵称'};throw Error('unavailable');},
+      getSummonerById:async id=>{if(id===7)return {gameName:'补查昵称',tagLine:'CN2'};throw Error('unavailable');},
+    }},
+  });
+  assert.deepEqual(await resolvePlayerIdentity({puuid:'valid',summonerId:1,summonerName:'旧名'}),{summonerName:'当前昵称',tagLine:'CN1'});
+  assert.equal((await resolvePlayerIdentity({puuid:'missing',summonerId:7})).summonerName,'补查昵称');
+  assert.deepEqual(await resolvePlayerIdentity({puuid:'',summonerId:0,gameName:'session昵称',gameTag:'CN3'}),{summonerName:'session昵称',tagLine:'CN3'});
+  assert.equal(calls.includes(''),false);
+});
+
+test('icons persist across manager restarts, deduplicate downloads and separate patches', async () => {
+  const fs=require('node:fs/promises');const path=require('node:path');
+  const base=resolve(root,'../../specs');await fs.mkdir(base,{recursive:true});
+  const directory=await fs.mkdtemp(join(base,'test-assets-'));
+  try {
+    const { AssetCacheManager }=load('src/main/assets/index.ts',{
+      electron:{app:{getPath:()=>directory}},path:{default:path},'fs/promises':{default:fs},
+    });
+    const manager=new AssetCacheManager();manager.fetchLatestVersion=async()=>'16.21.1';let downloads=0;
+    manager.downloadFile=async()=>{downloads++;return Buffer.from([0x89,0x50,0x4e,0x47]);};
+    const url='https://raw.communitydragon.org/16.21/icon.png';
+    const images=await Promise.all([manager.getAssetFileUrl(url,'icons',1),manager.getAssetFileUrl(url,'icons',1)]);
+    assert.equal(downloads,1);assert.equal(images[0],images[1]);assert.ok(images[0].startsWith('data:image/png;base64,'));
+    const restarted=new AssetCacheManager();restarted.fetchLatestVersion=async()=>'16.21.1';restarted.downloadFile=async()=>{throw Error('offline');};
+    assert.equal(await restarted.getAssetFileUrl(url,'icons',1),images[0]);
+    await manager.getAssetFileUrl(url.replace('16.21','16.22'),'icons',1);assert.equal(downloads,2);
+    assert.equal((await manager.getCacheStats()).entryCount,2);
+  } finally {
+    assert.ok(directory.startsWith(base+path.sep+'test-assets-'));await fs.rm(directory,{recursive:true,force:true});
+  }
+});
+
+test('renderer icon requests share a download and pin current-patch URLs', async () => {
+  let downloads=0;let received;
+  global.window={electronAPI:{getGameVersion:async()=>'16.21.1',getCachedAsset:async url=>{downloads++;received=url;return 'data:image/png;base64,test';}}};
+  const { cachedImageSource }=load('src/renderer/src/directives/cached-src.ts');
+  const url='https://raw.communitydragon.org/latest/icon.png';
+  await Promise.all([cachedImageSource(url),cachedImageSource(url)]);
+  assert.equal(downloads,1);assert.equal(received,'https://raw.communitydragon.org/16.21/icon.png');
+  await cachedImageSource('https://ddragon.leagueoflegends.com/cdn/16.5.1/img/item/3020.png');
+  assert.ok(received.includes('/16.21.1/'));assert.equal(await cachedImageSource('data:image/png;base64,local'),'data:image/png;base64,local');
+});
+
+const mayhemPage = `<!doctype html><html><head>
+  <link rel="canonical" href="https://arammayhem.com/zh-cn/build/yasuo/">
+  <meta property="og:title" content="疾风剑豪 海克斯大乱斗出装与强化符文推荐（26.21）">
+</head><body>
+  <section id="best-augments"><h2>疾风剑豪 最佳强化符文</h2><span>数据日期: 2026-10-30</span>
+    <p data-recommendation-coverage="partial" data-recommendation-top="mapped">部分推荐缺失。</p>
+    <div><h3>棱彩强化符文</h3>
+      <a href="/zh-cn/augments/mystic-punch/"><img src="/augments/Mystic_Punch_mayhem_augment.webp" alt="秘术冲拳"><span data-recommendation-rank="rarity">S- · #7</span><span data-recommendation-rank="overall">总榜 S- · #17</span><span>登场率: <span>16.05%</span></span></a>
+      <a href="https://untrusted.example/augments/wrong/"><img alt="错误外链"></a>
+    </div>
+    <div><h3>黄金强化符文</h3><a href="/zh-cn/augments/soul-siphon/"><img alt="灵魂虹吸"><span>登场率: 0.00%</span></a></div>
+    <div><h3>白银强化符文</h3><a href="/zh-cn/augments/deft/"><img alt="灵巧" src="https://untrusted.example/icon.png"></a></div>
+  </section>
+  <section id="global-augments"><h3>全局强化</h3><a href="/zh-cn/augments/mystic-punch/">秘术冲拳 登场率: 31.52%</a></section>
+</body></html>`;
+
+function mayhemModule(directory) {
+  return load('src/main/scraper/aram-mayhem.ts', {
+    electron:{app:{getPath:()=>directory}},path:{default:require('node:path')},
+    'fs/promises':{default:require('node:fs/promises')},
+  });
+}
+
+test('Mayhem parsing isolates hero recommendations and preserves missing and zero statistics', () => {
+  const { parseMayhemChampion } = mayhemModule('unused');
+  const data = parseMayhemChampion(mayhemPage,157,'https://arammayhem.com/zh-cn/build/yasuo/');
+  assert.equal(data.source,'ARAMMayhem');assert.equal(data.patch,'26.21');assert.equal(data.statsDate,'2026-10-30');assert.equal(data.partial,true);
+  assert.equal(data.augments.length,3);
+  assert.deepEqual(data.augments.map(a=>a.rarity),['prismatic','gold','silver']);
+  assert.equal(data.augments[0].pickRate,16.05); // Global 31.52% must never replace the hero rate.
+  assert.equal(data.augments[0].sourceTier,'S-');assert.equal(data.augments[0].sourceRank,7);assert.equal(data.augments[0].overallRank,17);
+  assert.equal(data.augments[1].pickRate,0);assert.equal(data.augments[2].pickRate,undefined);
+  assert.equal(data.augments[2].iconUrl,undefined);assert.equal('winRate' in data.augments[0],false);
+  const quotedIcon = parseMayhemChampion(mayhemPage.replace('Mystic_Punch_mayhem_augment.webp', "Upgrade_Death's_Dance_mayhem_augment.webp"),157,'https://arammayhem.com/zh-cn/build/yasuo/');
+  assert.ok(quotedIcon.augments[0].iconUrl.includes("Death's_Dance"));
+});
+
+test('Mayhem rejects mismatched and changed pages instead of showing unrelated data', () => {
+  const { parseMayhemChampion, mayhemSourceUrl } = mayhemModule('unused');
+  assert.throws(()=>parseMayhemChampion(mayhemPage,99,'https://arammayhem.com/zh-cn/build/lux/'),/未返回/);
+  assert.throws(()=>parseMayhemChampion('<html>temporary challenge</html>',157,'https://arammayhem.com/zh-cn/build/yasuo/'),/未返回/);
+  const fallback = parseMayhemChampion(mayhemPage.replace('top="mapped"','top="global"'),157,'https://arammayhem.com/zh-cn/build/yasuo/');
+  assert.equal(fallback.augments.length,0);assert.equal(fallback.partial,true);
+  for (const url of ['javascript:alert(1)','https://arammayhem.com.untrusted.example/','https://arammayhem.com/redirect?url=bad','https://user:pass@arammayhem.com/']) assert.throws(()=>mayhemSourceUrl(url));
+  assert.equal(mayhemSourceUrl('/zh-cn/build/'),'https://arammayhem.com/zh-cn/build/');
+});
+
+test('Mayhem requests share downloads, persist caches and mark old data when refresh fails', async () => {
+  const fs=require('node:fs/promises');const path=require('node:path');const base=resolve(root,'../../specs');await fs.mkdir(base,{recursive:true});
+  const directory=await fs.mkdtemp(join(base,'test-mayhem-'));
+  try {
+    const { AramMayhemProvider }=mayhemModule(directory);const provider=new AramMayhemProvider();let calls=0;
+    provider.http={get:async url=>{calls++;if(url.endsWith('champions.json'))return {data:{rows:[{championId:'Yasuo',slug:'yasuo'}]}};return {data:mayhemPage};}};
+    const [first,second]=await Promise.all([provider.getChampion(157),provider.getChampion(157)]);
+    assert.equal(calls,2);assert.equal(first,second);await provider.getChampion(157);assert.equal(calls,2);
+    const restarted=new AramMayhemProvider();restarted.http={get:async()=>{throw Error('offline');}};
+    assert.equal((await restarted.getChampion(157)).augments[0].pickRate,16.05);
+    const stale=await restarted.getChampion(157,true);assert.equal(stale.stale,true);assert.equal(stale.fetchedAt,first.fetchedAt);
+    await assert.rejects(restarted.getChampion(99),/暂时无法获取/);await assert.rejects(restarted.getChampion(-1),/有效英雄/);
+  } finally {assert.ok(directory.startsWith(base+path.sep+'test-mayhem-'));await fs.rm(directory,{recursive:true,force:true});}
+});
+
+test('Mayhem catalog slugs are used instead of guessing champion page paths', async () => {
+  const fs=require('node:fs/promises');const path=require('node:path');const base=resolve(root,'../../specs');const directory=await fs.mkdtemp(join(base,'test-mayhem-'));
+  try {
+    const { AramMayhemProvider }=mayhemModule(directory);const provider=new AramMayhemProvider();
+    provider.http={get:async url=>{if(url.endsWith('champions.json'))return {data:{rows:[{championId:'MonkeyKing',slug:'wukong'}]}};assert.ok(url.endsWith('/build/wukong/'));return {data:mayhemPage.replaceAll('/yasuo/','/wukong/')};}};
+    assert.ok((await provider.getChampion(62)).sourceUrl.endsWith('/wukong/'));
+  } finally {assert.ok(directory.startsWith(base+path.sep+'test-mayhem-'));await fs.rm(directory,{recursive:true,force:true});}
 });

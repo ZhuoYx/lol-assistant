@@ -62,7 +62,7 @@ export function useDraftAssistant() {
   const aramTierMap = ref<Map<number, AramChampionTier>>(new Map());
   const aramTierLoading = ref(false);
 
-  // 当前队列 ID (用于区分大乱斗 450 / 海克斯大乱斗 2400+)
+  // 当前队列 ID (用于区分大乱斗 450 / 海克斯大乱斗 2400)
   const currentQueueId = ref<number>(0);
 
   // Bench swap 状态
@@ -83,8 +83,8 @@ export function useDraftAssistant() {
   /** 是否为 ARAM (大乱斗/海克斯大乱斗) 模式 */
   const isAram = computed(() => session.value?.benchEnabled === true);
 
-  /** 是否为海克斯大乱斗（queueId >= 2400） */
-  const isHextechAram = computed(() => currentQueueId.value >= 2400);
+  /** 是否为海克斯大乱斗 */
+  const isHextechAram = computed(() => currentQueueId.value === 2400);
 
   /** 当前模式名称 */
   const aramModeName = computed(() => {
@@ -217,10 +217,8 @@ export function useDraftAssistant() {
   /** 获取当前队列 ID（从 gameflow session 获取） */
   async function fetchCurrentQueueId() {
     try {
-      const gameflow = await window.electronAPI.analyzeLiveGame() as { queueId?: number } | null;
-      if (gameflow && typeof gameflow === 'object' && 'queueId' in gameflow) {
-        currentQueueId.value = (gameflow as { queueId: number }).queueId;
-      }
+      const gameflow = await window.electronAPI.getGameflowState();
+      currentQueueId.value = gameflow?.queueId ?? 0;
     } catch {
       // 静默失败，可能不在对局中
     }

@@ -13,6 +13,7 @@
         <span class="mode-tag" :class="queueTagClass">{{ queueName }}</span>
         <span v-if="isRanked && laneName" class="lane-tag">{{ laneName }}</span>
       </div>
+      <div v-if="summaryStats.length" class="summary-stats">{{ summaryStats.join(' · ') }}</div>
     </div>
     <div class="kda-section">
       <div class="kda-row">
@@ -29,13 +30,29 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { MatchSummary } from '@lol-assistant/shared';
-import { calculateKDA, formatRelativeTime, getQueueNameById } from '@lol-assistant/shared';
+import {
+  calculateKDA,
+  formatRelativeTime,
+  getQueueNameById,
+  formatNumber,
+} from '@lol-assistant/shared';
 import { ChampionIcon } from '@/components/common';
 
 const props = defineProps<{
   match: MatchSummary;
   isExpanded?: boolean;
 }>();
+
+const summaryStats = computed(() => {
+  const match = props.match;
+  return [
+    match.totalDamageDealtToChampions !== undefined
+      ? `伤害 ${formatNumber(match.totalDamageDealtToChampions)}`
+      : '',
+    match.totalDamageTaken !== undefined ? `承伤 ${formatNumber(match.totalDamageTaken)}` : '',
+    match.goldEarned !== undefined ? `金币 ${formatNumber(match.goldEarned)}` : '',
+  ].filter(Boolean);
+});
 
 defineEmits<{
   click: [gameId: number];
@@ -110,6 +127,14 @@ const laneName = computed(() => {
   cursor: pointer;
   transition: background var(--transition-fast);
   position: relative;
+}
+
+.summary-stats {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  margin-top: 3px;
+  white-space: normal;
 }
 
 .match-item.win {

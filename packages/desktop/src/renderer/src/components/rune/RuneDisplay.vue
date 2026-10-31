@@ -64,7 +64,7 @@
             <img
               v-if="primaryInfo.iconUrl"
               class="tree-icon"
-              :src="primaryInfo.iconUrl"
+              v-cached-src="primaryInfo.iconUrl"
               :alt="primaryInfo.name"
             />
             <div v-else class="tree-dot" :style="{ background: primaryInfo.color }" />
@@ -82,7 +82,7 @@
                 <img
                   v-if="getPerkIconUrl(perkId)"
                   class="perk-img"
-                  :src="getPerkIconUrl(perkId)"
+                  v-cached-src="getPerkIconUrl(perkId)"
                   :alt="String(perkId)"
                   @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
                 />
@@ -98,7 +98,7 @@
             <img
               v-if="secondaryInfo.iconUrl"
               class="tree-icon"
-              :src="secondaryInfo.iconUrl"
+              v-cached-src="secondaryInfo.iconUrl"
               :alt="secondaryInfo.name"
             />
             <div v-else class="tree-dot" :style="{ background: secondaryInfo.color }" />
@@ -111,7 +111,7 @@
                 <img
                   v-if="getPerkIconUrl(perkId)"
                   class="perk-img"
-                  :src="getPerkIconUrl(perkId)"
+                  v-cached-src="getPerkIconUrl(perkId)"
                   :alt="String(perkId)"
                   @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
                 />
@@ -131,7 +131,7 @@
               <img
                 v-if="getPerkIconUrl(shardId)"
                 class="shard-img"
-                :src="getPerkIconUrl(shardId)"
+                v-cached-src="getPerkIconUrl(shardId)"
                 :alt="String(shardId)"
                 @error="(e: Event) => ((e.target as HTMLImageElement).style.display = 'none')"
               />

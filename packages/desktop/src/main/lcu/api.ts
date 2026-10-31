@@ -31,6 +31,10 @@ export const lcuAPI = {
     return lcuClient.get<Summoner>(`/lol-summoner/v2/summoners/puuid/${puuid}`);
   },
 
+  async getSummonerById(summonerId: number): Promise<Summoner> {
+    return lcuClient.get<Summoner>(`/lol-summoner/v1/summoners/${summonerId}`);
+  },
+
   /**
    * 通过召唤师名称搜索
    * LCU 端点 /lol-summoner/v1/summoners 需要 GET + form-encoded body { name: "xxx" }
@@ -158,7 +162,10 @@ export const lcuAPI = {
    * 设置藏品背景皮肤
    * 通过 summoner-profile 端点设置，skinId 格式为 championId * 1000 + skinIndex
    */
-  async setCollectionsBackdrop(_summonerId: number, data: { championId: number; skinId: number }): Promise<unknown> {
+  async setCollectionsBackdrop(
+    _summonerId: number,
+    data: { championId: number; skinId: number },
+  ): Promise<unknown> {
     return lcuClient.post('/lol-summoner/v1/current-summoner/summoner-profile', {
       key: 'backgroundSkinId',
       value: data.skinId,
@@ -187,11 +194,7 @@ export const lcuAPI = {
   /**
    * 通用 LCU API 请求（供未封装的端点使用）
    */
-  async request<T = unknown>(
-    method: string,
-    endpoint: string,
-    data?: unknown,
-  ): Promise<T> {
+  async request<T = unknown>(method: string, endpoint: string, data?: unknown): Promise<T> {
     return lcuClient.request<T>(endpoint, { method, data });
   },
 };
@@ -208,9 +211,8 @@ function buildMatchListQuery(params: MatchListParams): string {
   if (params.endIndex !== undefined) {
     queryParams.push(`endIndex=${params.endIndex}`);
   }
-  // 注意：LCU API 不支持 queue 参数，队列筛选在前端完成
+  // 注意：LCU 不提供 queue 参数；队列分页由 SGP tag 筛选处理
   // championId is not a documented match-history query parameter either.
-  // Apply both champion and queue filters after retrieving the raw LCU page.
 
   if (queryParams.length === 0) return '';
   return `?${queryParams.join('&')}`;

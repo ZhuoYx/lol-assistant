@@ -10,136 +10,154 @@ import { useSummonerStore } from './summoner';
 
 export const useMatchStore = defineStore('match', () => {
   const matchList = ref<MatchSummary[]>([]);
+  const recentMatches = ref<MatchSummary[]>([]);
   const currentMatch = ref<MatchDetail | null>(null);
   const totalGames = ref(0);
   const loading = ref(false);
+  const loadingRecent = ref(false);
   const loadingDetail = ref(false);
   const error = ref<string | null>(null);
-
+  const recentError = ref<string | null>(null);
   const filters = ref<MatchFilters>({});
-
-  const PAGE_SIZE = 20;
+  const currentPage = ref(1);
   const hasMore = ref(false);
-  const paginationNotice = ref('');
-  let nextIndex = 0;
-  let seenPageIds = new Set<number>();
-
+  const PAGE_SIZE = 10;
   let fetchId = 0;
+  let recentFetchId = 0;
+  let detailFetchId = 0;
+  let queryKey = '';
+  let historySource: 'lcu' | 'sgp' | undefined;
+  let platformId: string | undefined;
+  // Only IDs are retained for duplicate-page validation, never previous page data.
+  const pageIds = new Map<number, number[]>();
 
-  async function fetchMatchList(reset = false): Promise<boolean> {
-    if (!reset && loading.value) return false;
+  async function fetchMatchList(page = 1): Promise<boolean> {
+    const puuid = useSummonerStore().activePUUID;
+    const key = `${puuid}/${filters.value.queue ?? 'all'}/${filters.value.championId ?? 'all'}`;
+    const changedQuery = key !== queryKey;
+    if (changedQuery) {
+      queryKey = key;
+      matchList.value = [];
+      currentPage.value = 1;
+      hasMore.value = false;
+    }
+    if (changedQuery || page === 1) {
+      pageIds.clear();
+      historySource = undefined;
+      platformId = undefined;
+    }
     loading.value = true;
     error.value = null;
-    const currentFetchId = ++fetchId;
-
-    // reset 时立即清空旧数据，防止切换用户时短暂展示旧用户战绩
-    if (reset) {
-      matchList.value = [];
-      totalGames.value = 0;
-      nextIndex = 0;
-      seenPageIds = new Set();
-      hasMore.value = false;
-      paginationNotice.value = '';
-    }
-
+    const requestId = ++fetchId;
+    const knownGameIds = [...pageIds.entries()]
+      .filter(([p]) => p !== page)
+      .flatMap(([, ids]) => ids);
     try {
-      const summonerStore = useSummonerStore();
-      const begIndex = reset ? 0 : nextIndex;
+      const begIndex = (page - 1) * PAGE_SIZE;
       const params: MatchListParams = {
-        puuid: summonerStore.activePUUID,
+        puuid,
         begIndex,
         endIndex: begIndex + PAGE_SIZE - 1,
-        championId: filters.value.championId,
         queue: filters.value.queue,
+        championId: filters.value.championId,
+        historySource,
+        platformId,
+        knownGameIds,
       };
-
       const result = await window.electronAPI.getMatchList(params);
-
-      if (currentFetchId !== fetchId) return false;
-
-      const pageIds = result.pageGameIds ?? (result.matches ?? []).map((m) => m.gameId);
-      const repeatsPage =
-        begIndex > 0 && pageIds.length > 0 && pageIds.every((id) => seenPageIds.has(id));
-      for (const id of pageIds) seenPageIds.add(id);
-      nextIndex = result.nextIndex ?? begIndex + pageIds.length;
-      hasMore.value =
-        !repeatsPage && nextIndex > begIndex && (result.hasMore ?? pageIds.length >= PAGE_SIZE);
-      if (repeatsPage)
-        paginationNotice.value = '客户端重复返回已加载战绩，已停止翻页；当前大区可能限制更早记录。';
-
-      if (reset) {
-        matchList.value = result.matches ?? [];
-      } else {
-        const loadedIds = new Set(matchList.value.map((m) => m.gameId));
-        matchList.value.push(
-          ...(result.matches ?? []).filter((m) => {
-            if (loadedIds.has(m.gameId)) return false;
-            loadedIds.add(m.gameId);
-            return true;
-          }),
-        );
+      if (requestId !== fetchId) return false;
+      const ids = result.pageGameIds ?? result.matches.map((m) => m.gameId);
+      if (page > 1 && ids.length && ids.every((id) => knownGameIds.includes(id))) {
+        throw new Error('战绩接口返回了重复页，已保留当前页，请重试');
       }
-      totalGames.value = result.totalGames ?? 0;
+      matchList.value = result.matches;
+      currentPage.value = page;
+      hasMore.value = result.hasMore ?? ids.length === PAGE_SIZE;
+      totalGames.value = result.totalGames;
+      historySource = result.source;
+      platformId = result.platformId;
+      pageIds.set(page, ids);
       return true;
     } catch (e) {
-      if (currentFetchId !== fetchId) return false;
-      error.value = e instanceof Error ? e.message : '获取战绩失败';
+      if (requestId === fetchId) error.value = e instanceof Error ? e.message : '获取战绩失败';
       return false;
     } finally {
-      if (currentFetchId === fetchId) {
-        loading.value = false;
-      }
+      if (requestId === fetchId) loading.value = false;
+    }
+  }
+
+  async function fetchRecentMatches() {
+    const requestId = ++recentFetchId;
+    loadingRecent.value = true;
+    recentError.value = null;
+    recentMatches.value = [];
+    try {
+      const result = await window.electronAPI.getMatchList({
+        puuid: useSummonerStore().activePUUID,
+        begIndex: 0,
+        endIndex: 7,
+      });
+      if (requestId === recentFetchId) recentMatches.value = result.matches;
+    } catch (e) {
+      if (requestId === recentFetchId)
+        recentError.value = e instanceof Error ? e.message : '获取最近战绩失败';
+    } finally {
+      if (requestId === recentFetchId) loadingRecent.value = false;
     }
   }
 
   async function fetchMatchDetail(gameId: number) {
+    const requestId = ++detailFetchId;
+    currentMatch.value = null;
     loadingDetail.value = true;
     try {
       const result = await window.electronAPI.getMatchDetail(gameId);
-      console.log('[matchStore] fetchMatchDetail result:', gameId, result);
-      console.log('[matchStore] participants count:', result?.participants?.length ?? 0);
-      if (result?.participants?.length > 0) {
-        console.log('[matchStore] first participant:', JSON.stringify(result.participants[0]));
-      }
-      currentMatch.value = result;
+      if (requestId === detailFetchId) currentMatch.value = result;
     } catch (e) {
-      console.error('[matchStore] fetchMatchDetail error:', e);
-      error.value = e instanceof Error ? e.message : '获取战绩详情失败';
+      if (requestId === detailFetchId)
+        error.value = e instanceof Error ? e.message : '获取战绩详情失败';
     } finally {
-      loadingDetail.value = false;
+      if (requestId === detailFetchId) loadingDetail.value = false;
     }
   }
 
-  function setFilters(newFilters: MatchFilters) {
-    filters.value = newFilters;
+  function setFilters(value: MatchFilters) {
+    filters.value = value;
   }
-
   function clear() {
     ++fetchId;
-    loading.value = false;
-    nextIndex = 0;
-    seenPageIds = new Set();
-    hasMore.value = false;
-    paginationNotice.value = '';
+    ++recentFetchId;
+    ++detailFetchId;
+    loading.value = loadingRecent.value = loadingDetail.value = false;
     matchList.value = [];
+    recentMatches.value = [];
     currentMatch.value = null;
     totalGames.value = 0;
-    error.value = null;
+    currentPage.value = 1;
+    hasMore.value = false;
+    error.value = recentError.value = null;
     filters.value = {};
+    queryKey = '';
+    historySource = undefined;
+    platformId = undefined;
+    pageIds.clear();
   }
-
   return {
     matchList,
+    recentMatches,
     currentMatch,
     totalGames,
     loading,
+    loadingRecent,
     loadingDetail,
     error,
+    recentError,
     filters,
+    currentPage,
     hasMore,
-    paginationNotice,
     pageSize: PAGE_SIZE,
     fetchMatchList,
+    fetchRecentMatches,
     fetchMatchDetail,
     setFilters,
     clear,

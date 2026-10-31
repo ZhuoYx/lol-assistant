@@ -225,39 +225,6 @@ select optgroup {
   color: var(--color-lose);
 }
 
-/* Cross-fade rendered snapshots; keep opacity off live glass and its ancestors. */
-::view-transition {
-  pointer-events: none;
-}
-
-::view-transition-group(root) {
-  animation-duration: 220ms;
-}
-
-::view-transition-old(root) {
-  animation: route-fade-out 220ms ease-in-out both;
-}
-
-::view-transition-new(root) {
-  animation: route-fade-in 220ms ease-in-out both;
-}
-
-@keyframes route-fade-out {
-  to { opacity: 0; }
-}
-
-@keyframes route-fade-in {
-  from { opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(root),
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
-    animation: none;
-  }
-}
-
 /* Local text fade transition */
 .fade-enter-active,
 .fade-leave-active {

@@ -15,6 +15,7 @@ import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import https from 'https';
 import http from 'http';
+import { createHash } from 'crypto';
 import type { AssetCacheIndex, AssetCacheEntry } from '@lol-assistant/shared';
 import {
   getDDragonVersionsUrl,
@@ -39,6 +40,8 @@ export class AssetCacheManager {
   private cacheIndex: AssetCacheIndex | null = null;
   private currentVersion: string = '';
   private initPromise: Promise<void> | null = null;
+  private downloads = new Map<string, Promise<string>>();
+  private writes = Promise.resolve();
 
   /**
    * 初始化资源缓存管理器
@@ -99,10 +102,16 @@ export class AssetCacheManager {
   async getCachedAsset(
     remoteUrl: string,
     assetType: string,
-    assetId: string | number
+    assetId: string | number,
   ): Promise<string> {
     await this.init();
 
+    // The URL includes patch and origin. An ID alone can reuse an obsolete icon.
+    assetType = assetType.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const version = new URL(remoteUrl).hostname === 'arammayhem.com' ? this.currentVersion : '';
+    assetId = createHash('sha256')
+      .update(remoteUrl + version)
+      .digest('hex');
     const cacheKey = getAssetCacheKey(assetType, assetId);
 
     // 检查缓存
@@ -111,14 +120,13 @@ export class AssetCacheManager {
       return cached.localPath;
     }
 
-    // 下载并缓存
-    try {
-      const localPath = await this.downloadAndCache(remoteUrl, assetType, assetId);
-      return localPath;
-    } catch {
-      // 下载失败时返回远程 URL
-      return remoteUrl;
-    }
+    const existing = this.downloads.get(cacheKey);
+    if (existing) return existing;
+    const task = this.downloadAndCache(remoteUrl, assetType, assetId)
+      .catch(() => remoteUrl)
+      .finally(() => this.downloads.delete(cacheKey));
+    this.downloads.set(cacheKey, task);
+    return task;
   }
 
   /**
@@ -157,20 +165,34 @@ export class AssetCacheManager {
   }
 
   /**
-   * 将远程图片 URL 转换为本地协议 URL（file:// 或直接路径）
+   * 读取磁盘缓存并返回 data URL，兼容开发与打包环境
    * 用于渲染进程中的 img src
    */
   async getAssetFileUrl(
     remoteUrl: string,
     assetType: string,
-    assetId: string | number
+    assetId: string | number,
   ): Promise<string> {
     const localPath = await this.getCachedAsset(remoteUrl, assetType, assetId);
     if (localPath === remoteUrl) {
       return remoteUrl;
     }
-    // 转换为 file:// 协议供渲染进程使用
-    return `file://${localPath.replace(/\\/g, '/')}`;
+    // Data URLs also work in the Vite renderer; http pages cannot load file://.
+    try {
+      const bytes = await fs.readFile(localPath);
+      const ext = path.extname(localPath).toLowerCase();
+      const mime =
+        ext === '.svg'
+          ? 'image/svg+xml'
+          : ext === '.jpg' || ext === '.jpeg'
+            ? 'image/jpeg'
+            : ext === '.webp'
+              ? 'image/webp'
+              : 'image/png';
+      return `data:${mime};base64,${bytes.toString('base64')}`;
+    } catch {
+      return remoteUrl;
+    }
   }
 
   /**
@@ -247,7 +269,7 @@ export class AssetCacheManager {
   private async downloadAndCache(
     remoteUrl: string,
     assetType: string,
-    assetId: string | number
+    assetId: string | number,
   ): Promise<string> {
     // 构建本地缓存路径
     const ext = path.extname(new URL(remoteUrl).pathname) || '.png';
@@ -257,38 +279,41 @@ export class AssetCacheManager {
     await fs.mkdir(typeDir, { recursive: true });
     const localPath = path.join(typeDir, fileName);
 
-    // 下载文件
+    // Download concurrently; serialize filesystem/index mutations afterwards.
     const buffer = await this.downloadFile(remoteUrl);
+    const write = this.writes.then(async () => {
+      // 检查缓存大小限制
+      await this.ensureCacheSize(buffer.length);
 
-    // 检查缓存大小限制
-    await this.ensureCacheSize(buffer.length);
+      // 写入本地文件
+      await fs.writeFile(localPath, buffer);
 
-    // 写入本地文件
-    await fs.writeFile(localPath, buffer);
-
-    // 更新缓存索引
-    const cacheKey = getAssetCacheKey(assetType, assetId);
-    const entry: AssetCacheEntry = {
-      remoteUrl,
-      localPath,
-      cachedAt: Date.now(),
-      size: buffer.length,
-      version: this.currentVersion,
-    };
-
-    if (!this.cacheIndex) {
-      this.cacheIndex = {
+      // 更新缓存索引
+      const cacheKey = getAssetCacheKey(assetType, assetId);
+      const entry: AssetCacheEntry = {
+        remoteUrl,
+        localPath,
+        cachedAt: Date.now(),
+        size: buffer.length,
         version: this.currentVersion,
-        lastUpdated: Date.now(),
-        entries: {},
-        totalSize: 0,
       };
-    }
 
-    this.cacheIndex.entries[cacheKey] = entry;
-    this.cacheIndex.totalSize += buffer.length;
-    this.cacheIndex.lastUpdated = Date.now();
-    await this.saveCacheIndex();
+      if (!this.cacheIndex) {
+        this.cacheIndex = {
+          version: this.currentVersion,
+          lastUpdated: Date.now(),
+          entries: {},
+          totalSize: 0,
+        };
+      }
+
+      this.cacheIndex.entries[cacheKey] = entry;
+      this.cacheIndex.totalSize += buffer.length;
+      this.cacheIndex.lastUpdated = Date.now();
+      await this.saveCacheIndex();
+    });
+    this.writes = write.catch(() => {});
+    await write;
 
     return localPath;
   }
@@ -331,8 +356,22 @@ export class AssetCacheManager {
   /**
    * 从 URL 下载文件为 Buffer
    */
-  private downloadFile(url: string): Promise<Buffer> {
+  private downloadFile(url: string, redirects = 0): Promise<Buffer> {
     return new Promise((resolve, reject) => {
+      const parsed = new URL(url);
+      if (
+        parsed.protocol !== 'https:' ||
+        !['raw.communitydragon.org', 'ddragon.leagueoflegends.com', 'arammayhem.com'].includes(
+          parsed.hostname,
+        ) ||
+        (parsed.hostname === 'arammayhem.com' &&
+          (parsed.origin !== 'https://arammayhem.com' ||
+            !/^\/augments\/[^/]+\.(?:png|webp|jpg)$/i.test(parsed.pathname))) ||
+        redirects > 3
+      ) {
+        reject(new Error('Unsupported image origin'));
+        return;
+      }
       const client = url.startsWith('https') ? https : http;
 
       const request = client.get(url, { timeout: 30000 }, (response) => {
@@ -343,17 +382,28 @@ export class AssetCacheManager {
           response.statusCode < 400 &&
           response.headers.location
         ) {
-          this.downloadFile(response.headers.location).then(resolve).catch(reject);
+          response.resume();
+          this.downloadFile(new URL(response.headers.location, url).href, redirects + 1)
+            .then(resolve)
+            .catch(reject);
           return;
         }
 
         if (response.statusCode !== 200) {
+          response.resume();
           reject(new Error(`HTTP ${response.statusCode} for ${url}`));
           return;
         }
 
         const chunks: Buffer[] = [];
-        response.on('data', (chunk: Buffer) => chunks.push(chunk));
+        let size = 0;
+        response.on('data', (chunk: Buffer) => {
+          size += chunk.length;
+          if (size > 8 * 1024 * 1024) {
+            request.destroy();
+            reject(new Error('Image too large'));
+          } else chunks.push(chunk);
+        });
         response.on('end', () => resolve(Buffer.concat(chunks)));
         response.on('error', reject);
       });

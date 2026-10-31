@@ -35,6 +35,10 @@
   --color-bg-sidebar: rgba(248, 250, 255, 0.48);
   --color-bg-card: rgba(255, 255, 255, var(--glass-opacity));
   --color-bg-option: #f5f7ff;
+  --color-filter-bg: rgba(255, 255, 255, 0.88);
+  --color-filter-border: #697b9d;
+  --color-filter-active: #4054c7;
+  --color-filter-on-active: #ffffff;
   --color-bg-readable: rgba(255, 255, 255, clamp(0.35, calc(var(--glass-opacity) + 0.12), 0.9));
   --color-highlight-text: #855d13;
   --color-bg-hover: rgba(0, 0, 0, 0.04);
@@ -193,6 +197,10 @@
   --color-bg-sidebar: rgba(15, 23, 41, 0.48);
   --color-bg-card: rgba(18, 30, 50, var(--glass-opacity));
   --color-bg-option: #1c2941;
+  --color-filter-bg: rgba(19, 32, 56, 0.92);
+  --color-filter-border: #8b9dbb;
+  --color-filter-active: #b9c5ff;
+  --color-filter-on-active: #101c37;
   --color-bg-readable: rgba(18, 30, 50, clamp(0.35, calc(var(--glass-opacity) + 0.12), 0.9));
   --color-highlight-text: #f0cb78;
   --color-bg-hover: rgba(255, 255, 255, 0.06);

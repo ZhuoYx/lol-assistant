@@ -8,7 +8,7 @@
           : 'BP 阶段克制推荐与队伍分析'
       "
       ><template #actions
-        ><DataSourceSelect />
+        ><DataSourceSelect v-if="!isHextechAram" />
         <div v-if="isInChampSelect && session" class="draft-status">
           <span v-if="isAram && isHextechAram" class="mode-badge hextech">海克斯大乱斗</span
           ><span v-else-if="isAram" class="mode-badge aram">大乱斗</span
@@ -84,7 +84,9 @@
               <div class="aram-champ-icon">
                 <img
                   v-if="member.championId"
-                  :src="`https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/${member.championId}.png`"
+                  v-cached-src="
+                    `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/${member.championId}.png`
+                  "
                   :alt="getChampName(member.championId)"
                   class="champ-img"
                   @error="($event.target as HTMLImageElement).style.display = 'none'"
@@ -121,7 +123,9 @@
             >
               <div class="bench-champ-icon">
                 <img
-                  :src="`https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/${champId}.png`"
+                  v-cached-src="
+                    `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/${champId}.png`
+                  "
                   :alt="getChampName(champId)"
                   class="champ-img"
                   @error="($event.target as HTMLImageElement).style.display = 'none'"
@@ -140,6 +144,12 @@
             </div>
           </div>
         </div>
+
+        <MayhemAugmentPanel
+          v-if="isHextechAram && myMayhemChampion"
+          :champion-id="myMayhemChampion"
+          compact
+        />
 
         <!-- ARAM 提示 -->
         <div class="aram-tips card">
@@ -224,6 +234,7 @@ import { EmptyState } from '@/components/common';
 import TeamComposition from '@/components/draft/TeamComposition.vue';
 import CounterSuggestion from '@/components/draft/CounterSuggestion.vue';
 import { useDraftAssistant } from '@/composables/useDraftAssistant';
+import MayhemAugmentPanel from '@/components/aram/MayhemAugmentPanel.vue';
 
 const appStore = useAppStore();
 
@@ -253,6 +264,11 @@ const {
   benchSwapChampion,
   swappingChampionId,
 } = useDraftAssistant();
+
+const myMayhemChampion = computed(
+  () =>
+    myTeamPicks.value.find((member) => member.cellId === localPlayerCellId.value)?.championId || 0,
+);
 
 const phaseLabel = computed(() => {
   switch (timerPhase.value) {

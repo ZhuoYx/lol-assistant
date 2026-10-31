@@ -3,7 +3,7 @@
     <img
       v-if="iconUrl && !imgError"
       class="icon-img"
-      :src="iconUrl"
+      v-cached-src="iconUrl"
       :alt="name || ''"
       loading="lazy"
       @error="imgError = true"
@@ -20,22 +20,28 @@ import { computed, ref, watch } from 'vue';
 
 const CDRAGON_BASE = 'https://raw.communitydragon.org';
 
-const props = withDefaults(defineProps<{
-  championId: number;
-  name?: string;
-  showName?: boolean;
-  size?: 'xs' | 'sm' | 'md' | 'lg';
-}>(), {
-  showName: false,
-  size: 'md',
-});
+const props = withDefaults(
+  defineProps<{
+    championId: number;
+    name?: string;
+    showName?: boolean;
+    size?: 'xs' | 'sm' | 'md' | 'lg';
+  }>(),
+  {
+    showName: false,
+    size: 'md',
+  },
+);
 
 const imgError = ref(false);
 
 // 当 championId 改变时重置错误状态
-watch(() => props.championId, () => {
-  imgError.value = false;
-});
+watch(
+  () => props.championId,
+  () => {
+    imgError.value = false;
+  },
+);
 
 const iconUrl = computed(() => {
   if (!props.championId || props.championId <= 0) return '';
@@ -72,10 +78,31 @@ const initial = computed(() => {
   flex-shrink: 0;
 }
 
-.xs .icon-img, .xs .icon-placeholder { width: 24px; height: 24px; font-size: 10px; border-radius: var(--radius-sm); }
-.sm .icon-img, .sm .icon-placeholder { width: 32px; height: 32px; font-size: var(--text-xs); }
-.md .icon-img, .md .icon-placeholder { width: 40px; height: 40px; font-size: var(--text-sm); }
-.lg .icon-img, .lg .icon-placeholder { width: 52px; height: 52px; font-size: var(--text-lg); }
+.xs .icon-img,
+.xs .icon-placeholder {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+  border-radius: var(--radius-sm);
+}
+.sm .icon-img,
+.sm .icon-placeholder {
+  width: 32px;
+  height: 32px;
+  font-size: var(--text-xs);
+}
+.md .icon-img,
+.md .icon-placeholder {
+  width: 40px;
+  height: 40px;
+  font-size: var(--text-sm);
+}
+.lg .icon-img,
+.lg .icon-placeholder {
+  width: 52px;
+  height: 52px;
+  font-size: var(--text-lg);
+}
 
 .icon-letter {
   text-transform: uppercase;

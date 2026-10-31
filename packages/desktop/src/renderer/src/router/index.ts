@@ -1,5 +1,4 @@
 import { createRouter, createMemoryHistory, type RouteRecordRaw } from 'vue-router';
-import { installRouteTransitions } from './transitions';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -13,12 +12,6 @@ const routes: RouteRecordRaw[] = [
     name: 'MatchHistory',
     component: () => import('@/views/MatchHistory.vue'),
     meta: { title: '战绩', icon: 'match' },
-  },
-  {
-    path: '/champion-stats',
-    name: 'ChampionStats',
-    component: () => import('@/views/ChampionStats.vue'),
-    meta: { title: '英雄', icon: 'champion' },
   },
   {
     path: '/live-game',
@@ -45,6 +38,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '英雄排名', icon: 'ranking' },
   },
   {
+    path: '/mayhem-augments',
+    name: 'MayhemAugments',
+    component: () => import('@/views/MayhemAugments.vue'),
+    meta: { title: '海克斯推荐', icon: 'rune' },
+  },
+  {
     path: '/settings',
     name: 'Settings',
     component: () => import('@/views/Settings.vue'),
@@ -62,8 +61,6 @@ const router = createRouter({
   history: createMemoryHistory(),
   routes,
 });
-
-installRouteTransitions(router);
 
 export default router;
 export { routes };

@@ -183,7 +183,6 @@
             <main class="main-area">
               <div class="content-wrapper">
                 <router-view v-slot="{ Component }">
-                  <!-- Router snapshots provide fades without changing live glass opacity. -->
                   <component
                     :is="Component"
                     :key="recommendationPage ? appStore.championDataSource : undefined"
@@ -332,11 +331,6 @@ const menuItems = computed(() => {
       icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>',
     },
     {
-      path: '/champion-stats',
-      label: '英雄',
-      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
-    },
-    {
       path: '/live-game',
       label: '对局分析',
       icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>',
@@ -357,6 +351,11 @@ const menuItems = computed(() => {
       path: '/champion-ranking',
       label: '英雄排名',
       icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17V3"/><path d="m17 8-5-5-5 5"/></svg>',
+    },
+    {
+      path: '/mayhem-augments',
+      label: '海克斯推荐',
+      icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 2 9 5v10l-9 5-9-5V7Z"/><path d="m12 7 4 5-4 5-4-5Z"/></svg>',
     },
   ];
 });

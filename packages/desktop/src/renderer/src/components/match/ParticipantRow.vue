@@ -19,6 +19,26 @@
           {{ participant.summonerName }}
           <span v-if="participant.tagLine" class="pr-id">#{{ participant.tagLine }}</span>
         </span>
+        <div v-if="highlights?.length" class="pr-highlights" aria-label="本场表现标签">
+          <span
+            v-for="tag in highlights.slice(0, 3)"
+            :key="tag.key"
+            class="performance-tag"
+            :title="tag.description"
+            >{{ tag.label }}</span
+          >
+          <span
+            v-if="highlights.length > 3"
+            class="performance-more"
+            :title="
+              highlights
+                .slice(3)
+                .map((tag) => `${tag.label}：${tag.description}`)
+                .join('\n')
+            "
+            >+{{ highlights.length - 3 }}</span
+          >
+        </div>
         <span v-if="showLane && laneLabel" class="pr-lane">{{ laneLabel }}</span>
       </div>
     </div>
@@ -33,19 +53,19 @@
       <span class="kda-ratio" :class="kdaColorClass">{{ kdaValue }} KDA</span>
     </div>
     <div class="pr-damage">
-      <span class="damage-value">{{ formatNumber(participant.totalDamageDealt) }}</span>
+      <span class="damage-value">{{ statText(participant.totalDamageDealtToChampions) }}</span>
       <div class="damage-bar-bg">
         <div class="damage-bar-fill damage-dealt" :style="{ width: damagePercent + '%' }" />
       </div>
     </div>
     <div class="pr-damage-taken">
-      <span class="damage-taken-value">{{ formatNumber(participant.totalDamageTaken) }}</span>
+      <span class="damage-taken-value">{{ statText(participant.totalDamageTaken) }}</span>
       <div class="damage-bar-bg">
         <div class="damage-bar-fill damage-taken" :style="{ width: damageTakenPercent + '%' }" />
       </div>
     </div>
     <div class="pr-gold">
-      <span class="gold-value">{{ formatNumber(participant.goldEarned) }}</span>
+      <span class="gold-value">{{ statText(participant.goldEarned) }}</span>
     </div>
     <div class="pr-items">
       <div
@@ -57,7 +77,7 @@
         <img
           v-if="itemId"
           class="item-img"
-          :src="getItemIconUrl(itemId)"
+          v-cached-src="getItemIconUrl(itemId)"
           :alt="'item-' + itemId"
           loading="lazy"
           @error="onItemImgError($event)"
@@ -69,7 +89,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Participant } from '@lol-assistant/shared';
+import type { Participant, ParticipantHighlight } from '@lol-assistant/shared';
 import { calculateKDA, formatNumber } from '@lol-assistant/shared';
 import { ChampionIcon } from '@/components/common';
 
@@ -79,7 +99,12 @@ const props = defineProps<{
   maxDamage?: number;
   maxDamageTaken?: number;
   showLane?: boolean;
+  highlights?: ParticipantHighlight[];
 }>();
+
+function statText(value: number | undefined): string {
+  return value === undefined ? '—' : formatNumber(value);
+}
 
 defineEmits<{
   clickPlayer: [puuid: string];
@@ -121,7 +146,7 @@ const damagePercent = computed(() => {
 
 const damageTakenPercent = computed(() => {
   if (!props.maxDamageTaken || props.maxDamageTaken === 0) return 0;
-  return Math.min(100, (props.participant.totalDamageTaken / props.maxDamageTaken) * 100);
+  return Math.min(100, ((props.participant.totalDamageTaken ?? 0) / props.maxDamageTaken) * 100);
 });
 
 const displayItems = computed(() => {
@@ -145,7 +170,7 @@ function onItemImgError(event: Event) {
 .participant-row {
   display: grid;
   grid-template-columns: var(--participant-columns);
-  min-width: 820px;
+  min-width: var(--participant-min-width, 820px);
   align-items: center;
   padding: var(--space-2) var(--space-4);
   cursor: pointer;
@@ -176,6 +201,28 @@ function onItemImgError(event: Event) {
   flex-direction: column;
   gap: 1px;
   min-width: 0;
+}
+
+.pr-highlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 4px;
+}
+.performance-tag {
+  font-size: 10px;
+  line-height: 1.6;
+  padding: 1px 5px;
+  border-radius: 5px;
+  color: var(--color-accent);
+  background-color: var(--color-accent-soft);
+  border: 1px solid var(--color-border-light);
+  white-space: nowrap;
+}
+.performance-more {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  padding: 1px 3px;
 }
 
 .pr-name {

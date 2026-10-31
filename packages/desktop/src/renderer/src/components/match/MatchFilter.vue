@@ -6,6 +6,7 @@
         :key="q.label"
         class="filter-chip"
         :class="{ active: currentQueue === q.value }"
+        :aria-pressed="currentQueue === q.value"
         @click="$emit('update:queue', q.value)"
       >
         {{ q.label }}
@@ -37,10 +38,6 @@ const queueOptions: { label: string; value: number | undefined }[] = [
 </script>
 
 <style scoped>
-.match-filter {
-  overflow: hidden;
-}
-
 .filter-scroll {
   display: flex;
   gap: 6px;
@@ -54,30 +51,32 @@ const queueOptions: { label: string; value: number | undefined }[] = [
 }
 
 .filter-chip {
-  padding: 4px 14px;
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-  color: var(--color-text-tertiary);
-  background-color: transparent;
-  border: 1px solid var(--color-border-light);
+  min-height: 34px;
+  padding: 6px 14px;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  background-color: var(--color-filter-bg);
+  border: 1px solid var(--color-filter-border);
   border-radius: var(--radius-full);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .filter-chip:hover {
-  color: var(--color-text-secondary);
-  border-color: var(--color-border);
-  background-color: var(--color-bg-hover);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-soft);
 }
 
 .filter-chip.active {
-  color: var(--color-accent);
-  background-color: rgba(0, 113, 227, 0.08);
-  border-color: rgba(0, 113, 227, 0.3);
-  font-weight: var(--font-semibold);
+  color: var(--color-filter-on-active);
+  background-color: var(--color-filter-active);
+  border-color: var(--color-filter-active);
+  box-shadow: 0 2px 8px var(--color-accent-soft);
 }
 
 .match-filter {
@@ -88,8 +87,5 @@ const queueOptions: { label: string; value: number | undefined }[] = [
   overflow-x: visible;
   gap: 7px;
   padding: 2px;
-}
-.filter-chip {
-  background-color: var(--color-bg-card);
 }
 </style>

@@ -5,9 +5,9 @@
         <img
           v-if="avatarUrl"
           class="avatar-img"
-          :src="avatarUrl"
+          v-cached-src="avatarUrl"
           :alt="summoner.displayName"
-          @error="avatarError = true"
+          @error="avatarIndex++"
         />
         <div v-else class="avatar-fallback">
           {{ summonerName.charAt(0) }}
@@ -53,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { Summoner } from '@lol-assistant/shared';
 import { getProfileIconUrl } from '@lol-assistant/shared';
 import { LoadingSpinner } from '@/components/common';
@@ -63,7 +63,34 @@ const props = defineProps<{
   isConnected: boolean;
 }>();
 
-const avatarError = ref(false);
+const avatarCandidates = ref<string[]>([]);
+const avatarIndex = ref(0);
+let avatarRequest = 0;
+watch(
+  () => [props.summoner?.puuid, props.summoner?.profileIconId, props.isConnected],
+  async () => {
+    const request = ++avatarRequest;
+    avatarIndex.value = 0;
+    avatarCandidates.value = [];
+    const iconId = props.summoner?.profileIconId;
+    if (iconId === undefined || !Number.isSafeInteger(iconId) || iconId < 0) return;
+    const [local, version] = await Promise.all([
+      window.electronAPI.getSummonerIcon(iconId).catch(() => ''),
+      window.electronAPI.getGameVersion().catch(() => null),
+    ]);
+    if (request !== avatarRequest) return;
+    avatarCandidates.value = [
+      ...new Set(
+        [
+          local,
+          `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/profile-icons/${iconId}.jpg`,
+          version ? getProfileIconUrl(iconId, version) : '',
+        ].filter(Boolean),
+      ),
+    ];
+  },
+  { immediate: true },
+);
 
 const summonerName = computed(() => {
   if (!props.summoner) return '';
@@ -72,10 +99,7 @@ const summonerName = computed(() => {
   );
 });
 
-const avatarUrl = computed(() => {
-  if (!props.summoner || avatarError.value) return '';
-  return getProfileIconUrl(props.summoner.profileIconId, '14.24.1');
-});
+const avatarUrl = computed(() => avatarCandidates.value[avatarIndex.value] ?? '');
 
 const xpPercent = computed(() => {
   if (!props.summoner) return 0;

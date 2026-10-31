@@ -18,17 +18,22 @@ export interface MatchSummary {
   isMVP?: boolean;
   /** 是否为失败方 KDA 最高者 */
   isSVP?: boolean;
+  totalDamageDealtToChampions?: number;
+  totalDamageTaken?: number;
+  goldEarned?: number;
 }
 
 /** 战绩列表 */
 export interface MatchList {
   matches: MatchSummary[];
   totalGames: number;
-  /** Raw LCU page cursor, before local queue/champion filtering. */
+  /** Next service offset; lists are requested page by page without local filtering. */
   nextIndex?: number;
   hasMore?: boolean;
   /** Used to detect servers that ignore pagination and repeat the first page. */
   pageGameIds?: number[];
+  source?: 'lcu' | 'sgp';
+  platformId?: string;
 }
 
 /** 战绩列表查询参数 */
@@ -38,6 +43,10 @@ export interface MatchListParams {
   endIndex?: number;
   championId?: number;
   queue?: number;
+  /** IDs from other pages, used to detect a service repeating the first page. */
+  knownGameIds?: number[];
+  historySource?: 'lcu' | 'sgp';
+  platformId?: string;
 }
 
 /** 战绩详情 */
@@ -73,16 +82,44 @@ export interface Participant {
   kills: number;
   deaths: number;
   assists: number;
+  /** 兼容旧展示字段；这里保存对英雄伤害，所有目标总伤害见 totalDamageDealtAllTargets。 */
   totalDamageDealt: number;
-  totalDamageTaken: number;
-  goldEarned: number;
-  visionScore: number;
+  totalDamageTaken?: number;
+  goldEarned?: number;
+  visionScore?: number;
   items: number[];
   perks: Perks;
   lane: string;
   role: string;
   isMVP?: boolean;
   isSVP?: boolean;
+  totalDamageDealtToChampions?: number;
+  physicalDamageDealtToChampions?: number;
+  magicDamageDealtToChampions?: number;
+  trueDamageDealtToChampions?: number;
+  totalDamageDealtAllTargets?: number;
+  physicalDamageDealt?: number;
+  magicDamageDealt?: number;
+  trueDamageDealt?: number;
+  physicalDamageTaken?: number;
+  magicDamageTaken?: number;
+  trueDamageTaken?: number;
+  damageSelfMitigated?: number;
+  totalHeal?: number;
+  totalHealsOnTeammates?: number;
+  totalDamageShieldedOnTeammates?: number;
+  timeCCingOthers?: number;
+  totalMinionsKilled?: number;
+  neutralMinionsKilled?: number;
+  damageDealtToTurrets?: number;
+  damageDealtToObjectives?: number;
+  goldSpent?: number;
+  wardsPlaced?: number;
+  wardsKilled?: number;
+  visionWardsBoughtInGame?: number;
+  totalTimeSpentDead?: number;
+  largestMultiKill?: number;
+  firstBloodKill?: boolean;
 }
 
 /** 符文配置 */
