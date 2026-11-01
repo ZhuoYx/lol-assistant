@@ -5,7 +5,6 @@
 import log from 'electron-log';
 import path from 'path';
 import fs from 'fs';
-import { app } from 'electron';
 import { execSync } from 'child_process';
 
 // Windows 下尽早将当前控制台代码页设为 UTF-8，避免中文乱码
@@ -88,24 +87,6 @@ export function cleanupOldLogs(): void {
  */
 export function getLogDirectory(): string {
   return path.dirname(log.transports.file.getFile().path);
-}
-
-/**
- * 导出日志文件路径（供设置页使用）
- */
-export function exportLogPath(): string {
-  try {
-    const logDir = getLogDirectory();
-    // 返回最新的日志文件路径
-    const currentLog = path.join(logDir, `${getDateString()}.log`);
-    if (fs.existsSync(currentLog)) {
-      return currentLog;
-    }
-    // 如果当天日志不存在，返回日志目录
-    return logDir;
-  } catch {
-    return app.getPath('logs');
-  }
 }
 
 /** 日志实例 */

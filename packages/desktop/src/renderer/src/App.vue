@@ -9,48 +9,7 @@
     <n-message-provider>
       <n-notification-provider>
         <n-dialog-provider>
-          <!-- Mini Mode Layout -->
-          <div v-if="appStore.isMiniMode" class="mini-layout" :style="wallpaperStyle">
-            <div class="app-backdrop" aria-hidden="true" />
-            <div class="mini-titlebar">
-              <span class="mini-title">LOL 助手</span>
-              <div class="mini-controls">
-                <button class="mini-btn" title="退出迷你模式" @click="exitMiniMode">
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <polyline points="15 3 21 3 21 9" />
-                    <polyline points="9 21 3 21 3 15" />
-                    <line x1="21" y1="3" x2="14" y2="10" />
-                    <line x1="3" y1="21" x2="10" y2="14" />
-                  </svg>
-                </button>
-                <button class="mini-btn" title="最小化到托盘" @click="minimizeToTray">
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div class="mini-content">
-              <router-view />
-            </div>
-          </div>
-
-          <!-- Normal Mode Layout -->
-          <div v-else class="app-layout" :style="wallpaperStyle">
+          <div class="app-layout" :style="wallpaperStyle">
             <div class="app-backdrop" aria-hidden="true" />
             <!-- Sidebar -->
             <aside class="sidebar" :class="{ collapsed: appStore.sidebarCollapsed }">
@@ -397,15 +356,6 @@ const gamePhaseLabel = computed(() => {
   };
   return map[appStore.gamePhase] ?? '';
 });
-
-function exitMiniMode() {
-  appStore.updateSettings({ miniMode: false });
-  window.electronAPI.setMiniMode(false);
-}
-
-function minimizeToTray() {
-  window.electronAPI.minimizeToTray();
-}
 
 // Keyboard shortcuts
 function handleKeydown(e: KeyboardEvent) {
@@ -813,71 +763,5 @@ onUnmounted(() => {
   50% {
     opacity: 0.4;
   }
-}
-
-/* ============================
-   Mini Mode Layout
-   ============================ */
-.mini-layout {
-  position: relative;
-  isolation: isolate;
-  width: 100vw;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: var(--app-canvas);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-
-.mini-titlebar {
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 var(--space-3);
-  background-color: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border-light);
-  flex-shrink: 0;
-}
-
-.mini-title {
-  font-size: var(--text-xs);
-  font-weight: var(--font-semibold);
-  color: var(--color-text-secondary);
-  letter-spacing: -0.2px;
-}
-
-.mini-controls {
-  display: flex;
-  gap: var(--space-1);
-}
-
-.mini-btn {
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background-color: transparent;
-  color: var(--color-text-tertiary);
-  border-radius: var(--radius-xs);
-  transition: all var(--transition-fast);
-}
-
-.mini-btn:hover {
-  background-color: var(--color-bg-hover);
-  color: var(--color-text-primary);
-}
-
-.mini-content {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-width: 0;
-  min-height: 0;
-  container: workspace / inline-size;
-  padding: var(--space-2);
 }
 </style>

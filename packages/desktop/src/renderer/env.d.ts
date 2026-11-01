@@ -94,7 +94,6 @@ interface ElectronAPI {
 
   // 窗口管理
   setAlwaysOnTop: (flag: boolean) => void;
-  setMiniMode: (flag: boolean) => void;
   minimizeToTray: () => void;
 
   // 自动更新
@@ -112,8 +111,9 @@ interface ElectronAPI {
     callback: (info: import('@lol-assistant/shared').UpdateInfo) => void,
   ) => () => void;
 
-  // 日志
-  exportLog: () => Promise<string>;
+  // 日志导出
+  exportLog: () => Promise<import('@lol-assistant/shared').LogExportResult>;
+  revealExportedLog: () => Promise<boolean>;
 
   // 游戏阶段变化
   onGamePhaseChange: (callback: (phase: string) => void) => () => void;

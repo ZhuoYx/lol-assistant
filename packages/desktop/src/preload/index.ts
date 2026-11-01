@@ -93,7 +93,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ─── 窗口管理 ──────────────────────────────────────────
   setAlwaysOnTop: (flag: boolean) => ipcRenderer.send('window:setAlwaysOnTop', flag),
-  setMiniMode: (flag: boolean) => ipcRenderer.send('window:setMiniMode', flag),
   minimizeToTray: () => ipcRenderer.send('window:minimize-to-tray'),
 
   // ─── 自动更新 ──────────────────────────────────────────
@@ -111,8 +110,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return createEventListener('updater:update-available', callback);
   },
 
-  // ─── 日志 ──────────────────────────────────────────────
+  // ─── 日志导出 ──────────────────────────────────────────
   exportLog: () => ipcRenderer.invoke('log:export'),
+  revealExportedLog: () => ipcRenderer.invoke('log:revealExport'),
 
   // ─── 通知事件（主进程 -> 渲染进程） ─────────────────────
   onGamePhaseChange: (callback: (phase: string) => void) => {

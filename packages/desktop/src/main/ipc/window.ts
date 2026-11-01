@@ -2,7 +2,7 @@
  * 窗口管理 IPC 处理器
  */
 import { ipcMain, BrowserWindow } from 'electron';
-import { getMainWindow, toggleMiniMode } from '../index';
+import { getMainWindow } from '../index';
 import { logger } from '../utils/logger';
 
 export function registerWindowIpcHandlers(): void {
@@ -13,11 +13,6 @@ export function registerWindowIpcHandlers(): void {
       win.setAlwaysOnTop(flag, flag ? 'floating' : undefined);
       logger.info(`窗口置顶: ${flag}`);
     }
-  });
-
-  // 切换迷你模式
-  ipcMain.on('window:setMiniMode', (_event, flag: boolean) => {
-    toggleMiniMode(flag);
   });
 
   // 最小化到托盘

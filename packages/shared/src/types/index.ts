@@ -8,3 +8,4 @@ export * from './common';
 export * from './error';
 export * from './assets';
 export * from './aram-mayhem';
+export * from './log';

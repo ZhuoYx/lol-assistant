@@ -26,8 +26,6 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 /** LOL 客户端进程轮询取消函数 */
 let cancelPoll: (() => void) | null = null;
-/** 迷你窗口模式 */
-let isMiniMode = false;
 /** 是否正在退出应用 */
 let isQuitting = false;
 /** 上一次游戏阶段 */
@@ -37,15 +35,17 @@ let autoAcceptTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** 窗口尺寸配置 */
 const WINDOW_CONFIG = {
-  normal: { width: 1280, height: 800, minWidth: 1024, minHeight: 768 },
-  mini: { width: 400, height: 300, minWidth: 300, minHeight: 200 },
+  width: 1280,
+  height: 800,
+  minWidth: 1024,
+  minHeight: 768,
 } as const;
 
 /**
  * 创建主窗口
  */
 function createWindow(): void {
-  const { width, height, minWidth, minHeight } = WINDOW_CONFIG.normal;
+  const { width, height, minWidth, minHeight } = WINDOW_CONFIG;
 
   mainWindow = new BrowserWindow({
     width,
@@ -110,14 +110,6 @@ function createTray(): void {
         mainWindow?.focus();
       },
     },
-    {
-      label: '迷你模式',
-      type: 'checkbox',
-      checked: isMiniMode,
-      click: (menuItem) => {
-        toggleMiniMode(menuItem.checked);
-      },
-    },
     { type: 'separator' },
     {
       label: '退出',
@@ -133,29 +125,6 @@ function createTray(): void {
     mainWindow?.show();
     mainWindow?.focus();
   });
-}
-
-/**
- * 切换迷你窗口模式
- */
-function toggleMiniMode(enable: boolean): void {
-  if (!mainWindow) return;
-
-  isMiniMode = enable;
-
-  if (enable) {
-    const { width, height, minWidth, minHeight } = WINDOW_CONFIG.mini;
-    mainWindow.setMinimumSize(minWidth, minHeight);
-    mainWindow.setSize(width, height);
-    mainWindow.setAlwaysOnTop(true, 'floating');
-  } else {
-    const { width, height, minWidth, minHeight } = WINDOW_CONFIG.normal;
-    mainWindow.setMinimumSize(minWidth, minHeight);
-    mainWindow.setSize(width, height);
-    mainWindow.setAlwaysOnTop(false);
-  }
-
-  logger.info(`迷你模式: ${enable ? '开启' : '关闭'}`);
 }
 
 /**
@@ -437,5 +406,3 @@ app.on('before-quit', () => {
 export function getMainWindow(): BrowserWindow | null {
   return mainWindow;
 }
-
-export { toggleMiniMode };

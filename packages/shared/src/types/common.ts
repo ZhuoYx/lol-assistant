@@ -48,6 +48,5 @@ export interface AppSettings {
   cacheEnabled: boolean;
   lanProxyEnabled: boolean;
   alwaysOnTop: boolean;
-  miniMode: boolean;
   autoUpdate: boolean;
 }

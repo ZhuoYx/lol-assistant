@@ -101,16 +101,6 @@
             <span>建议将英雄联盟客户端设为「无边框窗口」模式以获得最佳体验</span>
             <button class="tip-dismiss" @click="alwaysOnTopTipDismissed = true">&times;</button>
           </div>
-          <div class="setting-divider" />
-          <div class="setting-row">
-            <div class="setting-info">
-              <span class="setting-label">迷你模式</span>
-              <span class="setting-desc">切换为悬浮小窗模式</span>
-            </div>
-            <div class="setting-control">
-              <n-switch v-model:value="miniMode" @update:value="onMiniModeChange" />
-            </div>
-          </div>
         </div>
       </section> -->
 
@@ -390,7 +380,7 @@
         </div>
       </section>
 
-      <!-- LAN Proxy -->
+      <!-- 局域网代理暂不开放，保留代码便于后续恢复。
       <section class="settings-section">
         <h2 class="section-title">局域网代理</h2>
         <div class="settings-card glass-panel">
@@ -445,6 +435,8 @@
         </div>
       </section>
 
+      -->
+
       <!-- About -->
       <section class="settings-section">
         <h2 class="section-title">关于</h2>
@@ -452,11 +444,23 @@
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">导出日志</span>
-              <span class="setting-desc">导出应用日志用于问题排查</span>
+              <span class="setting-desc"
+                >导出近 7 天运行日志与基础环境信息，连接凭证会自动隐藏</span
+              >
             </div>
             <div class="setting-control">
-              <n-button size="small" @click="handleExportLog">导出</n-button>
+              <n-button
+                size="small"
+                :loading="exportingLogs"
+                :disabled="exportingLogs"
+                @click="handleExportLog"
+                >导出</n-button
+              >
             </div>
+          </div>
+          <div v-if="exportedLogPath" class="export-log-result" role="status">
+            <span>已保存：{{ exportedLogPath }}</span>
+            <n-button size="tiny" @click="revealExportedLog">打开所在文件夹</n-button>
           </div>
           <div class="setting-divider" />
           <div class="setting-row">
@@ -506,10 +510,11 @@ const themeValue = computed({
   set: onThemeChange,
 });
 const alwaysOnTop = ref(appStore.settings.alwaysOnTop);
-const miniMode = ref(appStore.settings.miniMode);
 const autoUpdate = ref(appStore.settings.autoUpdate);
 const alwaysOnTopTipDismissed = ref(false);
 const clearingCache = ref(false);
+const exportingLogs = ref(false);
+const exportedLogPath = ref('');
 
 const cacheSize = ref(0);
 const cacheSizeText = ref('计算中...');
@@ -570,11 +575,6 @@ function onThemeChange(value: 'light' | 'dark' | 'system') {
 function onAlwaysOnTopChange(value: boolean) {
   appStore.updateSettings({ alwaysOnTop: value });
   window.electronAPI.setAlwaysOnTop(value);
-}
-
-function onMiniModeChange(value: boolean) {
-  appStore.updateSettings({ miniMode: value });
-  window.electronAPI.setMiniMode(value);
 }
 
 function onAutoUpdateChange(value: boolean) {
@@ -658,7 +658,36 @@ async function handleUpdateScraper() {
 }
 
 async function handleExportLog() {
-  await window.electronAPI.exportLog();
+  if (exportingLogs.value) return;
+  exportingLogs.value = true;
+  try {
+    const result = await window.electronAPI.exportLog();
+    if (result.status === 'saved') {
+      exportedLogPath.value = result.filePath;
+      message.success(`已导出 ${result.fileCount} 个日志文件`);
+      if (result.truncated || result.skippedCount)
+        message.info('部分日志因大小限制或读取失败未完整导出，文件中已注明。');
+    } else if (result.status === 'empty') {
+      message.info('暂无可导出的近 7 天日志。');
+    } else if (result.status === 'busy') {
+      message.info('日志正在导出，请稍候。');
+    } else if (result.status === 'error') {
+      message.error(result.message);
+    }
+  } catch {
+    message.error('导出日志失败，请稍后重试。');
+  } finally {
+    exportingLogs.value = false;
+  }
+}
+
+async function revealExportedLog() {
+  try {
+    if (!(await window.electronAPI.revealExportedLog()))
+      message.warning('导出的文件已移动或无法打开，请重新导出。');
+  } catch {
+    message.error('无法打开所在文件夹。');
+  }
 }
 
 function handleResetGuide() {
@@ -851,7 +880,8 @@ watch(() => appStore.championDataSource, loadScraperVersion);
 onMounted(() => {
   loadCacheStats();
   loadScraperVersion();
-  loadProxyStatus();
+  // 局域网代理暂不开放。
+  // loadProxyStatus();
   loadUpdateStatus();
   initUpdateListeners();
   loadAutoAccept();
@@ -868,6 +898,20 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.export-log-result {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 var(--space-5) var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.export-log-result span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .glass-adjustment {
   display: flex;
   align-items: center;

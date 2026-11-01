@@ -58,7 +58,6 @@ export function registerAllIpcHandlers(): void {
   // 自动更新
   registerUpdaterIpcHandlers();
 
-  // 日志
   registerLogIpcHandlers();
 
   // 应用（首次引导等）

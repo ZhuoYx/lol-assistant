@@ -20,6 +20,78 @@ function load(file, mocks = {}) {
 const fixtures = JSON.parse(readFileSync(join(__dirname, 'fixtures/qq101.json'), 'utf8'));
 const { QQ101Scraper, unpack101 } = load('src/main/scraper/qq101.ts');
 
+const logExport = load('src/main/utils/log-export.ts');
+const logContext = { appVersion:'0.1.0',system:'Windows test',arch:'x64',electronVersion:'33',nodeVersion:'20',connectionStatus:'disconnected' };
+async function temporaryLogDirectory(run) {
+  const fs=require('node:fs/promises');const path=require('node:path');const base=require('node:os').tmpdir();
+  const directory=await fs.mkdtemp(join(base,'lol-log-export-test-'));
+  try {return await run(fs,directory);} finally {
+    assert.ok(path.resolve(directory).startsWith(path.resolve(base)+path.sep+'lol-log-export-test-'));
+    await fs.rm(directory,{recursive:true,force:true});
+  }
+}
+
+test('exported logs hide credentials while preserving endpoint errors and readable Chinese', () => {
+  const source=[
+    '[2026-11-01 16:23:45] LCU 请求失败 GET /lol-match-history/v1/products/lol/abc (500)',
+    '--remoting-auth-token=command-secret --password "quoted secret"',
+    'https://riot:url-secret@127.0.0.1:1234/path',
+    'Authorization: Basic YmFzaWMtc2VjcmV0',
+    'Cookie: session=cookie-secret; other=second-cookie',
+    JSON.stringify({accessToken:'opaque-access',refresh_token:'refresh-secret',password:'json-secret',puuid:'private-player'}),
+    'LeagueClient:99:1234:lock-secret:https',
+    'Bearer eyJhbGciOiJub25lIn0.eyJleHAiOjEyM30.signature',
+    'C:\\Users\\ExampleUser\\AppData\\Roaming\\lol-assistant 01234567-1234-5678-9123-0123456789ab',
+  ].join('\n');
+  const safe=logExport.redactLogText(source);
+  for(const secret of ['command-secret','quoted secret','url-secret','YmFzaWMtc2VjcmV0','cookie-secret','second-cookie','opaque-access','refresh-secret','json-secret','private-player','lock-secret','eyJhbGci','ExampleUser','01234567-1234-5678-9123-0123456789ab'])assert.ok(!safe.includes(secret),secret);
+  assert.ok(safe.includes('/lol-match-history/v1/products/lol/abc (500)'));assert.ok(safe.includes('LCU 请求失败'));assert.ok(safe.includes('2026-11-01 16:23:45'));
+});
+
+test('log reports combine recent rotated logs, skip unrelated files and bound oversized tails', async () => {
+  await temporaryLogDirectory(async(fs,directory)=>{
+    const now=new Date();
+    await fs.writeFile(join(directory,'recent.log'),'中文错误: password=fixture-password\nHTTP 500\n');
+    await fs.writeFile(join(directory,'recent.old.log'),'之前的错误\n');
+    await fs.writeFile(join(directory,'old.log'),'too old');await fs.utimes(join(directory,'old.log'),new Date(now.getTime()-9*86400000),new Date(now.getTime()-9*86400000));
+    await fs.writeFile(join(directory,'settings.json'),'not a log');await fs.mkdir(join(directory,'folder.log'));
+    const report=await logExport.buildLogReport(directory,logContext,now);
+    assert.equal(report.fileCount,2);assert.ok(report.text.includes('之前的错误'));assert.ok(report.text.includes('应用版本：0.1.0'));
+    assert.ok(!report.text.includes('fixture-password'));assert.ok(!report.text.includes('too old'));assert.ok(!report.text.includes('not a log'));
+    assert.ok((await fs.readFile(join(directory,'recent.log'),'utf8')).includes('fixture-password'));
+    await fs.writeFile(join(directory,'large.log'),'旧消息\n'.repeat(400000)+'LATEST ERROR\n');
+    const large=await logExport.buildLogReport(directory,logContext);
+    assert.equal(large.truncated,true);assert.ok(large.text.includes('LATEST ERROR'));assert.ok(Buffer.byteLength(large.text)<2.1*1024*1024);
+    assert.equal((await logExport.buildLogReport(join(directory,'missing'),logContext)).fileCount,0);
+  });
+});
+
+test('log IPC saves a real UTF-8 report and handles cancellation, failure and duplicate requests', async () => {
+  await temporaryLogDirectory(async(fs,directory)=>{
+    const handlers=new Map();let dialogResult={canceled:true},revealed=null;
+    const {registerLogIpcHandlers}=load('src/main/ipc/log.ts',{
+      electron:{app:{getVersion:()=>'0.1.0',getPath:()=>directory},BrowserWindow:{fromWebContents:()=>null},
+        dialog:{showSaveDialog:async options=>{assert.equal(options.filters[0].extensions[0],'txt');return dialogResult;}},
+        ipcMain:{handle:(key,fn)=>handlers.set(key,fn)},shell:{showItemInFolder:file=>{revealed=file;}}},
+      '../utils/logger':{getLogDirectory:()=>directory,logger:{info(){},warn(){}}},
+      '../utils/log-export':logExport,'../lcu/client':{lcuClient:{status:'disconnected'}},
+    });
+    registerLogIpcHandlers();const exportLogs=()=>handlers.get('log:export')({sender:{}}),reveal=handlers.get('log:revealExport');
+    assert.equal(await reveal(),false);assert.equal((await exportLogs()).status,'empty');
+    await fs.writeFile(join(directory,'today.log'),'中文连接失败 HTTP 500\naccessToken=fixture-secret\n');
+    assert.equal((await exportLogs()).status,'cancelled');assert.equal(await reveal(),false);
+    const destination=join(directory,'report.txt');dialogResult={canceled:false,filePath:destination};
+    const saved=await exportLogs();assert.equal(saved.status,'saved');assert.equal(saved.fileCount,1);assert.equal(saved.filePath,destination);
+    const report=await fs.readFile(destination,'utf8');assert.equal(report.charCodeAt(0),0xfeff);assert.ok(report.includes('中文连接失败'));assert.ok(!report.includes('fixture-secret'));
+    assert.equal(await reveal(),true);assert.equal(revealed,destination);
+    dialogResult={canceled:false,filePath:join(directory,'today.log')};assert.equal((await exportLogs()).status,'error');
+    assert.ok((await fs.readFile(join(directory,'today.log'),'utf8')).includes('fixture-secret'));
+    dialogResult={canceled:false,filePath:join(directory,'not-created','report.txt')};assert.equal((await exportLogs()).status,'error');
+    dialogResult={canceled:true};const pending=exportLogs();assert.equal((await exportLogs()).status,'busy');assert.equal((await pending).status,'cancelled');
+    await fs.unlink(destination);assert.equal(await reveal(),false);
+  });
+});
+
 test('101 source decodes captured ranked, rune, item and counter responses', async () => {
   const scraper = new QQ101Scraper();
   scraper.http = { get: async (url, options) => {

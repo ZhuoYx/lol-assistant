@@ -17,7 +17,6 @@ export const useAppStore = defineStore('app', () => {
     cacheEnabled: true,
     lanProxyEnabled: false,
     alwaysOnTop: false,
-    miniMode: false,
     autoUpdate: true,
   });
 
@@ -71,7 +70,6 @@ export const useAppStore = defineStore('app', () => {
   const isDarkTheme = computed(() =>
     settings.value.theme === 'system' ? systemPrefersDark.value : settings.value.theme === 'dark',
   );
-  const isMiniMode = computed(() => settings.value.miniMode);
 
   // Actions
   function setConnectionStatus(status: ConnectionStatus) {
@@ -150,7 +148,6 @@ export const useAppStore = defineStore('app', () => {
     isConnected,
     isConnecting,
     isDarkTheme,
-    isMiniMode,
 
     // Actions
     setConnectionStatus,
