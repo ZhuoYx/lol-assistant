@@ -1,0 +1,51 @@
+name: Windows 发布
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: 验证版本标签与发布仓库
+        run: node packages/desktop/scripts/check-release.cjs
+      - name: 安装锁定依赖
+        run: pnpm install --frozen-lockfile
+      - name: 构建共享包
+        run: pnpm build:shared
+      - name: 类型检查
+        run: |
+          pnpm --filter @lol-assistant/desktop typecheck:node
+          pnpm --filter @lol-assistant/desktop typecheck:web
+      - name: 验证数据与更新流程
+        run: |
+          node packages/desktop/scripts/check-data.cjs
+          node packages/desktop/scripts/check-updater.cjs
+      - name: 构建桌面端
+        run: pnpm build:desktop
+      - name: 上传安装包、差分文件和更新清单至 Release 草稿
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm --filter @lol-assistant/desktop exec electron-builder --win --x64 --publish always

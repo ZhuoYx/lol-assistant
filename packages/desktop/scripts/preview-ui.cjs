@@ -13,6 +13,7 @@ const iconFile=path.resolve(__dirname,'../../../specs/aram-source/icon-fixture.j
 const data={ids,names,matches,players,mayhemRecommendations,mayhemIcons};
 function shim(data){
  const query=new URLSearchParams(location.search);localStorage.setItem('lol-assistant-theme',query.get('theme')||'dark');localStorage.setItem('lol-assistant-wallpaper','anime');
+ const updateListeners=new Set();let updateState={status:query.get('update')||'idle',currentVersion:'1.0.0',supported:!query.has('dev-update'),autoUpdate:true,downloadPercent:query.get('update')==='downloading'?42:query.get('update')==='downloaded'?100:0,updateInfo:['available','downloading','downloaded'].includes(query.get('update'))?{version:'1.0.1'}:null,error:query.get('update')==='error'?'尚未发布可用的更新，或发布文件不完整，请稍后重试。':null};const emitUpdate=()=>{updateListeners.forEach(fn=>fn({...updateState}));return {...updateState};};
  const mayhem=query.get('mode')==='mayhem';let source='opgg',started=false;const phases=new Set();const phase=query.get('phase')==='draft'?'ChampSelect':query.get('phase')==='live'?'InProgress':'Lobby';
  const rank={tier:'EMERALD',division:'II',leaguePoints:56,wins:126,losses:98};
  const builds={championId:99,role:'mid',patch:'16.21',dataSource:'opgg',availableRoles:['mid','support'],
@@ -43,10 +44,10 @@ function shim(data){
  getGameflowState:async()=>({phase,queueId:mayhem?2400:420}),
  analyzeLiveGame:async()=>({gameId:1248573906,gameMode:mayhem?'KIWI':'CLASSIC',queueId:mayhem?2400:420,teams:[{teamId:100,players:data.players.slice(0,5)},{teamId:200,players:data.players.slice(5)}]}),
  getGameVersion:async()=>'',getMetadata:async()=>null,getScraperDataVersion:async()=>({patch:'16.21',source,lastUpdated:Date.now()}),
- getCacheStats:async()=>({totalSize:2345678,totalEntries:18,byType:{}}),getUpdateStatus:async()=>({status:'idle',downloadPercent:0}),
+ getCacheStats:async()=>({totalSize:2345678,totalEntries:18,byType:{}}),getUpdateStatus:async()=>({...updateState}),onUpdateStateChange:fn=>{updateListeners.add(fn);return()=>updateListeners.delete(fn);},setAutoUpdate:async enabled=>{updateState.autoUpdate=enabled;return emitUpdate();},checkForUpdates:async()=>{updateState.status=query.get('update')==='error'?'error':'not-available';return emitUpdate();},downloadUpdate:async()=>{updateState.status='downloaded';updateState.downloadPercent=100;return emitUpdate();},installUpdate:async()=>({...updateState}),
  getAutoAccept:async()=>({enabled:false,delay:0}),getProxyStatus:async()=>({running:false,address:null}),
  getClientStatus:async()=>({statusMessage:'星光不问赶路人',availability:'chat'}),getClientSettings:async()=>({}),
- getAppVersion:async()=>'0.1.0',getClientPath:async()=>'D:/Riot Games/League of Legends',
+ getAppVersion:async()=>'1.0.0',getClientPath:async()=>'D:/Riot Games/League of Legends',
  onGamePhaseChange:fn=>{phases.add(fn);if(!started){started=true;setTimeout(()=>phases.forEach(cb=>cb(phase)),150);}return()=>phases.delete(fn);}
  };
  window.electronAPI=new Proxy(api,{get:(target,key)=>target[key]||(String(key).startsWith('on')?()=>()=>{}:async()=>null)});

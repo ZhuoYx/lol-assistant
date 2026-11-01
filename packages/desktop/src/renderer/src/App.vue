@@ -214,7 +214,6 @@ const router = useRouter();
 useLCU();
 useGameNotification();
 
-let unsubUpdateAvailable: (() => void) | null = null;
 let unsubUpdateStatus: (() => void) | null = null;
 
 const currentRoute = computed(() => route.path);
@@ -378,14 +377,18 @@ onMounted(async () => {
   document.addEventListener('keydown', handleKeydown);
 
   // Listen for update events
-  unsubUpdateAvailable = window.electronAPI.onUpdateAvailable((info) => {
-    appStore.setUpdateAvailable(info.version);
-  });
-  unsubUpdateStatus = window.electronAPI.onUpdateStatusChange((status) => {
-    if (status === 'downloaded') {
-      appStore.setUpdateDownloaded();
-    }
-  });
+  const syncUpdateState = (state: import('@lol-assistant/shared').UpdateState) => {
+    appStore.updateSettings({ autoUpdate: state.autoUpdate });
+    appStore.clearUpdateState();
+    if (state.updateInfo) appStore.setUpdateAvailable(state.updateInfo.version);
+    if (state.status === 'downloaded') appStore.setUpdateDownloaded();
+  };
+  unsubUpdateStatus = window.electronAPI.onUpdateStateChange(syncUpdateState);
+  try {
+    syncUpdateState(await window.electronAPI.getUpdateStatus());
+  } catch {
+    // Settings can retry reading the updater state.
+  }
 
   // Check first launch
   try {
@@ -401,7 +404,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown);
-  unsubUpdateAvailable?.();
   unsubUpdateStatus?.();
 });
 </script>

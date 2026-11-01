@@ -354,12 +354,7 @@ async function initApp(): Promise<void> {
   // 启动进程轮询
   startProcessPolling();
 
-  // 延迟检查自动更新（启动 5 秒后），避免影响启动速度
-  setTimeout(() => {
-    appUpdater.checkForUpdates().catch(() => {
-      // 静默跳过，不影响正常使用
-    });
-  }, 5000);
+  appUpdater.start();
 }
 
 // ---- 应用生命周期 ----
@@ -384,6 +379,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  appUpdater.dispose();
 
   // 清理资源
   if (cancelPoll) {

@@ -21,6 +21,27 @@ export interface UpdateInfo {
   releaseDate?: string;
 }
 
+export type UpdateStatus =
+  | 'idle'
+  | 'checking'
+  | 'available'
+  | 'not-available'
+  | 'downloading'
+  | 'downloaded'
+  | 'unsupported'
+  | 'error';
+
+/** 更新状态由主进程统一维护，页面切换后也能恢复下载进度。 */
+export interface UpdateState {
+  status: UpdateStatus;
+  currentVersion: string;
+  supported: boolean;
+  autoUpdate: boolean;
+  updateInfo: UpdateInfo | null;
+  downloadPercent: number;
+  error: string | null;
+}
+
 /** 游戏流程阶段 */
 export type GamePhase =
   | 'None'

@@ -7,51 +7,18 @@
 import { ipcMain } from 'electron';
 import { appUpdater } from '../updater/index';
 import { getMainWindow } from '../index';
-import { logger } from '../utils/logger';
 
 export function registerUpdaterIpcHandlers(): void {
-  // 检查更新
-  ipcMain.handle('updater:checkForUpdates', async () => {
-    try {
-      return await appUpdater.checkForUpdates();
-    } catch (err) {
-      logger.warn('检查更新失败（静默跳过）:', err);
-      return null;
-    }
+  appUpdater.init((state) => {
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) win.webContents.send('updater:state-change', state);
   });
-
-  // 下载更新
-  ipcMain.on('updater:downloadUpdate', () => {
-    appUpdater.downloadUpdate();
-  });
-
-  // 安装更新
-  ipcMain.on('updater:installUpdate', () => {
-    appUpdater.installUpdate();
-  });
-
-  // 获取更新状态
-  ipcMain.handle('updater:getStatus', () => {
-    return appUpdater.getStatus();
-  });
-
-  // 初始化 updater 并注册事件转发
-  appUpdater.init({
-    onStatusChange: (status) => {
-      const win = getMainWindow();
-      win?.webContents.send('updater:status-change', status);
-    },
-    onProgress: (percent) => {
-      const win = getMainWindow();
-      win?.webContents.send('updater:progress', percent);
-    },
-    onUpdateInfo: (info) => {
-      const win = getMainWindow();
-      win?.webContents.send('updater:update-available', info);
-    },
-    onError: (error) => {
-      const win = getMainWindow();
-      win?.webContents.send('updater:error', error);
-    },
+  ipcMain.handle('updater:checkForUpdates', () => appUpdater.checkForUpdates());
+  ipcMain.handle('updater:downloadUpdate', () => appUpdater.downloadUpdate());
+  ipcMain.handle('updater:installUpdate', () => appUpdater.installUpdate());
+  ipcMain.handle('updater:getStatus', () => appUpdater.getStatus());
+  ipcMain.handle('updater:setAutoUpdate', (_event, enabled: unknown) => {
+    if (typeof enabled !== 'boolean') throw new Error('自动更新设置必须为布尔值');
+    return appUpdater.setAutoUpdate(enabled);
   });
 }

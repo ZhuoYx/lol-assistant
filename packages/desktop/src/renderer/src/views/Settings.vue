@@ -243,10 +243,18 @@
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">当前版本</span>
-              <span class="setting-desc">v{{ appVersion }}</span>
+              <span class="setting-desc">{{ appVersion ? 'v' + appVersion : '读取中…' }}</span>
             </div>
             <div class="setting-control">
-              <n-button size="small" :loading="updateChecking" @click="handleCheckUpdate">
+              <n-button
+                size="small"
+                :loading="updateChecking || updateStatus === 'checking'"
+                :disabled="
+                  !updateSupported ||
+                  ['checking', 'downloading', 'downloaded'].includes(updateStatus)
+                "
+                @click="handleCheckUpdate"
+              >
                 检查更新
               </n-button>
             </div>
@@ -255,10 +263,15 @@
           <div class="setting-row">
             <div class="setting-info">
               <span class="setting-label">自动更新</span>
-              <span class="setting-desc">有新版本时自动下载安装</span>
+              <span class="setting-desc">通过 GitHub 检查并下载新版本，正常退出助手时安装</span>
             </div>
             <div class="setting-control">
-              <n-switch v-model:value="autoUpdate" @update:value="onAutoUpdateChange" />
+              <n-switch
+                v-model:value="autoUpdate"
+                :disabled="!updateSupported || autoUpdateSaving"
+                :loading="autoUpdateSaving"
+                @update:value="onAutoUpdateChange"
+              />
             </div>
           </div>
           <template v-if="updateStatus === 'available' && updateNewVersion">
@@ -309,7 +322,7 @@
               <n-button size="tiny" type="primary" @click="handleInstallUpdate">立即重启</n-button>
             </div>
           </template>
-          <template v-if="updateStatus === 'not-available' && updateCheckDone">
+          <template v-if="updateStatus === 'not-available'">
             <div class="setting-tip update-latest-tip">
               <svg
                 width="14"
@@ -327,6 +340,15 @@
               <span>当前已是最新版本</span>
             </div>
           </template>
+          <div v-if="!updateSupported && appVersion" class="setting-tip" role="status">
+            自动更新仅支持已安装的 Windows 版本，开发模式下不会下载或安装更新。
+          </div>
+          <div v-if="updateStatus === 'error'" class="setting-tip update-error-tip" role="alert">
+            <span>{{ updateError || '无法读取更新状态，请稍后重试。' }}</span>
+            <n-button v-if="updateNewVersion" size="tiny" @click="handleDownloadUpdate"
+              >重试下载</n-button
+            >
+          </div>
         </div>
       </section>
 
@@ -493,7 +515,12 @@ import {
   CHAMPION_CN_NAME_MAP,
   getCDragonChampionDetailUrl,
 } from '@lol-assistant/shared';
-import type { ScraperDataVersion, CDragonSkinData } from '@lol-assistant/shared';
+import type {
+  ScraperDataVersion,
+  CDragonSkinData,
+  UpdateState,
+  UpdateStatus,
+} from '@lol-assistant/shared';
 import QRCode from 'qrcode';
 import { wallpapers } from '@/styles/wallpapers';
 import DataSourceSelect from '@/components/common/DataSourceSelect.vue';
@@ -552,15 +579,15 @@ const proxyAddress = ref<string | null>(null);
 const proxyQrDataUrl = ref<string | null>(null);
 
 // Auto Update
-const appVersion = ref('0.1.0');
+const appVersion = ref('');
+const updateSupported = ref(false);
+const autoUpdateSaving = ref(false);
 const updateChecking = ref(false);
-const updateStatus = ref('idle'); // idle | checking | available | downloading | downloaded | not-available | error
+const updateStatus = ref<UpdateStatus>('idle');
+const updateError = ref('');
 const updateNewVersion = ref<string | null>(null);
 const updatePercent = ref(0);
-const updateCheckDone = ref(false);
 let unsubUpdateStatus: (() => void) | null = null;
-let unsubUpdateProgress: (() => void) | null = null;
-let unsubUpdateAvailable: (() => void) | null = null;
 
 const themeOptions = [
   { label: '浅色', value: 'light' as const },
@@ -577,67 +604,68 @@ function onAlwaysOnTopChange(value: boolean) {
   window.electronAPI.setAlwaysOnTop(value);
 }
 
-function onAutoUpdateChange(value: boolean) {
-  appStore.updateSettings({ autoUpdate: value });
+function applyUpdateState(state: UpdateState) {
+  appVersion.value = state.currentVersion;
+  updateSupported.value = state.supported;
+  autoUpdate.value = state.autoUpdate;
+  appStore.updateSettings({ autoUpdate: state.autoUpdate });
+  updateStatus.value = state.status;
+  updateNewVersion.value = state.updateInfo?.version ?? null;
+  updatePercent.value = state.downloadPercent;
+  updateError.value = state.error ?? '';
+}
+
+async function onAutoUpdateChange(value: boolean) {
+  autoUpdateSaving.value = true;
+  try {
+    applyUpdateState(await window.electronAPI.setAutoUpdate(value));
+  } catch {
+    autoUpdate.value = appStore.settings.autoUpdate;
+    message.error('自动更新设置保存失败，请重试。');
+  } finally {
+    autoUpdateSaving.value = false;
+  }
 }
 
 async function handleCheckUpdate() {
   updateChecking.value = true;
-  updateCheckDone.value = false;
   try {
-    const info = await window.electronAPI.checkForUpdates();
-    if (info) {
-      updateStatus.value = 'available';
-      updateNewVersion.value = info.version;
-    } else {
-      updateStatus.value = 'not-available';
-    }
-    updateCheckDone.value = true;
+    applyUpdateState(await window.electronAPI.checkForUpdates());
   } catch {
     updateStatus.value = 'error';
+    updateError.value = '检查更新失败，请稍后重试。';
   } finally {
     updateChecking.value = false;
   }
 }
 
-function handleDownloadUpdate() {
-  window.electronAPI.downloadUpdate();
-  updateStatus.value = 'downloading';
-  updatePercent.value = 0;
+async function handleDownloadUpdate() {
+  try {
+    applyUpdateState(await window.electronAPI.downloadUpdate());
+  } catch {
+    updateStatus.value = 'error';
+    updateError.value = '下载更新失败，请稍后重试。';
+  }
 }
 
-function handleInstallUpdate() {
-  window.electronAPI.installUpdate();
+async function handleInstallUpdate() {
+  try {
+    applyUpdateState(await window.electronAPI.installUpdate());
+  } catch {
+    message.error('安装更新失败，请重试。');
+  }
 }
 
 function initUpdateListeners() {
-  unsubUpdateStatus = window.electronAPI.onUpdateStatusChange((status) => {
-    updateStatus.value = status;
-    if (status === 'not-available') {
-      updateCheckDone.value = true;
-    }
-  });
-
-  unsubUpdateProgress = window.electronAPI.onUpdateProgress((percent) => {
-    updatePercent.value = percent;
-  });
-
-  unsubUpdateAvailable = window.electronAPI.onUpdateAvailable((info) => {
-    updateNewVersion.value = info.version;
-    updateStatus.value = 'available';
-  });
+  unsubUpdateStatus = window.electronAPI.onUpdateStateChange(applyUpdateState);
 }
 
 async function loadUpdateStatus() {
   try {
-    const status = await window.electronAPI.getUpdateStatus();
-    updateStatus.value = status.status;
-    if (status.updateInfo) {
-      updateNewVersion.value = status.updateInfo.version;
-    }
-    updatePercent.value = status.downloadPercent;
+    applyUpdateState(await window.electronAPI.getUpdateStatus());
   } catch {
-    // ignore
+    updateStatus.value = 'error';
+    updateError.value = '无法读取当前版本和更新状态，请重新打开设置页。';
   }
 }
 
@@ -882,8 +910,8 @@ onMounted(() => {
   loadScraperVersion();
   // 局域网代理暂不开放。
   // loadProxyStatus();
-  loadUpdateStatus();
   initUpdateListeners();
+  loadUpdateStatus();
   loadAutoAccept();
   if (appStore.isConnected) {
     loadStatusMessage();
@@ -892,8 +920,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   unsubUpdateStatus?.();
-  unsubUpdateProgress?.();
-  unsubUpdateAvailable?.();
 });
 </script>
 
@@ -1166,6 +1192,15 @@ onUnmounted(() => {
   background-color: rgba(48, 209, 88, 0.06);
   color: var(--color-success);
   border-top: 1px solid rgba(48, 209, 88, 0.1);
+}
+
+.update-error-tip {
+  color: var(--color-error);
+  flex-wrap: wrap;
+}
+.update-error-tip span {
+  flex: 1;
+  min-width: 180px;
 }
 
 /* Auto Accept Delay */

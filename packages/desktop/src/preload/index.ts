@@ -97,17 +97,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ─── 自动更新 ──────────────────────────────────────────
   checkForUpdates: () => ipcRenderer.invoke('updater:checkForUpdates'),
-  downloadUpdate: () => ipcRenderer.send('updater:downloadUpdate'),
-  installUpdate: () => ipcRenderer.send('updater:installUpdate'),
+  downloadUpdate: () => ipcRenderer.invoke('updater:downloadUpdate'),
+  installUpdate: () => ipcRenderer.invoke('updater:installUpdate'),
   getUpdateStatus: () => ipcRenderer.invoke('updater:getStatus'),
-  onUpdateProgress: (callback: (progress: number) => void) => {
-    return createEventListener('updater:progress', callback);
-  },
-  onUpdateStatusChange: (callback: (status: string) => void) => {
-    return createEventListener('updater:status-change', callback);
-  },
-  onUpdateAvailable: (callback: (info: unknown) => void) => {
-    return createEventListener('updater:update-available', callback);
+  setAutoUpdate: (enabled: boolean) => ipcRenderer.invoke('updater:setAutoUpdate', enabled),
+  onUpdateStateChange: (callback: (state: import('@lol-assistant/shared').UpdateState) => void) => {
+    return createEventListener('updater:state-change', callback);
   },
 
   // ─── 日志导出 ──────────────────────────────────────────

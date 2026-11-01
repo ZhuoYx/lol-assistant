@@ -18,7 +18,7 @@
       }
     ],
     "icon": "resources/icons/poro-companion.ico",
-    "artifactName": "${productName}-${version}-setup.${ext}",
+    "artifactName": "lol-assistant-${version}-${arch}-setup.${ext}",
     "requestedExecutionLevel": "requireAdministrator"
   },
   "nsis": {
@@ -31,9 +31,9 @@
   },
   "publish": {
     "provider": "github",
-    "owner": "your-github-username",
+    "owner": "ZhuoYx",
     "repo": "lol-assistant",
-    "releaseType": "release"
+    "releaseType": "draft"
   },
   "asar": true,
   "compression": "maximum"

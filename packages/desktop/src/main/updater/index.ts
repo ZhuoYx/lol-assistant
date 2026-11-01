@@ -1,160 +1,215 @@
-/**
- * 自动更新模块
- *
- * 封装 electron-updater，配置 GitHub Releases 作为更新分发渠道
- * 更新检查失败时静默跳过，不影响正常使用
- */
+import { app } from 'electron';
 import { autoUpdater, type UpdateInfo as ElectronUpdateInfo } from 'electron-updater';
 import { logger } from '../utils/logger';
-import type { UpdateInfo } from '@lol-assistant/shared';
+import { cacheStore } from '../cache/store';
+import type { UpdateInfo, UpdateState, UpdateStatus } from '@lol-assistant/shared';
 
-/** 更新状态 */
-export type UpdateStatus =
-  | 'idle'
-  | 'checking'
-  | 'available'
-  | 'not-available'
-  | 'downloading'
-  | 'downloaded'
-  | 'error';
+const CHECK_INTERVAL = 4 * 60 * 60 * 1000;
 
-/** 更新事件回调 */
-interface UpdateCallbacks {
-  onStatusChange?: (status: UpdateStatus) => void;
-  onProgress?: (percent: number) => void;
-  onUpdateInfo?: (info: UpdateInfo) => void;
-  onError?: (error: string) => void;
-}
-
-class AppUpdater {
+export class AppUpdater {
   private status: UpdateStatus = 'idle';
-  private callbacks: UpdateCallbacks = {};
   private updateInfo: UpdateInfo | null = null;
   private downloadPercent = 0;
+  private error: string | null = null;
+  private enabled = true;
   private initialized = false;
+  private started = false;
+  private onChange: ((state: UpdateState) => void) | undefined;
+  private checking: Promise<UpdateState> | null = null;
+  private downloading: Promise<UpdateState> | null = null;
+  private startupTimer: ReturnType<typeof setTimeout> | undefined;
+  private intervalTimer: ReturnType<typeof setInterval> | undefined;
 
-  /**
-   * 初始化自动更新
-   */
-  init(callbacks: UpdateCallbacks = {}): void {
+  init(onChange?: (state: UpdateState) => void): void {
+    this.onChange = onChange;
     if (this.initialized) return;
     this.initialized = true;
-    this.callbacks = callbacks;
-
-    // 配置 autoUpdater
+    this.enabled = cacheStore.getSetting<boolean>('autoUpdate', true) !== false;
+    // Start downloads explicitly so an in-flight check respects a newly disabled preference.
     autoUpdater.autoDownload = false;
-    autoUpdater.autoInstallOnAppQuit = true;
-    autoUpdater.logger = null; // 使用自定义 logger
+    autoUpdater.autoInstallOnAppQuit = this.enabled;
+    autoUpdater.allowPrerelease = false;
+    autoUpdater.allowDowngrade = false;
+    autoUpdater.logger = logger;
 
-    // 注册事件
-    autoUpdater.on('checking-for-update', () => {
-      this.setStatus('checking');
-      logger.info('正在检查更新...');
-    });
-
+    autoUpdater.on('checking-for-update', () => this.setStatus('checking'));
     autoUpdater.on('update-available', (info: ElectronUpdateInfo) => {
-      this.updateInfo = {
-        version: info.version,
-        releaseNotes: typeof info.releaseNotes === 'string'
-          ? info.releaseNotes
-          : undefined,
-        releaseDate: info.releaseDate,
-      };
+      this.updateInfo = this.normalizeInfo(info);
+      this.error = null;
+      this.downloadPercent = 0;
       this.setStatus('available');
-      this.callbacks.onUpdateInfo?.(this.updateInfo);
-      logger.info(`发现新版本: ${info.version}`);
+      logger.info(`发现新版本：${info.version}`);
+      if (this.enabled) void this.downloadUpdate();
     });
-
     autoUpdater.on('update-not-available', () => {
+      this.updateInfo = null;
+      this.downloadPercent = 0;
+      this.error = null;
       this.setStatus('not-available');
-      logger.info('当前已是最新版本');
     });
-
     autoUpdater.on('download-progress', (progress) => {
-      this.downloadPercent = Math.round(progress.percent);
+      this.downloadPercent = Math.max(0, Math.min(100, Math.round(progress.percent || 0)));
       this.setStatus('downloading');
-      this.callbacks.onProgress?.(this.downloadPercent);
     });
-
     autoUpdater.on('update-downloaded', () => {
+      this.downloadPercent = 100;
+      this.error = null;
       this.setStatus('downloaded');
-      logger.info('更新已下载，将在下次启动时安装');
+      logger.info('更新已下载，等待用户重启或正常退出应用');
     });
-
-    autoUpdater.on('error', (err) => {
-      const msg = err?.message ?? '未知更新错误';
-      this.setStatus('error');
-      this.callbacks.onError?.(msg);
-      logger.warn('更新检查失败（静默跳过）:', msg);
-    });
+    autoUpdater.on('error', (error: Error) => this.fail(error));
   }
 
-  /**
-   * 检查更新
-   */
-  async checkForUpdates(): Promise<UpdateInfo | null> {
-    try {
-      this.setStatus('checking');
-      const result = await autoUpdater.checkForUpdates();
-      if (result?.updateInfo) {
-        this.updateInfo = {
-          version: result.updateInfo.version,
-          releaseNotes: typeof result.updateInfo.releaseNotes === 'string'
-            ? result.updateInfo.releaseNotes
-            : undefined,
-          releaseDate: result.updateInfo.releaseDate,
-        };
-        return this.updateInfo;
+  start(): void {
+    this.started = true;
+    this.scheduleChecks();
+  }
+
+  private scheduleChecks(): void {
+    this.clearTimers();
+    if (!this.started || !this.enabled || !this.isSupported()) return;
+    this.startupTimer = setTimeout(() => void this.checkForUpdates(true), 5000);
+    this.intervalTimer = setInterval(() => void this.checkForUpdates(true), CHECK_INTERVAL);
+    this.startupTimer.unref();
+    this.intervalTimer.unref();
+  }
+
+  private clearTimers(): void {
+    clearTimeout(this.startupTimer);
+    clearInterval(this.intervalTimer);
+  }
+
+  dispose(): void {
+    this.started = false;
+    this.clearTimers();
+  }
+
+  setAutoUpdate(value: boolean): UpdateState {
+    cacheStore.setSetting('autoUpdate', value);
+    this.enabled = value;
+    autoUpdater.autoInstallOnAppQuit = value;
+    this.scheduleChecks();
+    this.notify();
+    if (value && this.status === 'available') void this.downloadUpdate();
+    // A manual download made while auto-install was disabled has no quit hook yet.
+    // Revalidating the cached download registers electron-updater's official quit hook.
+    if (value && this.status === 'downloaded')
+      void autoUpdater.downloadUpdate().catch((error) => this.fail(error));
+    return this.getStatus();
+  }
+
+  async checkForUpdates(background = false): Promise<UpdateState> {
+    if (background && !this.enabled) return this.getStatus();
+    if (!this.isSupported()) {
+      this.error = '自动更新仅支持已安装的 Windows 版本，开发模式下不会下载或安装更新。';
+      this.setStatus('unsupported');
+      return this.getStatus();
+    }
+    if (this.downloading || this.status === 'downloaded') return this.getStatus();
+    if (this.checking) return this.checking;
+    this.error = null;
+    this.updateInfo = null;
+    this.downloadPercent = 0;
+    this.setStatus('checking');
+    this.checking = (async () => {
+      try {
+        const result = await autoUpdater.checkForUpdates();
+        if (!result) throw new Error('更新服务未返回检查结果');
+        // updateInfo also exists when the server version equals/precedates this version.
+        // Only the explicit availability flag indicates a newer release.
+        if (!result.isUpdateAvailable) {
+          this.updateInfo = null;
+          this.setStatus('not-available');
+        }
+      } catch (error) {
+        this.fail(error);
       }
-      return null;
-    } catch (err) {
-      logger.warn('检查更新失败（静默跳过）:', err);
-      this.setStatus('error');
-      return null;
+      return this.getStatus();
+    })();
+    try {
+      return await this.checking;
+    } finally {
+      this.checking = null;
     }
   }
 
-  /**
-   * 下载更新
-   */
-  downloadUpdate(): void {
-    if (this.status !== 'available') {
-      logger.warn('没有可用更新可下载');
-      return;
+  async downloadUpdate(): Promise<UpdateState> {
+    if (!this.isSupported() || !this.updateInfo || !['available', 'error'].includes(this.status))
+      return this.downloading ?? this.getStatus();
+    if (this.downloading) return this.downloading;
+    this.error = null;
+    this.downloadPercent = 0;
+    this.setStatus('downloading');
+    this.downloading = (async () => {
+      try {
+        await autoUpdater.downloadUpdate();
+      } catch (error) {
+        this.fail(error);
+      }
+      return this.getStatus();
+    })();
+    try {
+      return await this.downloading;
+    } finally {
+      this.downloading = null;
     }
-    logger.info('开始下载更新...');
-    autoUpdater.downloadUpdate().catch((err) => {
-      logger.error('下载更新失败:', err);
-      this.setStatus('error');
-    });
   }
 
-  /**
-   * 安装更新（退出应用并安装）
-   */
-  installUpdate(): void {
-    if (this.status !== 'downloaded') {
-      logger.warn('更新尚未下载完成');
-      return;
+  installUpdate(): UpdateState {
+    if (this.status === 'downloaded' && this.isSupported()) {
+      try {
+        // Explicit installation is allowed even with automatic updates disabled.
+        autoUpdater.quitAndInstall(false, true);
+      } catch (error) {
+        this.fail(error);
+      }
     }
-    logger.info('退出并安装更新...');
-    autoUpdater.quitAndInstall(false, true);
+    return this.getStatus();
   }
 
-  /**
-   * 获取当前状态
-   */
-  getStatus(): { status: UpdateStatus; updateInfo: UpdateInfo | null; downloadPercent: number } {
+  getStatus(): UpdateState {
     return {
       status: this.status,
+      currentVersion: app.getVersion(),
+      supported: this.isSupported(),
+      autoUpdate: this.enabled,
       updateInfo: this.updateInfo,
       downloadPercent: this.downloadPercent,
+      error: this.error,
     };
+  }
+
+  private isSupported(): boolean {
+    return app.isPackaged && process.platform === 'win32';
+  }
+
+  private normalizeInfo(info: ElectronUpdateInfo): UpdateInfo {
+    return {
+      version: info.version,
+      releaseDate: info.releaseDate,
+      releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : undefined,
+    };
+  }
+
+  private fail(error: unknown): void {
+    const detail = error instanceof Error ? error.message : String(error);
+    this.error =
+      /404|No published versions|ERR_UPDATER_(?:LATEST_VERSION_NOT_FOUND|CHANNEL_FILE_NOT_FOUND)/i.test(
+        detail,
+      )
+        ? '尚未发布可用的更新，或发布文件不完整，请稍后重试。'
+        : '更新失败，请检查 GitHub 网络连接后重试；详细原因可通过导出日志查看。';
+    logger.warn('应用更新失败：', detail);
+    this.setStatus('error');
   }
 
   private setStatus(status: UpdateStatus): void {
     this.status = status;
-    this.callbacks.onStatusChange?.(status);
+    this.notify();
+  }
+
+  private notify(): void {
+    this.onChange?.(this.getStatus());
   }
 }
 
