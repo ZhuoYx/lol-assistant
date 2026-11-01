@@ -104,7 +104,7 @@ pnpm build:desktop:unpack
 
 桌面端代码输出到 `packages/desktop/out/`，Windows 打包结果输出到 `packages/desktop/release/`。安装程序命名为 `lol-assistant-<版本>-x64-setup.exe`。
 
-本地安装包构建使用 `--publish never`，不会上传到 GitHub。
+本地安装包构建使用 `--publish never`，不会上传到 GitHub。安装时切换到其他磁盘或父目录，会保留 `lol-assistant` 子目录，例如选择 `D:\` 后显示 `D:\lol-assistant`；更新安装会沿用已有安装位置。
 
 ### 检查
 
