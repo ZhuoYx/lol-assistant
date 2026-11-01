@@ -1,6 +1,6 @@
 # GitHub 发布与自动更新
 
-当前版本为 **1.0.0**，更新源为公开仓库 [ZhuoYx/lol-assistant 的 Releases](https://github.com/ZhuoYx/lol-assistant/releases)。版本显示取自主进程 `app.getVersion()`，与安装包内的版本一致。
+当前版本为 **1.0.1**，更新源为公开仓库 [ZhuoYx/lol-assistant 的 Releases](https://github.com/ZhuoYx/lol-assistant/releases)。版本显示取自主进程 `app.getVersion()`，与安装包内的版本一致。
 
 ## 安装后的行为
 

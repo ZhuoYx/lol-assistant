@@ -2,7 +2,7 @@
 
 连接本地英雄联盟客户端的 Windows 桌面助手，提供战绩查询、对局分析、选人建议、符文出装、英雄排名和海克斯大乱斗强化推荐。
 
-**当前版本：1.0.0 · 平台：Windows x64**
+**当前版本：1.0.1 · 平台：Windows x64**
 
 [下载已发布版本](https://github.com/ZhuoYx/lol-assistant/releases) · [自动更新与发布说明](docs/releasing.md)
 

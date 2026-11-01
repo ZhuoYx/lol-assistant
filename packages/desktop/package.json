@@ -1,6 +1,6 @@
 {
   "name": "@lol-assistant/desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "英雄联盟助手 - Electron 桌面端",
   "main": "./out/main/index.js",
