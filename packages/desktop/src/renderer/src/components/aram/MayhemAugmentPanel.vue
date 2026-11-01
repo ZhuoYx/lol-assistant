@@ -54,15 +54,17 @@
             :href="augment.sourceUrl"
             @click.prevent="openSource(augment.sourceUrl)"
           >
-            <span class="augment-icon"
-              ><span>{{ augment.name.charAt(0) }}</span
-              ><img
-                v-if="augment.iconUrl"
+            <span class="augment-icon">
+              <img
+                v-if="augment.iconUrl && !failedIconSlugs.has(augment.slug)"
+                :key="augment.iconUrl"
                 v-cached-src="augment.iconUrl"
                 :alt="augment.name"
                 loading="lazy"
-                @error="($event.target as HTMLImageElement).style.display = 'none'"
-            /></span>
+                @error="failedIconSlugs.add(augment.slug)"
+              />
+              <span v-else aria-hidden="true">{{ augment.name.charAt(0) }}</span>
+            </span>
             <span class="augment-content"
               ><strong>{{ augment.name }}</strong
               ><span class="augment-metrics"
@@ -118,6 +120,7 @@ const data = ref<MayhemChampionRecommendations | null>(null);
 const loading = ref(false);
 const error = ref('');
 const expanded = ref(!props.compact);
+const failedIconSlugs = ref(new Set<string>());
 let generation = 0;
 const championName = computed(() => getChampionDisplayName(props.championId));
 const sourceUrl = computed(() => data.value?.sourceUrl || 'https://arammayhem.com/zh-cn/build/');
@@ -146,7 +149,10 @@ async function load(refresh = false) {
   error.value = '';
   try {
     const result = await window.electronAPI.getMayhemRecommendations(id, refresh);
-    if (request === generation) data.value = result;
+    if (request === generation) {
+      failedIconSlugs.value.clear();
+      data.value = result;
+    }
   } catch (e) {
     if (request === generation)
       error.value = e instanceof Error ? e.message : '暂时无法获取英雄推荐，请重试';
