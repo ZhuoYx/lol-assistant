@@ -196,7 +196,7 @@
               </div>
               <div class="path-info">
                 <span class="path-label">安装路径</span>
-                <span class="path-value">{{ lolPath || '尚未检测到' }}</span>
+                <span class="path-value" :title="lolPath">{{ lolPath || '尚未检测到' }}</span>
               </div>
             </div>
 
@@ -248,7 +248,7 @@
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
-            <span>未检测到有效的英雄联盟安装，路径下未找到 LeagueClient.exe</span>
+            <span>{{ pathError }}</span>
           </div>
 
           <div class="path-tip">
@@ -264,7 +264,7 @@
               <line x1="12" y1="16" x2="12" y2="12" />
               <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
-            <span>如果客户端正在运行，可自动检测；否则请手动指定安装目录</span>
+            <span>可自动读取安装记录，也可手动选择游戏根目录或 LeagueClient 文件夹</span>
           </div>
 
           <div class="step-actions">
@@ -320,7 +320,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { NSwitch } from 'naive-ui';
 import { useAppStore } from '@/stores';
@@ -337,6 +337,8 @@ const prefDarkMode = ref(appStore.settings.theme === 'dark');
 // LOL path state
 const lolPath = ref('');
 const pathStatus = ref<'idle' | 'detecting' | 'valid' | 'invalid'>('idle');
+const pathError = ref('');
+let pathRequest = 0;
 
 function nextStep() {
   if (currentStep.value < totalSteps - 1) {
@@ -351,32 +353,53 @@ function prevStep() {
 }
 
 async function autoDetect() {
+  const request = ++pathRequest;
   pathStatus.value = 'detecting';
+  pathError.value = '';
   try {
     const detected = await window.electronAPI.detectLolPath();
+    if (request !== pathRequest) return;
     if (detected) {
-      lolPath.value = detected;
       const valid = await window.electronAPI.validateLolPath(detected);
+      if (request !== pathRequest) return;
+      lolPath.value = detected;
       pathStatus.value = valid ? 'valid' : 'invalid';
+      if (!valid) pathError.value = '检测到的安装记录已失效，请重试或手动选择安装目录。';
     } else {
       lolPath.value = '';
       pathStatus.value = 'invalid';
+      pathError.value = '未自动找到英雄联盟安装目录，请启动客户端后重试，或手动选择目录。';
     }
   } catch {
-    pathStatus.value = 'invalid';
+    if (request === pathRequest) {
+      pathStatus.value = 'invalid';
+      pathError.value = '自动检测失败，请重试或手动选择安装目录。';
+    }
   }
 }
 
 async function manualSelect() {
+  const request = ++pathRequest;
+  // A manually chosen path takes precedence over an older automatic request.
+  if (pathStatus.value === 'detecting') pathStatus.value = 'idle';
   try {
     const selected = await window.electronAPI.selectLolPath();
+    if (request !== pathRequest) return;
     if (selected) {
       lolPath.value = selected;
+      pathStatus.value = 'detecting';
+      pathError.value = '';
       const valid = await window.electronAPI.validateLolPath(selected);
+      if (request !== pathRequest) return;
       pathStatus.value = valid ? 'valid' : 'invalid';
+      if (!valid)
+        pathError.value = '所选目录未找到客户端，请选择英雄联盟根目录或 LeagueClient 文件夹。';
     }
   } catch {
-    // ignore
+    if (request === pathRequest) {
+      pathStatus.value = 'invalid';
+      pathError.value = '无法读取所选目录，请检查目录权限后重试。';
+    }
   }
 }
 
@@ -412,6 +435,9 @@ async function finishSetup() {
 onMounted(() => {
   // Auto-detect LOL path on mount
   autoDetect();
+});
+onBeforeUnmount(() => {
+  ++pathRequest;
 });
 </script>
 

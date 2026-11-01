@@ -43,6 +43,7 @@ jobs:
         run: |
           node packages/desktop/scripts/check-data.cjs
           node packages/desktop/scripts/check-updater.cjs
+          node packages/desktop/scripts/check-path.cjs
       - name: 构建桌面端
         run: pnpm build:desktop
       - name: 上传安装包、差分文件和更新清单至 Release 草稿

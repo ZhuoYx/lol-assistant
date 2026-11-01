@@ -27,7 +27,8 @@ function shim(data){
  const api={
  exportLog:async()=>query.get('log-export')==='error'?{status:'error',message:'测试保存位置不可写，请尝试其他保存位置。'}:query.get('log-export')==='empty'?{status:'empty'}:query.get('log-export')==='saved'?{status:'saved',filePath:'D:/dev/code/lol-assistant/specs/previews/log-export-example.txt',fileCount:2,skippedCount:0,truncated:false}:{status:'cancelled'},revealExportedLog:async()=>true,
  getMayhemRecommendations:async id=>{if(query.has('mayhem-error'))throw Error('测试网络暂不可用');const result=data.mayhemRecommendations[id];if(!result)throw Error('当前预览未配置该英雄的来源样本');return {...result,stale:query.has('mayhem-stale')};},openMayhemSource:async()=>{},
- getChampionDataSource:async()=>source,setChampionDataSource:async v=>(source=v),getIsFirstLaunch:async()=>false,
+ getChampionDataSource:async()=>source,setChampionDataSource:async v=>(source=v),getIsFirstLaunch:async()=>query.has('onboarding'),
+ detectLolPath:async()=>query.has('no-lol-path')?null:'D:/Program Files (x86)/英雄联盟(26)/LeagueClient',selectLolPath:async()=>null,validateLolPath:async value=>!!value&&!query.has('invalid-lol-path'),getSavedLolPath:async()=>null,saveLolPath:async()=>{},setFirstLaunchDone:async()=>{},
  lcuGetStatus:async()=>query.has('disconnected')?'disconnected':'connected',
  getCurrentSummoner:async()=>({puuid:'preview-0',summonerId:1,accountId:1,displayName:'星光漫游者',gameName:'星光漫游者',tagLine:'STARS',internalName:'Star',profileIconId:1,summonerLevel:186,xpSinceLastLevel:1200,xpUntilNextLevel:2400}),
  getSummonerById:async()=>api.getCurrentSummoner(),

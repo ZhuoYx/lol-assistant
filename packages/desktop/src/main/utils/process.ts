@@ -9,21 +9,10 @@ import { logger } from './logger';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { execPowerShell } from './powershell';
+import { resolveLOLClientPath as resolveLeagueClientDir } from './lol-path';
 
 const execAsync = promisify(exec);
-
-/**
- * 执行 PowerShell 命令，确保输出使用 UTF-8 编码
- * Windows 默认 PowerShell 输出编码为 GBK (CP936)，中文路径会乱码
- */
-async function execPowerShell(command: string, timeout = 5000): Promise<string> {
-  const utf8Prefix = '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $OutputEncoding = [System.Text.Encoding]::UTF8;';
-  const { stdout } = await execAsync(
-    `chcp 65001 >nul & powershell -NoProfile -NoLogo -Command "${utf8Prefix} ${command}"`,
-    { encoding: 'utf-8', timeout, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } },
-  );
-  return stdout.trim();
-}
 
 /** LOL 客户端进程名列表 */
 const LOL_PROCESS_NAMES = ['LeagueClientUx.exe', 'LeagueClient.exe'];
@@ -54,10 +43,7 @@ export interface ProcessInfo {
  * 这是最可靠的检测方式（不受进程权限限制）
  */
 async function detectViaRegistry(): Promise<string | null> {
-  const regKeys = [
-    `HKLM:\\SOFTWARE\\WOW6432Node\\Tencent\\LOL`,
-    `HKLM:\\SOFTWARE\\Tencent\\LOL`,
-  ];
+  const regKeys = [`HKLM:\\SOFTWARE\\WOW6432Node\\Tencent\\LOL`, `HKLM:\\SOFTWARE\\Tencent\\LOL`];
 
   for (const key of regKeys) {
     try {
@@ -85,7 +71,7 @@ async function detectViaGetCimInstance(): Promise<ProcessInfo | null> {
   try {
     // 使用 ForEach-Object 自定义输出，避免 Format-List 长行折行问题
     const stdout = await execPowerShell(
-      `Get-CimInstance Win32_Process -Filter \\\"${filter}\\\" | ForEach-Object { Write-Output \\\"ProcessId=$($_.ProcessId)\\\"; Write-Output \\\"CommandLine=$($_.CommandLine)\\\"; Write-Output \\\"ExecutablePath=$($_.ExecutablePath)\\\"; Write-Output \\\"---\\\" }`,
+      `Get-CimInstance Win32_Process -Filter "${filter}" -ErrorAction Stop | ForEach-Object { Write-Output "ProcessId=$($_.ProcessId)"; Write-Output "CommandLine=$($_.CommandLine)"; Write-Output "ExecutablePath=$($_.ExecutablePath)"; Write-Output "---" }`,
       10000,
     );
 
@@ -161,7 +147,9 @@ async function detectViaElevatedPowerShell(): Promise<ProcessInfo | null> {
     $lines = @()
     foreach($p in $procs) { $lines += "ProcessId=$($p.ProcessId)"; $lines += "CommandLine=$($p.CommandLine)"; $lines += "ExecutablePath=$($p.ExecutablePath)"; $lines += "---" }
     [System.IO.File]::WriteAllText('${tmpFile.replace(/\\/g, '\\\\')}', ($lines -join [char]10), [System.Text.Encoding]::UTF8)
-  `.replace(/\n/g, ' ').trim();
+  `
+    .replace(/\n/g, ' ')
+    .trim();
 
   try {
     // 用 Start-Process -Verb RunAs 弹一次 UAC
@@ -171,7 +159,7 @@ async function detectViaElevatedPowerShell(): Promise<ProcessInfo | null> {
     );
 
     // 等待临时文件写入
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     // 读取结果
     const content = await fs.readFile(tmpFile, 'utf-8');
@@ -224,69 +212,41 @@ function splitProcessBlocks(output: string): string[] {
 /**
  * 从单个进程块中解析信息
  */
+function commandOption(command: string, name: string): string | undefined {
+  const expression = new RegExp(
+    `"--${name}=([^"\\r\\n]*)"|'--${name}=([^'\\r\\n]*)'|(?:^|\\s)--${name}(?:=|\\s+)(?:"([^"\\r\\n]*)"|'([^'\\r\\n]*)'|([^\\s"']+))`,
+    'i',
+  );
+  return command
+    .match(expression)
+    ?.slice(1)
+    .find((value) => value !== undefined);
+}
+
 function parseProcessBlock(block: string): ProcessInfo | null {
-  // 提取 PID
-  const pidMatch = block.match(/ProcessId[=:]\s*(\d+)/i);
-  const pid = pidMatch ? parseInt(pidMatch[1], 10) : 0;
-
-  // 提取 --install-directory 参数
-  let installDirectory: string | null = null;
-
-  // 格式1: --install-directory=C:\path\to\lol
-  const match1 = block.match(/--install-directory=["']?([^"'\r\n]+?)["']?(?:\s|$)/i);
-  if (match1) {
-    installDirectory = match1[1].trim();
-  }
-
-  // 格式2: --install-directory "C:\path\to\lol"
-  if (!installDirectory) {
-    const match2 = block.match(/--install-directory\s+["']([^"']+)["']/i);
-    if (match2) {
-      installDirectory = match2[1].trim();
-    }
-  }
-
-  // 格式3: 从 ExecutablePath 提取
-  if (!installDirectory) {
-    const exePathMatch = block.match(/ExecutablePath[=:]\s*(.+)/i);
-    if (exePathMatch) {
-      const exePath = exePathMatch[1].trim();
-      if (exePath) {
-        installDirectory = path.dirname(exePath);
-      }
-    }
-  }
-
-  // 格式4: 从可执行文件路径推断
-  if (!installDirectory) {
-    for (const processName of LOL_PROCESS_NAMES) {
-      const exePattern = new RegExp(`["']?([A-Za-z]:[^"']*?)\\\\${processName.replace('.', '\\.')}`, 'i');
-      const match3 = block.match(exePattern);
-      if (match3) {
-        installDirectory = match3[1].trim();
-        break;
-      }
-    }
-  }
-
-  if (!installDirectory) {
-    return null;
-  }
-
+  const pid = Number(block.match(/ProcessId\s*[=:][ \t]*(\d+)/i)?.[1] ?? 0);
+  const command = block.match(/^CommandLine\s*[=:][ \t]*(.*)$/im)?.[1] ?? '';
+  const executable = block
+    .match(/^ExecutablePath\s*[=:][ \t]*(.+)$/im)?.[1]
+    ?.trim()
+    .replace(/^"|"$/g, '');
+  const commandExecutable = command
+    .match(
+      /^\s*(?:"([^"\r\n]+\.exe)"|'([^'\r\n]+\.exe)'|([A-Z]:[^\r\n]*?LeagueClient(?:Ux)?\.exe))/i,
+    )
+    ?.slice(1)
+    .find(Boolean);
+  // The actual executable path is more reliable than an installation argument.
+  const installDirectory = executable
+    ? path.dirname(executable)
+    : commandOption(command, 'install-directory') ||
+      (commandExecutable ? path.dirname(commandExecutable) : null);
+  if (!installDirectory) return null;
   const result: ProcessInfo = { pid, installDirectory };
-
-  // 提取 --app-port（LCU API 端口）
-  const appPortMatch = block.match(/--app-port=(\d+)/);
-  if (appPortMatch) {
-    result.appPort = parseInt(appPortMatch[1], 10);
-  }
-
-  // 提取 --remoting-auth-token（LCU 认证 token）
-  const authTokenMatch = block.match(/--remoting-auth-token=([A-Za-z0-9\-_=+/]+)/);
-  if (authTokenMatch) {
-    result.authToken = authTokenMatch[1];
-  }
-
+  const port = Number(commandOption(command, 'app-port'));
+  if (Number.isInteger(port) && port > 0 && port <= 65535) result.appPort = port;
+  const token = commandOption(command, 'remoting-auth-token');
+  if (token) result.authToken = token;
   return result;
 }
 
@@ -295,7 +255,7 @@ function parseProcessBlock(block: string): ProcessInfo | null {
  * 支持 Format-List 多行折行输出、多进程块
  * 优先返回包含完整凭证（appPort + authToken）的进程块
  */
-function parseProcessOutput(output: string): ProcessInfo | null {
+export function parseProcessOutput(output: string): ProcessInfo | null {
   // 先合并 Format-List 的续行折行
   const joined = joinFormatListContinuations(output);
 
@@ -323,48 +283,6 @@ function parseProcessOutput(output: string): ProcessInfo | null {
 }
 
 /**
- * 在已知安装根目录中查找 LeagueClient 子目录
- * 国服结构：根目录/LeagueClient/LeagueClientUx.exe
- */
-async function resolveLeagueClientDir(basePath: string): Promise<string | null> {
-  // 先检查 basePath 自身是否含有 LeagueClient 可执行文件
-  for (const exe of ['LeagueClientUx.exe', 'LeagueClient.exe']) {
-    try {
-      await fs.access(path.join(basePath, exe));
-      return basePath;
-    } catch {
-      // continue
-    }
-  }
-
-  // 国服结构：basePath/LeagueClient/ 子目录
-  const leagueClientSubDir = path.join(basePath, 'LeagueClient');
-  for (const exe of ['LeagueClientUx.exe', 'LeagueClient.exe', 'lockfile']) {
-    try {
-      await fs.access(path.join(leagueClientSubDir, exe));
-      return leagueClientSubDir;
-    } catch {
-      // continue
-    }
-  }
-
-  // 检查 TCLS/Client.exe（国服启动器）作为根目录有效性标记
-  try {
-    await fs.access(path.join(basePath, 'TCLS', 'Client.exe'));
-    try {
-      await fs.access(leagueClientSubDir);
-      return leagueClientSubDir;
-    } catch {
-      return basePath;
-    }
-  } catch {
-    // continue
-  }
-
-  return null;
-}
-
-/**
  * 检测 LOL 客户端进程是否正在运行
  * 多策略检测：PowerShell 进程 > WMIC 进程 > 提权获取 > 注册表
  * 优先使用进程检测（能获取 --app-port / --remoting-auth-token 命令行参数）
@@ -377,7 +295,9 @@ export async function detectLOLProcess(): Promise<ProcessInfo | null> {
   if (result && result.appPort && result.authToken) {
     const resolved = await resolveLeagueClientDir(result.installDirectory);
     if (resolved) result.installDirectory = resolved;
-    logger.info(`[PowerShell] 检测到 LOL 客户端: PID=${result.pid}, port=${result.appPort}, 路径=${result.installDirectory}`);
+    logger.info(
+      `[PowerShell] 检测到 LOL 客户端: PID=${result.pid}, port=${result.appPort}, 路径=${result.installDirectory}`,
+    );
     return result;
   }
 
@@ -386,7 +306,9 @@ export async function detectLOLProcess(): Promise<ProcessInfo | null> {
   if (result && result.appPort && result.authToken) {
     const resolved = await resolveLeagueClientDir(result.installDirectory);
     if (resolved) result.installDirectory = resolved;
-    logger.info(`[WMIC] 检测到 LOL 客户端: PID=${result.pid}, port=${result.appPort}, 路径=${result.installDirectory}`);
+    logger.info(
+      `[WMIC] 检测到 LOL 客户端: PID=${result.pid}, port=${result.appPort}, 路径=${result.installDirectory}`,
+    );
     return result;
   }
 
@@ -398,7 +320,9 @@ export async function detectLOLProcess(): Promise<ProcessInfo | null> {
     if (elevated && elevated.appPort && elevated.authToken) {
       const resolved = await resolveLeagueClientDir(elevated.installDirectory);
       if (resolved) elevated.installDirectory = resolved;
-      logger.info(`[ElevatedPS] 检测到 LOL 客户端: PID=${elevated.pid}, port=${elevated.appPort}, 路径=${elevated.installDirectory}`);
+      logger.info(
+        `[ElevatedPS] 检测到 LOL 客户端: PID=${elevated.pid}, port=${elevated.appPort}, 路径=${elevated.installDirectory}`,
+      );
       return elevated;
     }
   }
@@ -418,10 +342,10 @@ export async function detectLOLProcess(): Promise<ProcessInfo | null> {
   // 策略5：检测进程是否在运行（即使拿不到路径也标记进程存活）
   for (const processName of LOL_PROCESS_NAMES) {
     try {
-      const { stdout } = await execAsync(
-        `tasklist /FI "IMAGENAME eq ${processName}" /NH`,
-        { encoding: 'utf-8', timeout: 5000 },
-      );
+      const { stdout } = await execAsync(`tasklist /FI "IMAGENAME eq ${processName}" /NH`, {
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
       if (stdout.includes(processName)) {
         logger.info(`[Tasklist] 检测到 ${processName} 进程但无法获取路径`);
       }
@@ -439,10 +363,10 @@ export async function detectLOLProcess(): Promise<ProcessInfo | null> {
 export async function isLOLClientRunning(): Promise<boolean> {
   for (const processName of LOL_PROCESS_NAMES) {
     try {
-      const { stdout } = await execAsync(
-        `tasklist /FI "IMAGENAME eq ${processName}" /NH`,
-        { encoding: 'utf-8', timeout: 5000 },
-      );
+      const { stdout } = await execAsync(`tasklist /FI "IMAGENAME eq ${processName}" /NH`, {
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
       if (stdout.includes(processName)) return true;
     } catch {
       // continue
@@ -490,4 +414,3 @@ export function pollForLOLClient(
     }
   };
 }
-

@@ -121,6 +121,9 @@ node packages/desktop/scripts/check-data.cjs
 # 更新状态、下载、安装和开关持久化检查
 node packages/desktop/scripts/check-updater.cjs
 
+# 安装路径识别、进程解析与引导选择检查
+node packages/desktop/scripts/check-path.cjs
+
 # 发布版本、标签和仓库配置检查
 node packages/desktop/scripts/check-release.cjs
 
