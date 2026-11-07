@@ -1,6 +1,6 @@
 {
   "name": "@lol-assistant/shared",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "英雄联盟助手 - 共享代码包",
   "main": "./dist/index.js",

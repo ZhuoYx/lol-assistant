@@ -1,7 +1,7 @@
 {
   "name": "lol-assistant",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "英雄联盟助手工具",
   "scripts": {
     "dev:desktop": "pnpm --filter @lol-assistant/desktop dev",

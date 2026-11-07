@@ -1,6 +1,6 @@
 # GitHub 发布与自动更新
 
-当前版本为 **1.0.1**，更新源为公开仓库 [ZhuoYx/lol-assistant 的 Releases](https://github.com/ZhuoYx/lol-assistant/releases)。版本显示取自主进程 `app.getVersion()`，与安装包内的版本一致。
+当前版本为 **1.0.2**，更新源为公开仓库 [ZhuoYx/lol-assistant 的 Releases](https://github.com/ZhuoYx/lol-assistant/releases)。版本显示取自主进程 `app.getVersion()`，与安装包内的版本一致。
 
 ## 安装后的行为
 
@@ -13,16 +13,16 @@
 
 ## 发布新版本
 
-1. 将根目录、`packages/desktop` 和 `packages/shared` 的 `package.json` 中的版本一起改为新的 `x.y.z`，例如 `1.0.1`。无需修改锁文件中的依赖版本。
+1. 将根目录、`packages/desktop` 和 `packages/shared` 的 `package.json` 中的版本一起改为新的 `x.y.z`，例如 `1.0.2`。无需修改锁文件中的依赖版本。
 2. 完成代码提交并推送，然后创建和推送同版本标签：
 
    ```powershell
-   git tag v1.0.1
-   git push origin v1.0.1
+   git tag v1.0.2
+   git push origin v1.0.2
    ```
 
 3. GitHub Actions 的「Windows 发布」工作流验证标签、构建、执行检查，然后使用当前仓库的临时 `GITHUB_TOKEN` 创建 Release 草稿并上传：
-   - `lol-assistant-1.0.1-x64-setup.exe`
+   - `lol-assistant-1.0.2-x64-setup.exe`
    - 同名 `.exe.blockmap`
    - `latest.yml`
 4. 下载草稿中的安装程序验证，填写更新说明，再点击 **Publish release**。草稿不触发客户端更新，发布后客户端才会发现新版本。使用正式版 Release，保留全部三个更新文件。
