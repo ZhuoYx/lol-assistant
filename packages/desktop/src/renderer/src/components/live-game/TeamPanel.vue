@@ -57,11 +57,13 @@
     </header>
     <div class="player-list">
       <LiveGamePlayerCard
-        v-for="player in team.players"
-        :key="player.puuid"
+        v-for="(player, index) in team.players"
+        :key="player.puuid || index"
         :player="player"
         :is-me="player.puuid === myPuuid"
-        clickable
+        :clickable="!!player.puuid"
+        :can-share="canShare"
+        :champ-select-chat-id="champSelectChatId"
         :premade-groups="team.premadeGroups"
         @click="$emit('player-click', $event)"
       />
@@ -74,7 +76,13 @@ import { computed } from 'vue';
 import type { LiveGameTeam } from '@lol-assistant/shared';
 import LiveGamePlayerCard from './LiveGamePlayerCard.vue';
 
-const props = defineProps<{ team: LiveGameTeam; side: 'blue' | 'red'; myPuuid?: string }>();
+const props = defineProps<{
+  team: LiveGameTeam;
+  side: 'blue' | 'red';
+  myPuuid?: string;
+  canShare?: boolean;
+  champSelectChatId?: string;
+}>();
 defineEmits<{ 'player-click': [puuid: string] }>();
 const TIER_ORDER: Record<string, number> = {
   IRON: 1,

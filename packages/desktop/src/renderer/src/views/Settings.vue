@@ -114,7 +114,11 @@
               <span class="setting-desc">匹配成功后自动点击接受</span>
             </div>
             <div class="setting-control">
-              <n-switch v-model:value="autoAcceptEnabled" @update:value="onAutoAcceptChange" />
+              <n-switch
+                :value="autoAcceptEnabled"
+                :disabled="autoAcceptBusy"
+                @update:value="saveAutoAccept($event, autoAcceptDelay)"
+              />
             </div>
           </div>
           <template v-if="autoAcceptEnabled">
@@ -125,16 +129,46 @@
                 <span class="setting-desc">接受前等待秒数（0 表示立即接受）</span>
               </div>
               <div class="setting-control delay-control">
-                <n-button size="tiny" :disabled="autoAcceptDelay <= 0" @click="adjustDelay(-1)"
+                <n-button
+                  size="tiny"
+                  :disabled="autoAcceptBusy || autoAcceptDelay <= 0"
+                  @click="saveAutoAccept(true, autoAcceptDelay - 1)"
                   >−</n-button
                 >
                 <span class="delay-value">{{ autoAcceptDelay }}s</span>
-                <n-button size="tiny" :disabled="autoAcceptDelay >= 10" @click="adjustDelay(1)"
+                <n-button
+                  size="tiny"
+                  :disabled="autoAcceptBusy || autoAcceptDelay >= 10"
+                  @click="saveAutoAccept(true, autoAcceptDelay + 1)"
                   >+</n-button
                 >
               </div>
             </div>
           </template>
+        </div>
+      </section>
+
+      <section v-if="appStore.isConnected" class="settings-section">
+        <h2 class="section-title">在线状态</h2>
+        <div class="settings-card glass-panel">
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-label">好友可见状态</span>
+              <span class="setting-desc">由英雄联盟客户端管理，可随时切换</span>
+            </div>
+            <div class="setting-control">
+              <n-select
+                :value="chatAvailability"
+                :options="chatAvailabilityOptions"
+                :loading="chatAvailabilityLoading || chatAvailabilitySaving"
+                :disabled="chatAvailabilityLoading || chatAvailabilitySaving"
+                placeholder="选择状态"
+                size="small"
+                style="width: 120px"
+                @update:value="changeChatAvailability"
+              />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -516,6 +550,7 @@ import {
   getCDragonChampionDetailUrl,
 } from '@lol-assistant/shared';
 import type {
+  ChatAvailability,
   ScraperDataVersion,
   CDragonSkinData,
   UpdateState,
@@ -550,6 +585,17 @@ const scraperVersion = ref<ScraperDataVersion | null>(null);
 // Auto Accept
 const autoAcceptEnabled = ref(false);
 const autoAcceptDelay = ref(0);
+const autoAcceptBusy = ref(true);
+
+const chatAvailability = ref<ChatAvailability | null>(null);
+const chatAvailabilityLoading = ref(false);
+const chatAvailabilitySaving = ref(false);
+let chatAvailabilityRevision = 0;
+const chatAvailabilityOptions = [
+  { label: '在线', value: 'chat' },
+  { label: '离开', value: 'away' },
+  { label: '离线', value: 'offline' },
+];
 
 // Status Message
 const statusMessage = ref('');
@@ -768,15 +814,17 @@ function handleCopyAddress() {
 
 // ─── 自动接受 ──────────────────────────────────────────
 
-async function onAutoAcceptChange(value: boolean) {
-  autoAcceptEnabled.value = value;
-  await window.electronAPI.setAutoAccept(value, autoAcceptDelay.value);
-}
-
-async function adjustDelay(delta: number) {
-  autoAcceptDelay.value = Math.max(0, Math.min(10, autoAcceptDelay.value + delta));
-  if (autoAcceptEnabled.value) {
-    await window.electronAPI.setAutoAccept(true, autoAcceptDelay.value);
+async function saveAutoAccept(enabled: boolean, delay: number) {
+  if (autoAcceptBusy.value) return;
+  autoAcceptBusy.value = true;
+  try {
+    await window.electronAPI.setAutoAccept(enabled, delay);
+    autoAcceptEnabled.value = enabled;
+    autoAcceptDelay.value = delay;
+  } catch {
+    message.error('保存自动接受对局设置失败');
+  } finally {
+    autoAcceptBusy.value = false;
   }
 }
 
@@ -786,9 +834,47 @@ async function loadAutoAccept() {
     autoAcceptEnabled.value = state.enabled;
     autoAcceptDelay.value = state.delay;
   } catch {
-    // ignore
+    message.error('读取自动接受对局设置失败');
+  } finally {
+    autoAcceptBusy.value = false;
   }
 }
+
+async function changeChatAvailability(value: ChatAvailability) {
+  if (chatAvailabilitySaving.value) return;
+  const revision = chatAvailabilityRevision;
+  chatAvailabilitySaving.value = true;
+  try {
+    const current = await window.electronAPI.setChatAvailability(value);
+    if (revision !== chatAvailabilityRevision) return;
+    chatAvailability.value = current;
+    if (current === value) message.success('在线状态已更新');
+    else message.warning('客户端未应用所选状态');
+  } catch {
+    if (revision === chatAvailabilityRevision) message.error('更新在线状态失败');
+  } finally {
+    chatAvailabilitySaving.value = false;
+  }
+}
+
+watch(
+  () => appStore.isConnected,
+  async (connected) => {
+    const revision = ++chatAvailabilityRevision;
+    chatAvailability.value = null;
+    chatAvailabilityLoading.value = connected;
+    if (!connected) return;
+    try {
+      const current = await window.electronAPI.getChatAvailability();
+      if (revision === chatAvailabilityRevision) chatAvailability.value = current;
+    } catch {
+      if (revision === chatAvailabilityRevision) message.warning('暂时无法读取客户端在线状态');
+    } finally {
+      if (revision === chatAvailabilityRevision) chatAvailabilityLoading.value = false;
+    }
+  },
+  { immediate: true },
+);
 
 // ─── 个性签名 ──────────────────────────────────────────
 
@@ -919,6 +1005,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  ++chatAvailabilityRevision;
   unsubUpdateStatus?.();
 });
 </script>

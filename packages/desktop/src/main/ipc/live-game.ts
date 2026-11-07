@@ -7,16 +7,17 @@
  * 3. 聚合数据为 LiveGameAnalysis 结构返回
  * 4. 通过战绩交叉对比检测预组队（双排/多排）
  */
-import { ipcMain } from 'electron';
+import { clipboard, ipcMain } from 'electron';
 import pLimit from 'p-limit';
 import { lcuAPI } from '../lcu/api';
 import { logger } from '../utils/logger';
-import { ErrorCode, createAppError } from '@lol-assistant/shared';
+import { ErrorCode, createAppError, LIVE_GAME_SHARE_LABELS } from '@lol-assistant/shared';
 import type {
   LiveGameAnalysis,
   LiveGameTeam,
   LiveGamePlayer,
   RecentMatchSummary,
+  Summoner,
 } from '@lol-assistant/shared';
 
 /** 并发数限制 */
@@ -41,7 +42,7 @@ interface GameflowPlayer {
 
 /** Gameflow session 结构（LCU 原始格式） */
 interface GameflowSession {
-  gameData: {
+  gameData?: {
     gameId: number;
     queue: { id: number; gameMode: string };
     teamOne: GameflowPlayer[];
@@ -54,10 +55,41 @@ interface GameflowSession {
 const PREMADE_THRESHOLD = 2;
 
 export function registerLiveGameIpcHandlers(): void {
+  ipcMain.handle('live-game:share-summary', async (_event, text: unknown, chatId: unknown) => {
+    if (
+      typeof text !== 'string' ||
+      !Object.values(LIVE_GAME_SHARE_LABELS).some((label) => text.startsWith(`【${label}】`)) ||
+      text.length > 200 ||
+      /[\p{Cc}\p{Zl}\p{Zp}]/u.test(text)
+    ) {
+      throw new Error('无效的战绩摘要');
+    }
+
+    if (typeof chatId === 'string' && chatId) {
+      try {
+        const [session, currentChatId] = await Promise.all([
+          lcuAPI.getGameflowSession() as Promise<GameflowSession | null>,
+          getChampSelectChatId(),
+        ]);
+        if (session?.phase === 'ChampSelect' && currentChatId === chatId) {
+          await lcuAPI.sendGroupChatMessage(chatId, text);
+          return 'sent';
+        }
+      } catch (error) {
+        logger.warn('发送选人聊天战绩摘要失败:', error);
+      }
+    }
+
+    clipboard.writeText(text);
+    return 'copied';
+  });
+
   ipcMain.handle('live-game:analyze', async () => {
     try {
       // 1. 获取 gameflow session
-      const session = (await lcuAPI.getGameflowSession()) as GameflowSession;
+      const session = (await lcuAPI.getGameflowSession()) as GameflowSession | null;
+
+      if (session?.phase === 'ChampSelect') return await analyzeChampSelect(session);
 
       if (!session?.gameData) {
         throw createAppError(ErrorCode.LIVE_GAME_NOT_IN_GAME, '当前不在对局中');
@@ -98,6 +130,60 @@ export function registerLiveGameIpcHandlers(): void {
       throw createAppError(ErrorCode.LIVE_GAME_NOT_IN_GAME, '获取对局数据失败', String(err));
     }
   });
+}
+
+async function getChampSelectChatId(): Promise<string | undefined> {
+  const conversations = await lcuAPI.getChatConversations();
+  const rooms = conversations.filter((room) => room.type === 'championSelect' && room.id);
+  return rooms.length === 1 ? rooms[0].id : undefined;
+}
+
+async function analyzeChampSelect(session: GameflowSession): Promise<LiveGameAnalysis> {
+  const [selection, champSelectChatId] = await Promise.all([
+    lcuAPI.getChampSelectSession() as Promise<{
+      localPlayerCellId: number;
+      myTeam: {
+        cellId: number;
+        summonerId: number;
+        puuid?: string;
+        championId: number;
+        assignedPosition?: string;
+        nameVisibilityType?: string;
+        team: number;
+      }[];
+    } | null>,
+    getChampSelectChatId().catch(() => undefined),
+  ]);
+  const roster = selection?.myTeam ?? [];
+  const players = roster.filter(
+    (member) => member.nameVisibilityType !== 'HIDDEN' && member.summonerId > 0,
+  );
+  if (!players.length) {
+    throw createAppError(ErrorCode.LIVE_GAME_NOT_IN_GAME, '选人阶段暂未提供可分析的玩家');
+  }
+
+  const localPlayer = roster.find((member) => member.cellId === selection?.localPlayerCellId);
+  const teamId = localPlayer?.team === 2 || localPlayer?.team === 200 ? 200 : 100;
+  const queueId = session.gameData?.queue?.id ?? 0;
+  const team = await fetchTeamData(
+    players.map((member) => ({
+      puuid: member.puuid ?? '',
+      summonerId: member.summonerId,
+      championId: member.championId,
+      selectedPosition: member.assignedPosition,
+      teamId,
+    })),
+    teamId,
+    queueId,
+  );
+  team.premadeGroups = detectPremadeGroups(team.players);
+  return {
+    gameId: session.gameData?.gameId ?? 0,
+    gameMode: session.gameData?.queue?.gameMode ?? 'UNKNOWN',
+    queueId,
+    champSelectChatId,
+    teams: [team],
+  };
 }
 
 /** 位置排序优先级 */
@@ -225,9 +311,12 @@ function detectPremadeGroups(players: LiveGamePlayer[]): string[][] {
 /**
  * 获取单个玩家的详细数据
  */
-export async function resolvePlayerIdentity(player: GameflowPlayer) {
-  let summoner;
-  if (player.puuid && !/^0+$/.test(player.puuid.replace(/-/g, ''))) {
+function hasPuuid(puuid: string): boolean {
+  return Boolean(puuid) && !/^0+$/.test(puuid.replace(/-/g, ''));
+}
+
+export async function resolvePlayerIdentity(player: GameflowPlayer, summoner?: Summoner) {
+  if (!summoner && hasPuuid(player.puuid)) {
     summoner = await lcuAPI.getSummonerByPUUID(player.puuid).catch(() => undefined);
   }
   if (!summoner && player.summonerId > 0) {
@@ -249,14 +338,19 @@ async function fetchPlayerData(
   player: GameflowPlayer,
   queueId: number = 0,
 ): Promise<LiveGamePlayer> {
+  const summoner =
+    !hasPuuid(player.puuid) && player.summonerId > 0
+      ? await lcuAPI.getSummonerById(player.summonerId).catch(() => undefined)
+      : undefined;
+  if (summoner?.puuid) player = { ...player, puuid: summoner.puuid };
   const { puuid, summonerId, championId } = player;
 
   // 并发请求：段位、英雄熟练度、近期战绩
   const [rankResult, masteryResult, recentResult, identityResult] = await Promise.allSettled([
-    lcuAPI.getRankStats(puuid),
+    hasPuuid(puuid) ? lcuAPI.getRankStats(puuid) : null,
     lcuAPI.getChampionMastery(summonerId),
-    lcuAPI.getMatchListByPUUID(puuid, { begIndex: 0, endIndex: 9 }),
-    resolvePlayerIdentity(player),
+    hasPuuid(puuid) ? lcuAPI.getMatchListByPUUID(puuid, { begIndex: 0, endIndex: 9 }) : null,
+    resolvePlayerIdentity(player, summoner),
   ]);
 
   // 段位信息：根据队列类型优先显示对应段位
@@ -264,7 +358,7 @@ async function fetchPlayerData(
   let tier = '';
   let division = '';
   let leaguePoints = 0;
-  if (rankResult.status === 'fulfilled') {
+  if (rankResult.status === 'fulfilled' && rankResult.value) {
     const ranked = rankResult.value;
     const isFlexQueue = queueId === 440;
     const primaryQueue = isFlexQueue
@@ -302,7 +396,7 @@ async function fetchPlayerData(
   let championWinRate = 0;
   const recentMatches: RecentMatchSummary[] = [];
 
-  if (recentResult.status === 'fulfilled') {
+  if (recentResult.status === 'fulfilled' && recentResult.value) {
     const matchList = recentResult.value as unknown as Record<string, unknown>;
     // LCU 原始格式: { games: { games: [...], gameCount } } 或标准格式 { matches: [...] }
     let matches: Record<string, unknown>[] = [];

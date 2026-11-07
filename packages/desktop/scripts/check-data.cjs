@@ -197,78 +197,129 @@ test('live analysis keeps reactive state when async data arrives and refresh fai
   assert.equal(live.analysis.value.gameId, 101);
 });
 
-async function gameNavigationFixture({queueId=2400,phase='ChampSelect',session,api:overrides={}}={}) {
-  const vue=scopedRequire('vue');const {createRouter,createMemoryHistory}=scopedRequire('vue-router');
-  const router=createRouter({history:createMemoryHistory(),routes:[['/','Home'],['/draft-assistant','DraftAssistant'],['/live-game','LiveGame'],['/mayhem-augments','MayhemAugments']].map(([path,name])=>({path,name,component:{}}))});
-  await router.push('/');
-  const mounted=[],unmounted=[],listeners={};
-  const store={gamePhase:'None',setGamePhase(value){this.gamePhase=value;}};
-  const state={phase,queueId};
-  const api={getGameflowState:async()=>({...state}),getChampSelectSession:async()=>session,...overrides};
-  for(const key of ['onGamePhaseChange','onLCUEvent','onConnectionChange'])api[key]=callback=>{listeners[key]=callback;return()=>delete listeners[key];};
-  global.window={electronAPI:api};
-  const {useGameNotification}=load('src/renderer/src/composables/useGameNotification.ts',{
-    vue:{...vue,onMounted:fn=>mounted.push(fn),onUnmounted:fn=>unmounted.push(fn)},
-    'vue-router':{useRouter:()=>router},'@/stores/app':{useAppStore:()=>store},
+async function gameNavigationFixture(getGameflowState = async () => ({ phase: 'ChampSelect', queueId: 2400 })) {
+  const vue = scopedRequire('vue');
+  const { createRouter, createMemoryHistory } = scopedRequire('vue-router');
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [['/', 'Home'], ['/draft-assistant', 'DraftAssistant'], ['/live-game', 'LiveGame'], ['/mayhem-augments', 'MayhemAugments']]
+      .map(([path, name]) => ({ path, name, component: {} })),
   });
-  useGameNotification();mounted.forEach(fn=>fn());
-  const flush=async()=>{await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setImmediate(resolve));};
-  return {router,store,state,listeners,flush,
-    select(data,eventType='Update'){listeners.onLCUEvent({uri:'/lol-champ-select/v1/session',eventType,data});},
-    gameflow(id,gamePhase='ChampSelect'){state.queueId=id;state.phase=gamePhase;listeners.onLCUEvent({uri:'/lol-gameflow/v1/session',eventType:'Update',data:{phase:gamePhase,gameData:{queue:{id}}}});},
-    dispose(){unmounted.forEach(fn=>fn());},
-  };
-}
-const selectedSession=championId=>({localPlayerCellId:3,myTeam:[{cellId:0,championId:222},{cellId:3,championId}]});
-
-test('Mayhem selection opens the local champion and follows rerolls without stealing navigation on repeated events', async () => {
-  const f=await gameNavigationFixture({session:selectedSession(157)});await f.flush();
-  assert.equal(f.router.currentRoute.value.name,'MayhemAugments');assert.equal(f.router.currentRoute.value.query.championId,'157');
-  f.select(selectedSession(99));await f.flush();
-  assert.equal(f.router.currentRoute.value.query.championId,'99');
-  await f.router.push('/');
-  f.select({...selectedSession(99),timer:{adjustedTimeLeftInPhase:20000}});await f.flush();
-  assert.equal(f.router.currentRoute.value.name,'Home');
-  f.select({localPlayerCellId:3,myTeam:[{cellId:0,championId:777},{cellId:3,championId:99}]});await f.flush();
-  assert.equal(f.router.currentRoute.value.name,'Home');
-  f.select(selectedSession(17));await f.flush();assert.equal(f.router.currentRoute.value.query.championId,'17');
-  f.dispose();assert.deepEqual(Object.keys(f.listeners),[]);
-});
-
-test('only queue 2400 navigates to Mayhem and waits for the local champion and mode in either order', async () => {
-  for(const queueId of [420,440,450,2401]){
-    const f=await gameNavigationFixture({queueId,session:selectedSession(99)});await f.flush();
-    assert.equal(f.router.currentRoute.value.name,'DraftAssistant');f.dispose();
+  await router.push('/');
+  const mounted = [];
+  const unmounted = [];
+  const listeners = {};
+  const store = { gamePhase: 'None', setGamePhase(value) { this.gamePhase = value; } };
+  const api = { getGameflowState };
+  for (const key of ['onGamePhaseChange', 'onConnectionChange']) {
+    api[key] = (callback) => { listeners[key] = callback; return () => delete listeners[key]; };
   }
-  const f=await gameNavigationFixture({queueId:0,session:selectedSession(0)});await f.flush();
-  f.select(selectedSession(99));await f.flush();assert.equal(f.router.currentRoute.value.name,'DraftAssistant');
-  f.gameflow(2400);await f.flush();assert.equal(f.router.currentRoute.value.query.championId,'99');
-  f.gameflow(2400,'Lobby');await f.flush();await f.router.push('/');
-  f.gameflow(2400);await f.flush();assert.equal(f.router.currentRoute.value.name,'DraftAssistant');
-  f.select(selectedSession(117));await f.flush();assert.equal(f.router.currentRoute.value.query.championId,'117');f.dispose();
-});
+  global.window = { electronAPI: api };
+  const { useGameNotification } = load('src/renderer/src/composables/useGameNotification.ts', {
+    vue: { ...vue, onMounted: (fn) => mounted.push(fn), onUnmounted: (fn) => unmounted.push(fn) },
+    'vue-router': { useRouter: () => router },
+    '@/stores/app': { useAppStore: () => store },
+  });
+  useGameNotification();
+  mounted.forEach((fn) => fn());
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+  return { router, store, listeners, flush, dispose: () => unmounted.forEach((fn) => fn()) };
+}
 
-test('newer selection events beat initial snapshots and late replies cannot navigate after leaving champion select', async () => {
-  let finish;
-  const f=await gameNavigationFixture({session:selectedSession(157),api:{getChampSelectSession:()=>new Promise(resolve=>{finish=resolve;})}});
-  f.gameflow(2400);f.select(selectedSession(99));finish(selectedSession(157));await f.flush();
-  assert.equal(f.router.currentRoute.value.query.championId,'99');
-  f.gameflow(2400,'Lobby');await f.router.push('/');
-  f.select(selectedSession(17));await f.flush();assert.equal(f.router.currentRoute.value.name,'Home');
+test('Mayhem stays on the draft assistant and opens live analysis at game start', async () => {
+  const f = await gameNavigationFixture();
+  await f.flush();
+  assert.equal(f.router.currentRoute.value.name, 'DraftAssistant');
+  await f.router.push('/');
+  f.listeners.onGamePhaseChange('ChampSelect');
+  await f.flush();
+  assert.equal(f.router.currentRoute.value.name, 'Home');
+  f.listeners.onGamePhaseChange('GameStart');
+  await f.flush();
+  assert.equal(f.router.currentRoute.value.name, 'LiveGame');
+  f.listeners.onConnectionChange('disconnected');
+  assert.equal(f.store.gamePhase, 'None');
   f.dispose();
-  let resolveState;
-  const late=await gameNavigationFixture({session:selectedSession(99),api:{getGameflowState:()=>new Promise(resolve=>{resolveState=resolve;})}});
-  late.listeners.onGamePhaseChange('Lobby');resolveState({phase:'ChampSelect',queueId:2400});await late.flush();
-  assert.equal(late.router.currentRoute.value.name,'Home');late.dispose();
+  assert.deepEqual(Object.keys(f.listeners), []);
 });
 
-test('selection delete and disconnection clear Mayhem state while game start retains live analysis navigation', async () => {
-  const f=await gameNavigationFixture({session:selectedSession(99)});await f.flush();
-  f.select(null,'Delete');await f.router.push('/');
-  f.select(selectedSession(99));await f.flush();assert.equal(f.router.currentRoute.value.name,'MayhemAugments');
-  f.listeners.onGamePhaseChange('GameStart');await f.flush();assert.equal(f.router.currentRoute.value.name,'LiveGame');
-  f.listeners.onConnectionChange('disconnected');f.select(selectedSession(17));await f.flush();
-  assert.equal(f.store.gamePhase,'None');assert.equal(f.router.currentRoute.value.name,'LiveGame');f.dispose();
+test('a late gameflow snapshot cannot navigate after a newer phase event', async () => {
+  let resolveState;
+  const f = await gameNavigationFixture(() => new Promise((resolve) => { resolveState = resolve; }));
+  f.listeners.onGamePhaseChange('Lobby');
+  resolveState({ phase: 'ChampSelect', queueId: 2400 });
+  await f.flush();
+  assert.equal(f.router.currentRoute.value.name, 'Home');
+  f.dispose();
+});
+
+test('recent form labels weigh wins and KDA without treating a short or deathless run as a carry', () => {
+  const { formatLiveGameSummary } = scopedRequire('@lol-assistant/shared');
+  const player = { summonerName: '小魄罗', tagLine: 'CN1' };
+  const summarize = (wins, kills, deaths = 5, games = 10) =>
+    formatLiveGameSummary({
+      ...player,
+      recentMatches: Array.from({ length: games }, (_, index) => ({
+        win: index < wins,
+        kills,
+        deaths,
+        assists: 0,
+      })),
+    });
+
+  assert.match(summarize(3, 9), /^【下等马】/);
+  assert.match(summarize(4, 12), /^【中等马】/);
+  assert.match(summarize(8, 10), /^【中等马】/);
+  assert.equal(summarize(6, 16), '【中等马】小魄罗#CN1 · 近10场 6胜4负 · KDA 3.20');
+  assert.match(summarize(7, 23), /^【上等马】/);
+  assert.match(summarize(8, 35), /^【小代】/);
+  assert.match(summarize(9, 50), /^【通天代】/);
+  assert.match(summarize(8, 50), /^【小代】/);
+  assert.match(summarize(9, 49), /^【小代】/);
+  assert.match(summarize(8, 34), /^【上等马】/);
+  assert.match(summarize(6, 50), /^【中等马】/);
+  assert.match(summarize(4, 40, 5, 4), /^【中等马】/);
+  assert.match(summarize(10, 1, 0), /^【中等马】.*KDA 完美（零死亡）$/);
+  assert.equal(formatLiveGameSummary(player), null);
+});
+
+test('recent stats can only be posted to the current champion-select room and otherwise copy safely', async () => {
+  const handlers = new Map();
+  const sent = [];
+  const copied = [];
+  let phase = 'ChampSelect';
+  let conversationId = 'draft-one';
+  const { registerLiveGameIpcHandlers } = load('src/main/ipc/live-game.ts', {
+    electron: {
+      ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) },
+      clipboard: { writeText: (body) => copied.push(body) },
+    },
+    'p-limit': { default: () => (run) => run() },
+    '../utils/logger': { logger: quietLog },
+    '../lcu/api': {
+      lcuAPI: {
+        getGameflowSession: async () => ({ phase }),
+        getChatConversations: async () => [
+          { id: conversationId, type: 'championSelect' },
+          { id: 'friend', type: 'chat' },
+        ],
+        sendGroupChatMessage: async (id, body) => sent.push({ id, body }),
+      },
+    },
+  });
+  registerLiveGameIpcHandlers();
+  const share = handlers.get('live-game:share-summary');
+  const body = '【上等马】小魄罗#CN1 · 近10场 6胜4负 · KDA 3.20';
+  assert.equal(await share(null, body, 'draft-one'), 'sent');
+  conversationId = 'draft-two';
+  assert.equal(await share(null, body, 'draft-one'), 'copied');
+  assert.equal(await share(null, body, 'friend'), 'copied');
+  phase = 'InProgress';
+  assert.equal(await share(null, body, 'draft-two'), 'copied');
+  await assert.rejects(share(null, body + '\n/all test', 'draft-two'), /无效的战绩摘要/);
+  await assert.rejects(share(null, body.replace('上等马', '未知评级')), /无效的战绩摘要/);
+  assert.deepEqual(sent, [{ id: 'draft-one', body }]);
+  assert.deepEqual(copied, [body, body, body]);
 });
 
 test('system theme responds to OS changes and releases the listener', async () => {

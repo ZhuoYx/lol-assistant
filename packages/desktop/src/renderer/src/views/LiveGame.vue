@@ -1,6 +1,12 @@
 <template>
   <div class="page live-game-page">
-    <PageHeader title="对局分析" subtitle="双方阵容一览，掌握每位玩家的近期表现"
+    <PageHeader
+      title="对局分析"
+      :subtitle="
+        appStore.gamePhase === 'ChampSelect'
+          ? '查看选人阶段可见队友的近期表现'
+          : '双方阵容一览，掌握每位玩家的近期表现'
+      "
       ><template #actions
         ><DataSourceSelect v-if="analysis?.queueId !== 2400" /><span
           v-if="analysis"
@@ -97,12 +103,14 @@
         </div>
 
         <!-- Two-team layout -->
-        <div class="teams-grid">
+        <div class="teams-grid" :class="{ 'single-team': !blueTeam || !redTeam }">
           <TeamPanel
             v-if="blueTeam"
             :team="blueTeam"
             side="blue"
             :my-puuid="myPuuid"
+            :can-share="isInGame"
+            :champ-select-chat-id="champSelectChatId"
             @player-click="handlePlayerClick"
           />
           <TeamPanel
@@ -110,6 +118,8 @@
             :team="redTeam"
             side="red"
             :my-puuid="myPuuid"
+            :can-share="isInGame"
+            :champ-select-chat-id="champSelectChatId"
             @player-click="handlePlayerClick"
           />
         </div>
@@ -119,7 +129,7 @@
         </p>
 
         <ChampionInsights
-          v-if="analysis.gameMode === 'CLASSIC'"
+          v-if="appStore.gamePhase !== 'ChampSelect' && analysis.gameMode === 'CLASSIC'"
           :champion-ids="
             [...(blueTeam?.players ?? []), ...(redTeam?.players ?? [])]
               .map((p) => p.championId)
@@ -129,7 +139,11 @@
 
         <!-- Spell Cooldowns -->
         <SpellCooldowns
-          v-if="myChampId && (analysis.queueId === 420 || analysis.queueId === 440)"
+          v-if="
+            appStore.gamePhase !== 'ChampSelect' &&
+            myChampId &&
+            (analysis.queueId === 420 || analysis.queueId === 440)
+          "
           :my-champ-id="myChampId"
           :enemy-champ-ids="enemyLaneChampIds"
           :enemy-labels="enemyLaneLabels"
@@ -173,6 +187,9 @@ const isInGame = computed(() => {
 });
 
 const myPuuid = computed(() => summonerStore.currentSummoner?.puuid ?? '');
+const champSelectChatId = computed(() =>
+  appStore.gamePhase === 'ChampSelect' ? analysis.value?.champSelectChatId : undefined,
+);
 
 function handlePlayerClick(puuid: string) {
   router.push({
@@ -181,29 +198,16 @@ function handlePlayerClick(puuid: string) {
   });
 }
 
-/** 我方英雄 ID */
-const myChampId = computed(() => {
-  if (!blueTeam.value || !myPuuid.value) return 0;
-  // 先在蓝队找
-  let me = blueTeam.value.players.find((p) => p.puuid === myPuuid.value);
-  if (!me && redTeam.value) {
-    me = redTeam.value.players.find((p) => p.puuid === myPuuid.value);
-  }
-  return me?.championId ?? 0;
+const myPlayer = computed(() => {
+  if (!myPuuid.value) return undefined;
+  return analysis.value?.teams.flatMap((team) => team.players).find((p) => p.puuid === myPuuid.value);
 });
-
-/** 我的位置 */
-const myPosition = computed(() => {
-  if (!blueTeam.value || !myPuuid.value) return '';
-  let me = blueTeam.value.players.find((p) => p.puuid === myPuuid.value);
-  if (!me && redTeam.value) {
-    me = redTeam.value.players.find((p) => p.puuid === myPuuid.value);
-  }
-  return me?.position ?? '';
-});
+const myChampId = computed(() => myPlayer.value?.championId ?? 0);
+const myPosition = computed(() => myPlayer.value?.position ?? '');
 
 /** 我在哪个队伍 */
 const myTeamId = computed(() => {
+  if (!myPuuid.value) return 0;
   if (blueTeam.value?.players.some((p) => p.puuid === myPuuid.value)) return 100;
   if (redTeam.value?.players.some((p) => p.puuid === myPuuid.value)) return 200;
   return 0;
@@ -328,6 +332,9 @@ const enemyLaneLabels = computed<string[]>(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
+}
+.teams-grid.single-team {
+  grid-template-columns: minmax(0, 1fr);
 }
 .analysis-note {
   color: var(--color-text-tertiary);

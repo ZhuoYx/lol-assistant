@@ -104,6 +104,17 @@
         <span v-else class="no-matches">{{
           player.dataStatus === 'loading' ? '等待加载' : '暂无记录'
         }}</span>
+        <n-button
+          v-if="canShare && recentMatchList.length && player.summonerName"
+          class="share-summary"
+          size="tiny"
+          secondary
+          :loading="sharing"
+          :title="champSelectChatId ? '发送到当前选人聊天' : '复制后可粘贴到游戏聊天框'"
+          @click="shareSummary"
+        >
+          {{ champSelectChatId ? '发送战绩' : '复制战绩' }}
+        </n-button>
       </div>
       <div v-if="recentMatchList.length" class="match-list">
         <div
@@ -125,8 +136,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import { NButton, useMessage } from 'naive-ui';
 import {
+  formatLiveGameSummary,
   getChampionDisplayName,
   type LiveGamePlayer,
   type RecentMatchSummary,
@@ -139,6 +152,8 @@ const props = withDefaults(
     player: LiveGamePlayer;
     isMe?: boolean;
     clickable?: boolean;
+    canShare?: boolean;
+    champSelectChatId?: string;
     premadeGroups?: string[][];
   }>(),
   { isMe: false, clickable: false, premadeGroups: () => [] },
@@ -169,6 +184,27 @@ const premadeTag = computed(() => {
 });
 const recentMatchList = computed(() => props.player.recentMatches ?? []);
 const recentWins = computed(() => recentMatchList.value.filter((m) => m.win).length);
+const message = useMessage();
+const sharing = ref(false);
+
+async function shareSummary() {
+  if (!props.canShare || sharing.value) return;
+  const text = formatLiveGameSummary(props.player);
+  if (!text) return;
+  const chatId = props.champSelectChatId;
+
+  sharing.value = true;
+  try {
+    const result = await window.electronAPI.shareLiveGameSummary(text, chatId);
+    if (result === 'sent') message.success('战绩已发送到选人聊天');
+    else if (chatId) message.warning('未确认发送，战绩已复制，可手动粘贴');
+    else message.success('战绩已复制，可粘贴到聊天框');
+  } catch {
+    message.error('分享战绩失败，请重试');
+  } finally {
+    sharing.value = false;
+  }
+}
 function handleClick() {
   emit('click', props.player.puuid);
 }
@@ -392,11 +428,16 @@ function matchTitle(m: RecentMatchSummary) {
 }
 .recent-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
   color: var(--color-text-secondary);
   font-size: 10px;
+}
+.share-summary {
+  position: relative;
+  z-index: 2;
 }
 .recent-count,
 .no-matches {

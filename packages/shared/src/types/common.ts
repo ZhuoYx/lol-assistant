@@ -1,6 +1,9 @@
 /** 连接状态 */
 export type ConnectionStatus = 'connected' | 'disconnected' | 'connecting';
 
+/** 客户端好友列表中的在线状态 */
+export type ChatAvailability = 'chat' | 'away' | 'offline';
+
 /** 缓存统计 */
 export interface CacheStats {
   totalSize: number;

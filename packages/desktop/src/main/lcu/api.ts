@@ -4,6 +4,7 @@
  */
 import { LCU_ENDPOINTS } from '@lol-assistant/shared';
 import type {
+  ChatAvailability,
   Summoner,
   MatchList,
   MatchDetail,
@@ -177,8 +178,23 @@ export const lcuAPI = {
   /**
    * 获取当前聊天信息（含个性签名）
    */
-  async getChatMe(): Promise<unknown> {
+  async getChatMe(): Promise<{ statusMessage?: string; availability?: string }> {
     return lcuClient.get('/lol-chat/v1/me');
+  },
+
+  async setChatAvailability(availability: ChatAvailability): Promise<void> {
+    await lcuClient.put('/lol-chat/v1/me', { availability });
+  },
+
+  async getChatConversations(): Promise<{ id: string; type: string }[]> {
+    return lcuClient.get('/lol-chat/v1/conversations');
+  },
+
+  async sendGroupChatMessage(conversationId: string, body: string): Promise<void> {
+    await lcuClient.post(`/lol-chat/v1/conversations/${encodeURIComponent(conversationId)}/messages`, {
+      body,
+      type: 'groupchat',
+    });
   },
 
   /**

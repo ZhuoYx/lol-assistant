@@ -54,6 +54,7 @@ interface ElectronAPI {
 
   // 对局实时分析
   analyzeLiveGame: () => Promise<import('@lol-assistant/shared').LiveGameAnalysis>;
+  shareLiveGameSummary: (text: string, conversationId?: string) => Promise<'sent' | 'copied'>;
 
   // 第三方数据
   getMayhemRecommendations: (
@@ -167,6 +168,10 @@ interface ElectronAPI {
   // 客户端设置 - 个性签名
   getStatusMessage: () => Promise<string>;
   setStatusMessage: (message: string) => Promise<{ success: boolean }>;
+  getChatAvailability: () => Promise<import('@lol-assistant/shared').ChatAvailability | null>;
+  setChatAvailability: (
+    availability: import('@lol-assistant/shared').ChatAvailability,
+  ) => Promise<import('@lol-assistant/shared').ChatAvailability | null>;
 
   // ARAM 板凳英雄交换
   benchSwap: (championId: number) => Promise<{ success: boolean }>;

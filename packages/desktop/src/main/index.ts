@@ -12,7 +12,7 @@ import { pollForLOLClient } from './utils/process';
 import { lcuClient } from './lcu/client';
 import { lcuWebSocket } from './lcu/websocket';
 import { registerAllIpcHandlers } from './ipc/index';
-import { isAutoAcceptEnabled, getAutoAcceptDelay } from './ipc/client-settings';
+import { getAutoAcceptSettings } from './ipc/client-settings';
 import { assetCacheManager } from './assets/index';
 import { lanProxyServer } from './proxy/server';
 import { appUpdater } from './updater/index';
@@ -65,7 +65,7 @@ function createWindow(): void {
   });
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow?.show();
+    activateWindow();
     if (process.env['ELECTRON_RENDERER_URL']) {
       mainWindow?.webContents.openDevTools({ mode: 'detach' });
     }
@@ -105,10 +105,7 @@ function createTray(): void {
   const contextMenu = Menu.buildFromTemplate([
     {
       label: '显示窗口',
-      click: () => {
-        mainWindow?.show();
-        mainWindow?.focus();
-      },
+      click: activateWindow,
     },
     { type: 'separator' },
     {
@@ -121,10 +118,7 @@ function createTray(): void {
   ]);
 
   tray.setContextMenu(contextMenu);
-  tray.on('double-click', () => {
-    mainWindow?.show();
-    mainWindow?.focus();
-  });
+  tray.on('double-click', activateWindow);
 }
 
 /**
@@ -133,10 +127,7 @@ function createTray(): void {
 function showSystemNotification(title: string, body: string): void {
   if (!Notification.isSupported()) return;
   const notification = new Notification({ title, body, silent: false });
-  notification.on('click', () => {
-    mainWindow?.show();
-    mainWindow?.focus();
-  });
+  notification.on('click', activateWindow);
   notification.show();
 }
 
@@ -144,10 +135,15 @@ function showSystemNotification(title: string, body: string): void {
  * 激活窗口（显示 + 聚焦）
  */
 function activateWindow(): void {
-  if (!mainWindow) return;
+  if (!mainWindow || mainWindow.isDestroyed() || isQuitting) return;
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
+}
+
+function cancelAutoAccept(): void {
+  if (autoAcceptTimer) clearTimeout(autoAcceptTimer);
+  autoAcceptTimer = null;
 }
 
 /**
@@ -166,20 +162,21 @@ function handleGamePhaseChange(phase: GamePhase): void {
   mainWindow?.webContents.send('game:phase-change', phase);
 
   // 自动接受对局
-  if (phase === 'ReadyCheck' && isAutoAcceptEnabled()) {
-    if (autoAcceptTimer) clearTimeout(autoAcceptTimer);
-    const delay = getAutoAcceptDelay() * 1000;
-    autoAcceptTimer = setTimeout(async () => {
-      try {
-        await lcuAPI.acceptMatch();
-        logger.info('已自动接受对局');
-      } catch (err) {
-        logger.warn('自动接受对局失败:', err);
-      }
-    }, delay);
-  } else if (phase !== 'ReadyCheck' && autoAcceptTimer) {
-    clearTimeout(autoAcceptTimer);
-    autoAcceptTimer = null;
+  cancelAutoAccept();
+  if (phase === 'ReadyCheck') {
+    const { enabled, delay } = getAutoAcceptSettings();
+    if (enabled) {
+      autoAcceptTimer = setTimeout(async () => {
+        autoAcceptTimer = null;
+        if (isQuitting || lastGamePhase !== 'ReadyCheck' || !getAutoAcceptSettings().enabled) return;
+        try {
+          await lcuAPI.acceptMatch();
+          logger.info('已自动接受对局');
+        } catch (err) {
+          logger.warn('自动接受对局失败:', err);
+        }
+      }, delay * 1000);
+    }
   }
 
   // 进入选人阶段：自动激活窗口 + 系统通知
@@ -257,6 +254,7 @@ function initLCUConnection(): void {
   lcuClient.on('disconnected', () => {
     lcuWebSocket.disconnect();
     lastGamePhase = 'None';
+    cancelAutoAccept();
     // 重新开始轮询
     startProcessPolling();
   });
@@ -359,44 +357,42 @@ async function initApp(): Promise<void> {
 
 // ---- 应用生命周期 ----
 
-app.whenReady().then(() => {
-  initApp().catch((err) => {
-    logger.error('应用初始化失败:', err);
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', activateWindow);
+
+  app.whenReady().then(() => {
+    initApp().catch((err) => {
+      logger.error('应用初始化失败:', err);
+    });
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      else activateWindow();
+    });
   });
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
   });
-});
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
+  app.on('before-quit', () => {
+    isQuitting = true;
+    cancelAutoAccept();
+    appUpdater.dispose();
 
-app.on('before-quit', () => {
-  isQuitting = true;
-  appUpdater.dispose();
-
-  // 清理资源
-  if (cancelPoll) {
-    cancelPoll();
+    cancelPoll?.();
     cancelPoll = null;
-  }
-  lcuWebSocket.destroy();
-  lcuClient.destroy();
-  lanProxyServer.destroy();
+    lcuWebSocket.destroy();
+    lcuClient.destroy();
+    lanProxyServer.destroy();
 
-  if (tray) {
-    tray.destroy();
+    tray?.destroy();
     tray = null;
-  }
-
-  logger.info('应用退出');
-});
+    logger.info('应用退出');
+  });
+}
 
 // 导出主窗口引用供其他模块使用
 export function getMainWindow(): BrowserWindow | null {

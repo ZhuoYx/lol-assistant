@@ -1,10 +1,33 @@
 /**
  * 客户端设置 IPC 处理器
- * 自动接受对局、藏品背景皮肤、个性签名
+ * 自动接受对局、藏品背景皮肤、在线状态与个性签名
  */
 import { ipcMain } from 'electron';
+import type { ChatAvailability } from '@lol-assistant/shared';
+import { cacheStore } from '../cache/store';
 import { lcuAPI } from '../lcu/api';
 import { logger } from '../utils/logger';
+
+function normalizeAutoAcceptDelay(delay: unknown): number {
+  return typeof delay === 'number' && Number.isFinite(delay)
+    ? Math.max(0, Math.min(10, Math.round(delay)))
+    : 0;
+}
+
+export function getAutoAcceptSettings(): { enabled: boolean; delay: number } {
+  const saved = cacheStore.getSetting<{ enabled?: unknown; delay?: unknown }>('autoAccept');
+  return { enabled: saved?.enabled === true, delay: normalizeAutoAcceptDelay(saved?.delay) };
+}
+
+function isChatAvailability(value: unknown): value is ChatAvailability {
+  return value === 'chat' || value === 'away' || value === 'offline';
+}
+
+async function readChatAvailability(): Promise<ChatAvailability | null> {
+  const me = await lcuAPI.getChatMe();
+  const availability = me?.availability === 'online' ? 'chat' : me?.availability;
+  return isChatAvailability(availability) ? availability : null;
+}
 
 export function registerClientSettingsIpcHandlers(): void {
   // ─── 自动接受对局 ──────────────────────────────────────
@@ -47,7 +70,7 @@ export function registerClientSettingsIpcHandlers(): void {
 
   ipcMain.handle('client:getStatusMessage', async () => {
     try {
-      const me = (await lcuAPI.getChatMe()) as { statusMessage?: string };
+      const me = await lcuAPI.getChatMe();
       return me?.statusMessage ?? '';
     } catch (err) {
       logger.error('获取个性签名失败:', err);
@@ -65,21 +88,22 @@ export function registerClientSettingsIpcHandlers(): void {
     }
   });
 
-  // ─── 自动接受控制（由主进程管理定时器） ─────────────────
+  ipcMain.handle('client:getChatAvailability', readChatAvailability);
+  ipcMain.handle('client:setChatAvailability', async (_event, availability: unknown) => {
+    if (!isChatAvailability(availability)) throw new Error('无效的在线状态');
+    await lcuAPI.setChatAvailability(availability);
+    return readChatAvailability();
+  });
 
-  let autoAcceptEnabled = false;
-  let autoAcceptDelay = 0; // 秒
-
-  ipcMain.handle('client:setAutoAccept', async (_event, enabled: boolean, delay: number) => {
-    autoAcceptEnabled = enabled;
-    autoAcceptDelay = delay;
-    logger.info(`自动接受对局: ${enabled ? '开启' : '关闭'}，延迟 ${delay} 秒`);
+  ipcMain.handle('client:setAutoAccept', (_event, enabled: unknown, delay: unknown) => {
+    if (typeof enabled !== 'boolean') throw new Error('无效的自动接受设置');
+    const settings = { enabled, delay: normalizeAutoAcceptDelay(delay) };
+    cacheStore.setSetting('autoAccept', settings);
+    logger.info(`自动接受对局: ${enabled ? '开启' : '关闭'}，延迟 ${settings.delay} 秒`);
     return { success: true };
   });
 
-  ipcMain.handle('client:getAutoAccept', async () => {
-    return { enabled: autoAcceptEnabled, delay: autoAcceptDelay };
-  });
+  ipcMain.handle('client:getAutoAccept', getAutoAcceptSettings);
 
   // ─── 选人阶段 session 获取 ────────────────────────────
 
@@ -103,27 +127,4 @@ export function registerClientSettingsIpcHandlers(): void {
       throw err;
     }
   });
-
-  // 暴露状态检查供 WebSocket 事件使用
-  registerAutoAcceptState(() => autoAcceptEnabled, () => autoAcceptDelay);
-}
-
-// 自动接受状态回调
-let _getAutoAcceptEnabled: () => boolean = () => false;
-let _getAutoAcceptDelay: () => number = () => 0;
-
-function registerAutoAcceptState(
-  getEnabled: () => boolean,
-  getDelay: () => number,
-): void {
-  _getAutoAcceptEnabled = getEnabled;
-  _getAutoAcceptDelay = getDelay;
-}
-
-export function isAutoAcceptEnabled(): boolean {
-  return _getAutoAcceptEnabled();
-}
-
-export function getAutoAcceptDelay(): number {
-  return _getAutoAcceptDelay();
 }

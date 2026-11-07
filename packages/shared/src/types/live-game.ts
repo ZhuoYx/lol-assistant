@@ -3,6 +3,7 @@ export interface LiveGameAnalysis {
   gameId: number;
   gameMode: string;
   queueId?: number;
+  champSelectChatId?: string;
   teams: LiveGameTeam[];
 }
 

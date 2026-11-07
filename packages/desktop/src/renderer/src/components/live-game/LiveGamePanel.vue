@@ -21,8 +21,10 @@
         <span class="session-badge">本局概览</span>
       </div>
       <p>
-        <span>对局 #{{ analysis.gameId }}</span
-        ><span class="meta-dot">·</span><span>玩家数据来自客户端</span>
+        <template v-if="analysis.gameId">
+          <span>对局 #{{ analysis.gameId }}</span><span class="meta-dot">·</span>
+        </template>
+        <span>玩家数据来自客户端</span>
       </p>
     </div>
     <button class="refresh-btn" :disabled="refreshing" @click="$emit('refresh')">

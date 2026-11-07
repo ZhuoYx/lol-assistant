@@ -6,6 +6,7 @@ export const useLiveGameStore = defineStore('live-game', () => {
   const analysis = ref<LiveGameAnalysis | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
+  let requestId = 0;
 
   const hasData = computed(() => analysis.value !== null);
 
@@ -45,20 +46,24 @@ export const useLiveGameStore = defineStore('live-game', () => {
   });
 
   async function fetchLiveGame() {
+    const id = ++requestId;
     loading.value = true;
     error.value = null;
     try {
-      analysis.value = await window.electronAPI.analyzeLiveGame();
+      const result = await window.electronAPI.analyzeLiveGame();
+      if (id === requestId) analysis.value = result;
     } catch (e) {
-      error.value = e instanceof Error ? e.message : '获取对局分析失败';
+      if (id === requestId) error.value = e instanceof Error ? e.message : '获取对局分析失败';
     } finally {
-      loading.value = false;
+      if (id === requestId) loading.value = false;
     }
   }
 
   function clear() {
+    ++requestId;
     analysis.value = null;
     error.value = null;
+    loading.value = false;
   }
 
   return {

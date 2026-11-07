@@ -5,6 +5,7 @@
  * 所有事件监听器均返回 unsubscribe 函数，防止内存泄漏
  */
 import { contextBridge, ipcRenderer } from 'electron';
+import type { ChatAvailability } from '@lol-assistant/shared';
 
 /**
  * 创建安全的事件监听器，返回 unsubscribe 函数
@@ -61,6 +62,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ─── 对局实时分析 ──────────────────────────────────────
   analyzeLiveGame: () => ipcRenderer.invoke('live-game:analyze'),
+  shareLiveGameSummary: (text: string, conversationId?: string) =>
+    ipcRenderer.invoke('live-game:share-summary', text, conversationId),
 
   // ─── 第三方数据 ────────────────────────────────────────
   getMayhemRecommendations: (championId: number, refresh = false) =>
@@ -157,6 +160,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 个性签名
   getStatusMessage: () => ipcRenderer.invoke('client:getStatusMessage'),
   setStatusMessage: (message: string) => ipcRenderer.invoke('client:setStatusMessage', message),
+  getChatAvailability: () => ipcRenderer.invoke('client:getChatAvailability'),
+  setChatAvailability: (availability: ChatAvailability) =>
+    ipcRenderer.invoke('client:setChatAvailability', availability),
 
   // ARAM 板凳英雄交换
   benchSwap: (championId: number) => ipcRenderer.invoke('client:benchSwap', championId),
