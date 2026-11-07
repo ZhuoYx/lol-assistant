@@ -2,12 +2,16 @@ import axios from 'axios';
 import { app } from 'electron';
 import fs from 'fs/promises';
 import path from 'path';
-import { parse } from 'node-html-parser';
+import { parse, type HTMLElement } from 'node-html-parser';
 import {
   CHAMPION_ID_MAP,
   getChampionDisplayName,
+  isMayhemItemIconUrl,
   type MayhemAugmentRarity,
   type MayhemChampionRecommendations,
+  type MayhemEquipmentCategory,
+  type MayhemEquipmentGroup,
+  type MayhemItemRecommendation,
 } from '@lol-assistant/shared';
 
 const ORIGIN = 'https://arammayhem.com';
@@ -25,7 +29,7 @@ export function mayhemSourceUrl(value: string): string {
     url.username ||
     url.password ||
     url.search ||
-    !/^\/(?:zh-cn\/)?(?:build\/(?:[a-z0-9-]+\/?)?|augments\/[a-z0-9-]+\/?|data\/?)?$/.test(
+    !/^\/(?:zh-cn\/)?(?:build\/(?:[a-z0-9-]+\/?)?|augments\/[a-z0-9-]+\/?|items\/[a-z0-9_-]+\/?|data\/?)?$/.test(
       url.pathname,
     )
   ) {
@@ -37,6 +41,66 @@ export function mayhemSourceUrl(value: string): string {
 function rankValue(value: string) {
   const match = value.match(/([SABCD][+-]?)\s*·\s*#(\d+)/);
   return match ? { tier: match[1], rank: Number(match[2]) } : undefined;
+}
+
+function percentage(text: string, label: string): number | undefined {
+  const match = text.match(new RegExp(label + '\\s*[:：]?\\s*(\\d+(?:\\.\\d+)?)\\s*%'));
+  const value = match ? Number(match[1]) : undefined;
+  return value !== undefined && value >= 0 && value <= 100 ? value : undefined;
+}
+
+function parseMayhemItem(link: HTMLElement): MayhemItemRecommendation | undefined {
+  try {
+    const sourceUrl = mayhemSourceUrl(link.getAttribute('href') || '');
+    const slug = new URL(sourceUrl).pathname.match(/\/items\/([a-z0-9_-]+)\/?$/)?.[1];
+    const image = link.querySelector('img');
+    const name = (link.getAttribute('title') || image?.getAttribute('alt') || link.text).trim();
+    if (!slug || !name) return undefined;
+    const icon = image?.getAttribute('src');
+    const iconUrl = icon ? new URL(icon, ORIGIN).href : undefined;
+    return {
+      slug,
+      name,
+      sourceUrl,
+      iconUrl: iconUrl && isMayhemItemIconUrl(iconUrl) ? iconUrl : undefined,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+function parseMayhemEquipment(root: HTMLElement): MayhemEquipmentGroup[] {
+  const marker = root.querySelector('#mayhem-build');
+  if (!marker?.parentNode) return [];
+  const siblings = marker.parentNode.children;
+  const categories: Record<string, MayhemEquipmentCategory> = {
+    出门装: 'starting',
+    鞋子: 'boots',
+    核心出装: 'core',
+    其他成装: 'situational',
+  };
+  const groups: MayhemEquipmentGroup[] = [];
+  // 装备区块紧跟出装标题，遇到下一个带 ID 的区块时停止，排除历史快照。
+  for (const section of siblings.slice(siblings.indexOf(marker) + 1)) {
+    if (section.id) break;
+    if (section.tagName !== 'SECTION') continue;
+    const label = section.children[0]?.text.trim();
+    const category = label ? categories[label] : undefined;
+    if (!category || groups.some((group) => group.category === category)) continue;
+    const group: MayhemEquipmentGroup = { category, options: [] };
+    for (const row of section.children[1]?.children ?? []) {
+      const links = row.querySelectorAll('a[href]');
+      const items = links.map(parseMayhemItem);
+      if (!items.length || items.some((item) => !item)) continue;
+      group.options.push({
+        items: items as MayhemItemRecommendation[],
+        pickRate: percentage(row.text, '登场率'),
+        winRate: percentage(row.text, '胜率'),
+      });
+    }
+    if (group.options.length) groups.push(group);
+  }
+  return groups;
 }
 
 /** Parse only the visible hero-specific section, without executing site scripts. */
@@ -68,6 +132,7 @@ export function parseMayhemChampion(
         ?.getAttribute('data-recommendation-coverage') === 'partial',
     stale: false,
     augments: [],
+    equipmentGroups: parseMayhemEquipment(root),
     patch: root
       .querySelector('meta[property="og:title"]')
       ?.getAttribute('content')
@@ -203,7 +268,12 @@ export class AramMayhemProvider {
     if (pending) return pending;
     const request = (async () => {
       const cached = await this.read<MayhemChampionRecommendations>(`hero-${championId}`);
-      if (!refresh && cached && Date.now() - cached.savedAt < TTL)
+      if (
+        !refresh &&
+        cached &&
+        Array.isArray(cached.data.equipmentGroups) &&
+        Date.now() - cached.savedAt < TTL
+      )
         return { ...cached.data, stale: false };
       try {
         const catalog = await this.catalog(refresh);
@@ -217,7 +287,12 @@ export class AramMayhemProvider {
         await this.write(`hero-${championId}`, result);
         return result;
       } catch {
-        if (cached) return { ...cached.data, stale: true };
+        if (cached)
+          return {
+            ...cached.data,
+            equipmentGroups: cached.data.equipmentGroups ?? [],
+            stale: true,
+          };
         throw new Error('暂时无法获取 ARAMMayhem 英雄推荐，请检查网络后重试');
       }
     })();

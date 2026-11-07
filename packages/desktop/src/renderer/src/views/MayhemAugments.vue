@@ -1,13 +1,13 @@
 <template>
   <div class="page mayhem-page">
-    <PageHeader title="海克斯推荐" subtitle="按英雄查看海克斯大乱斗强化推荐" />
+    <PageHeader title="海克斯推荐" subtitle="按英雄查看海克斯大乱斗强化与装备推荐" />
     <ChampionPicker v-model="selectedChampionId" />
     <MayhemAugmentPanel v-if="selectedChampionId" :champion-id="selectedChampionId" />
     <EmptyState
       v-else
       class="glass-panel"
       title="选择一个英雄"
-      description="搜索英雄，查看对应的海克斯大乱斗强化推荐"
+      description="搜索英雄，查看对应的海克斯大乱斗强化与装备推荐"
     />
   </div>
 </template>

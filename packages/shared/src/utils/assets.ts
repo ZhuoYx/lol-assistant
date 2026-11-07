@@ -12,6 +12,13 @@
 const DDRAGON_BASE = 'https://ddragon.leagueoflegends.com';
 const DDRAGON_CDN = `${DDRAGON_BASE}/cdn`;
 
+/** ARAMMayhem 英雄出装页使用的装备图标 CDN。 */
+export function isMayhemItemIconUrl(value: string): boolean {
+  return /^https:\/\/pub-2322c7068eed43b08bc0dddf6528d1e2\.r2\.dev\/v1\/items\/icons\/[a-z0-9_-]+\/(?:64|128)\.png$/.test(
+    value,
+  );
+}
+
 /**
  * 获取当前最新游戏版本列表
  * 返回 URL，实际请求由调用方处理

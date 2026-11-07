@@ -21,6 +21,7 @@ import {
   getDDragonVersionsUrl,
   extractMajorVersion,
   getAssetCacheKey,
+  isMayhemItemIconUrl,
 } from '@lol-assistant/shared';
 
 /** 资源缓存目录 */
@@ -108,7 +109,10 @@ export class AssetCacheManager {
 
     // The URL includes patch and origin. An ID alone can reuse an obsolete icon.
     assetType = assetType.replace(/[^a-zA-Z0-9_-]/g, '_');
-    const version = new URL(remoteUrl).hostname === 'arammayhem.com' ? this.currentVersion : '';
+    const version =
+      new URL(remoteUrl).hostname === 'arammayhem.com' || isMayhemItemIconUrl(remoteUrl)
+        ? this.currentVersion
+        : '';
     assetId = createHash('sha256')
       .update(remoteUrl + version)
       .digest('hex');
@@ -361,9 +365,9 @@ export class AssetCacheManager {
       const parsed = new URL(url);
       if (
         parsed.protocol !== 'https:' ||
-        !['raw.communitydragon.org', 'ddragon.leagueoflegends.com', 'arammayhem.com'].includes(
+        (!['raw.communitydragon.org', 'ddragon.leagueoflegends.com', 'arammayhem.com'].includes(
           parsed.hostname,
-        ) ||
+        ) && !isMayhemItemIconUrl(url)) ||
         (parsed.hostname === 'arammayhem.com' &&
           (parsed.origin !== 'https://arammayhem.com' ||
             !/^\/augments\/[^/]+\.(?:png|webp|jpg)$/i.test(parsed.pathname))) ||

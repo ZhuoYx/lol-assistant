@@ -736,6 +736,14 @@ test('renderer icon requests share a download and pin current-patch URLs', async
   assert.equal(downloads,1);assert.equal(received,'https://raw.communitydragon.org/16.21/icon.png');
   await cachedImageSource('https://ddragon.leagueoflegends.com/cdn/16.5.1/img/item/3020.png');
   assert.ok(received.includes('/16.21.1/'));assert.equal(await cachedImageSource('data:image/png;base64,local'),'data:image/png;base64,local');
+  const itemIcon = 'https://pub-2322c7068eed43b08bc0dddf6528d1e2.r2.dev/v1/items/icons/rite_of_ruin/64.png';
+  const { isMayhemItemIconUrl } = scopedRequire('@lol-assistant/shared');
+  assert.equal(isMayhemItemIconUrl(itemIcon), true);
+  assert.equal(isMayhemItemIconUrl(itemIcon.replace('/v1/items/', '/other/')), false);
+  assert.equal(isMayhemItemIconUrl(itemIcon + '?redirect=elsewhere'), false);
+  assert.equal(isMayhemItemIconUrl(itemIcon.replace('.r2.dev/', '.r2.dev.evil.example/')), false);
+  await cachedImageSource(itemIcon);
+  assert.equal(received, itemIcon);
 });
 
 const mayhemPage = `<!doctype html><html><head>
@@ -785,6 +793,40 @@ test('Mayhem rejects mismatched and changed pages instead of showing unrelated d
   assert.equal(mayhemSourceUrl('/zh-cn/build/'),'https://arammayhem.com/zh-cn/build/');
 });
 
+test('Mayhem equipment keeps item combinations and hero rates separate from history and rejects foreign items', () => {
+  const { parseMayhemChampion, mayhemSourceUrl } = mayhemModule('unused');
+  const iconBase = 'https://pub-2322c7068eed43b08bc0dddf6528d1e2.r2.dev/v1/items/icons/';
+  const item = (slug, name) =>
+    '<a href="/zh-cn/items/' + slug + '/" title="' + name + '"><img src="' + iconBase + slug + '/64.png"><span>' + name + '</span></a>';
+  const option = (items, stats = '') => '<div><div>' + items + '</div><div>' + stats + '</div></div>';
+  const group = (title, rows) => '<section><div>' + title + '</div><div>' + rows + '</div></section>';
+  const equipment = '<section id="mayhem-build"><h2>海克斯大乱斗出装与强化</h2></section>' +
+    group('出门装', option(item('health_potion', '生命药水') + item('health_potion', '生命药水'), '登场率 0.00% 胜率 50.25%')) +
+    group('鞋子', option(item('berserkers_greaves', '狂战士胫甲'))) +
+    group('核心出装', option(item('rite_of_ruin', '毁坏仪式') + item('deaths_dance', '死亡之舞'), '登场率 6.99% 胜率 61.72%') +
+      option(item('rite_of_ruin', '毁坏仪式') + '<a href="https://untrusted.example/zh-cn/items/wrong/" title="错误装备">错误装备</a>')) +
+    group('其他成装', option(item('infinity_edge', '无尽之刃'), '登场率 120% 胜率 0.00%')) +
+    '<section id="stats-history">出门装 ' + item('old_item', '过期装备') + ' 登场率 99.99%</section>' +
+    group('鞋子', option(item('old_boots', '过期鞋子'), '登场率 99.99%'));
+  const html = mayhemPage.replace('</body>', equipment + '</body>');
+  const data = parseMayhemChampion(html, 157, 'https://arammayhem.com/zh-cn/build/yasuo/');
+  assert.deepEqual(data.equipmentGroups.map((group) => group.category), ['starting', 'boots', 'core', 'situational']);
+  const [starting, boots, core, situational] = data.equipmentGroups;
+  assert.deepEqual(starting.options[0].items.map((item) => item.slug), ['health_potion', 'health_potion']);
+  assert.equal(starting.options[0].pickRate, 0);
+  assert.equal(boots.options[0].winRate, undefined);
+  assert.equal(core.options.length, 1);
+  assert.equal(core.options[0].pickRate, 6.99);
+  assert.equal(core.options[0].winRate, 61.72);
+  assert.equal(core.options[0].items[0].iconUrl, iconBase + 'rite_of_ruin/64.png');
+  assert.equal(situational.options[0].pickRate, undefined);
+  assert.equal(situational.options[0].winRate, 0);
+  assert.ok(mayhemSourceUrl('/zh-cn/items/rite_of_ruin/').endsWith('/items/rite_of_ruin/'));
+  const withoutAugments = parseMayhemChampion(html.replace('top="mapped"', 'top="global"'), 157, data.sourceUrl);
+  assert.equal(withoutAugments.augments.length, 0);
+  assert.equal(withoutAugments.equipmentGroups.length, 4);
+});
+
 test('Mayhem requests share downloads, persist caches and mark old data when refresh fails', async () => {
   const fs=require('node:fs/promises');const path=require('node:path');const base=resolve(root,'../../specs');await fs.mkdir(base,{recursive:true});
   const directory=await fs.mkdtemp(join(base,'test-mayhem-'));
@@ -796,6 +838,18 @@ test('Mayhem requests share downloads, persist caches and mark old data when ref
     const restarted=new AramMayhemProvider();restarted.http={get:async()=>{throw Error('offline');}};
     assert.equal((await restarted.getChampion(157)).augments[0].pickRate,16.05);
     const stale=await restarted.getChampion(157,true);assert.equal(stale.stale,true);assert.equal(stale.fetchedAt,first.fetchedAt);
+    const cacheFile = join(directory, 'aram-mayhem/hero-157.json');
+    const oldCache = JSON.parse(await fs.readFile(cacheFile, 'utf8'));
+    delete oldCache.data.equipmentGroups;
+    await fs.writeFile(cacheFile, JSON.stringify(oldCache));
+    const legacy = await restarted.getChampion(157);
+    assert.equal(legacy.stale, true);
+    assert.deepEqual(legacy.equipmentGroups, []);
+    let refreshes = 0;
+    const upgraded = new AramMayhemProvider();
+    upgraded.http = { get: async () => { refreshes++; return { data: mayhemPage }; } };
+    assert.deepEqual((await upgraded.getChampion(157)).equipmentGroups, []);
+    assert.equal(refreshes, 1);
     await assert.rejects(restarted.getChampion(99),/暂时无法获取/);await assert.rejects(restarted.getChampion(-1),/有效英雄/);
   } finally {assert.ok(directory.startsWith(base+path.sep+'test-mayhem-'));await fs.rm(directory,{recursive:true,force:true});}
 });

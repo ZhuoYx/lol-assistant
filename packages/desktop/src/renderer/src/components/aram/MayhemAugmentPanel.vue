@@ -4,7 +4,7 @@
       <ChampionIcon :champion-id="championId" :name="championName" size="md" />
       <div class="mayhem-title">
         <h2>{{ championName }}</h2>
-        <p>海克斯大乱斗 · 强化推荐</p>
+        <p>海克斯大乱斗 · 强化与装备推荐</p>
       </div>
       <div class="mayhem-actions">
         <a :href="sourceUrl" @click.prevent="openSource(sourceUrl)">数据：ARAMMayhem ↗</a>
@@ -14,7 +14,7 @@
       </div>
     </header>
     <div v-if="loading && !data" class="mayhem-state" role="status">
-      <LoadingSpinner size="sm" />正在获取英雄强化推荐…
+      <LoadingSpinner size="sm" />正在获取英雄推荐…
     </div>
     <div v-else-if="error && !data" class="mayhem-state error" role="alert">
       <p>{{ error }}</p>
@@ -28,77 +28,104 @@
           >网络暂不可用，显示 {{ formatDate(data.fetchedAt) }} 的缓存</span
         >
       </div>
-      <p v-if="data.partial" class="mayhem-notice" role="status">
-        来源标注部分推荐缺失，以下展示已提供的英雄推荐。
-      </p>
-      <p v-if="!data.augments.length" class="mayhem-state">
-        来源暂未提供这个英雄的强化推荐，可打开来源页查看。
-      </p>
-      <div v-else class="mayhem-groups">
-        <section
-          v-for="group in groups"
-          :key="group.rarity"
-          class="mayhem-group"
-          :class="group.rarity"
-          :aria-label="group.label"
-        >
-          <h3>
-            <span class="rarity-mark" />{{ group.label
-            }}<span class="group-count">{{ group.items.length }}</span>
-          </h3>
-          <p v-if="!group.items.length" class="group-empty">来源暂未提供此类强化</p>
-          <a
-            v-for="augment in group.items.slice(0, expanded ? undefined : 3)"
-            :key="augment.slug"
-            class="augment-row"
-            :href="augment.sourceUrl"
-            @click.prevent="openSource(augment.sourceUrl)"
-          >
-            <span class="augment-icon">
-              <img
-                v-if="augment.iconUrl && !failedIconSlugs.has(augment.slug)"
-                :key="augment.iconUrl"
-                v-cached-src="augment.iconUrl"
-                :alt="augment.name"
-                loading="lazy"
-                @error="failedIconSlugs.add(augment.slug)"
-              />
-              <span v-else aria-hidden="true">{{ augment.name.charAt(0) }}</span>
-            </span>
-            <span class="augment-content"
-              ><strong>{{ augment.name }}</strong
-              ><span class="augment-metrics"
-                ><span
-                  v-if="augment.sourceTier"
-                  class="source-tier"
-                  :title="`来源评级${augment.sourceRank ? '，该稀有度排名 ' + augment.sourceRank : ''}`"
-                  >{{ augment.sourceTier
-                  }}<template v-if="augment.sourceRank">
-                    · #{{ augment.sourceRank }}</template
-                  ></span
-                ><span
-                  >登场率
-                  {{
-                    augment.pickRate === undefined ? '—' : augment.pickRate.toFixed(2) + '%'
-                  }}</span
-                ></span
-              ></span
-            >
-            <span class="source-arrow" aria-hidden="true">↗</span>
-          </a>
-        </section>
-      </div>
-      <footer class="mayhem-footer">
-        <p>百分比为该英雄的强化登场率；评级沿用来源标注。缺失项显示“—”。</p>
+      <div class="recommendation-tabs" aria-label="推荐类型">
         <button
-          v-if="compact && data.augments.length > 9"
-          class="expand-button"
-          :aria-expanded="expanded"
-          @click="expanded = !expanded"
+          type="button"
+          :class="{ active: activeTab === 'augments' }"
+          :aria-pressed="activeTab === 'augments'"
+          @click="activeTab = 'augments'"
         >
-          {{ expanded ? '收起部分强化' : '展开全部强化' }}
+          强化推荐
         </button>
-      </footer>
+        <button
+          type="button"
+          :class="{ active: activeTab === 'equipment' }"
+          :aria-pressed="activeTab === 'equipment'"
+          @click="activeTab = 'equipment'"
+        >
+          装备推荐
+        </button>
+      </div>
+      <MayhemEquipmentPanel
+        v-if="activeTab === 'equipment'"
+        :key="championId"
+        :groups="data.equipmentGroups ?? []"
+        :compact="compact"
+        @open-source="openSource"
+      />
+      <template v-else>
+        <p v-if="data.partial" class="mayhem-notice" role="status">
+          来源标注部分推荐缺失，以下展示已提供的英雄推荐。
+        </p>
+        <p v-if="!data.augments.length" class="mayhem-state">
+          来源暂未提供这个英雄的强化推荐，可打开来源页查看。
+        </p>
+        <div v-else class="mayhem-groups">
+          <section
+            v-for="group in groups"
+            :key="group.rarity"
+            class="mayhem-group"
+            :class="group.rarity"
+            :aria-label="group.label"
+          >
+            <h3>
+              <span class="rarity-mark" />{{ group.label
+              }}<span class="group-count">{{ group.items.length }}</span>
+            </h3>
+            <p v-if="!group.items.length" class="group-empty">来源暂未提供此类强化</p>
+            <a
+              v-for="augment in group.items.slice(0, expanded ? undefined : 3)"
+              :key="augment.slug"
+              class="augment-row"
+              :href="augment.sourceUrl"
+              @click.prevent="openSource(augment.sourceUrl)"
+            >
+              <span class="augment-icon">
+                <img
+                  v-if="augment.iconUrl && !failedIconSlugs.has(augment.slug)"
+                  :key="augment.iconUrl"
+                  v-cached-src="augment.iconUrl"
+                  :alt="augment.name"
+                  loading="lazy"
+                  @error="failedIconSlugs.add(augment.slug)"
+                />
+                <span v-else aria-hidden="true">{{ augment.name.charAt(0) }}</span>
+              </span>
+              <span class="augment-content"
+                ><strong>{{ augment.name }}</strong
+                ><span class="augment-metrics"
+                  ><span
+                    v-if="augment.sourceTier"
+                    class="source-tier"
+                    :title="`来源评级${augment.sourceRank ? '，该稀有度排名 ' + augment.sourceRank : ''}`"
+                    >{{ augment.sourceTier
+                    }}<template v-if="augment.sourceRank">
+                      · #{{ augment.sourceRank }}</template
+                    ></span
+                  ><span
+                    >登场率
+                    {{
+                      augment.pickRate === undefined ? '—' : augment.pickRate.toFixed(2) + '%'
+                    }}</span
+                  ></span
+                ></span
+              >
+              <span class="source-arrow" aria-hidden="true">↗</span>
+            </a>
+          </section>
+        </div>
+        <footer class="mayhem-footer">
+          <p>百分比为该英雄的强化登场率；评级沿用来源标注。缺失项显示“—”。</p>
+          <button
+            v-if="compact && data.augments.length > 9"
+            class="expand-button"
+            :aria-expanded="expanded"
+            @click="expanded = !expanded"
+          >
+            {{ expanded ? '收起部分强化' : '展开全部强化' }}
+          </button>
+        </footer>
+      </template>
     </template>
   </section>
 </template>
@@ -112,6 +139,7 @@ import {
   type MayhemAugmentRarity,
 } from '@lol-assistant/shared';
 import { ChampionIcon, LoadingSpinner } from '@/components/common';
+import MayhemEquipmentPanel from './MayhemEquipmentPanel.vue';
 
 const props = withDefaults(defineProps<{ championId: number; compact?: boolean }>(), {
   compact: false,
@@ -119,6 +147,7 @@ const props = withDefaults(defineProps<{ championId: number; compact?: boolean }
 const data = ref<MayhemChampionRecommendations | null>(null);
 const loading = ref(false);
 const error = ref('');
+const activeTab = ref<'augments' | 'equipment'>('augments');
 const expanded = ref(!props.compact);
 const failedIconSlugs = ref(new Set<string>());
 let generation = 0;
@@ -243,6 +272,31 @@ onBeforeUnmount(() => {
 }
 .cache-notice {
   color: var(--color-highlight-text);
+}
+.recommendation-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 20px 14px;
+}
+.recommendation-tabs button {
+  min-height: 34px;
+  padding: 7px 16px;
+  border: 1px solid var(--color-filter-border);
+  border-radius: 9px;
+  color: var(--color-text-secondary);
+  background: var(--color-filter-bg);
+  font-size: 12px;
+  font-weight: 600;
+}
+.recommendation-tabs button.active {
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+}
+.recommendation-tabs button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
 }
 .mayhem-notice {
   margin: 4px 20px 12px;

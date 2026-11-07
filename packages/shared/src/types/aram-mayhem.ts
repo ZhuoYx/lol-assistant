@@ -14,6 +14,26 @@ export interface MayhemAugmentRecommendation {
   overallRank?: number;
 }
 
+export type MayhemEquipmentCategory = 'starting' | 'boots' | 'core' | 'situational';
+
+export interface MayhemItemRecommendation {
+  slug: string;
+  name: string;
+  iconUrl?: string;
+  sourceUrl: string;
+}
+
+export interface MayhemEquipmentOption {
+  items: MayhemItemRecommendation[];
+  pickRate?: number;
+  winRate?: number;
+}
+
+export interface MayhemEquipmentGroup {
+  category: MayhemEquipmentCategory;
+  options: MayhemEquipmentOption[];
+}
+
 export interface MayhemChampionRecommendations {
   championId: number;
   championName: string;
@@ -25,4 +45,5 @@ export interface MayhemChampionRecommendations {
   partial: boolean;
   stale: boolean;
   augments: MayhemAugmentRecommendation[];
+  equipmentGroups: MayhemEquipmentGroup[];
 }

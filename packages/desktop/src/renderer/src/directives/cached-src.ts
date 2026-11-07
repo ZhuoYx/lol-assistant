@@ -1,4 +1,5 @@
 import type { ObjectDirective } from 'vue';
+import { isMayhemItemIconUrl } from '@lol-assistant/shared';
 
 const requests = new Map<string, Promise<string>>();
 const pending = new WeakMap<HTMLImageElement, object>();
@@ -8,7 +9,8 @@ export function cachedImageSource(src: string): Promise<string> {
   if (
     !/^https:\/\/(raw\.communitydragon\.org|ddragon\.leagueoflegends\.com|arammayhem\.com)\//.test(
       src,
-    )
+    ) &&
+    !isMayhemItemIconUrl(src)
   ) {
     return Promise.resolve(src);
   }
